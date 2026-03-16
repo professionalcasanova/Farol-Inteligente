@@ -1,10 +1,9 @@
-using System.Security.Claims;
+using Farol.Api.Common;
 using Farol.Domain.Ledger;
 using Farol.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.JsonWebTokens;
 
 namespace Farol.Api.Modules.Accounts;
 
@@ -18,7 +17,7 @@ public sealed class AccountsController(FarolDbContext dbContext) : ControllerBas
         CreateAccountRequest request,
         CancellationToken cancellationToken)
     {
-        if (!TryGetAuthenticatedUserId(out var userId))
+        if (!AuthenticatedUser.TryGetUserId(User, out var userId))
         {
             return Unauthorized(new { message = "Invalid access token." });
         }
@@ -48,7 +47,7 @@ public sealed class AccountsController(FarolDbContext dbContext) : ControllerBas
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<AccountResponse>>> List(CancellationToken cancellationToken)
     {
-        if (!TryGetAuthenticatedUserId(out var userId))
+        if (!AuthenticatedUser.TryGetUserId(User, out var userId))
         {
             return Unauthorized(new { message = "Invalid access token." });
         }
@@ -76,7 +75,7 @@ public sealed class AccountsController(FarolDbContext dbContext) : ControllerBas
         UpdateAccountRequest request,
         CancellationToken cancellationToken)
     {
-        if (!TryGetAuthenticatedUserId(out var userId))
+        if (!AuthenticatedUser.TryGetUserId(User, out var userId))
         {
             return Unauthorized(new { message = "Invalid access token." });
         }
@@ -116,15 +115,6 @@ public sealed class AccountsController(FarolDbContext dbContext) : ControllerBas
 
         return Ok(ToResponse(account));
     }
-
-    private bool TryGetAuthenticatedUserId(out Guid userId)
-    {
-        var userIdValue = User.FindFirstValue(JwtRegisteredClaimNames.Sub)
-            ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-        return Guid.TryParse(userIdValue, out userId);
-    }
-
     private static AccountResponse ToResponse(FinancialAccount account)
     {
         return new AccountResponse

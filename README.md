@@ -16,6 +16,7 @@ Sprint 1 concluida e Sprint 2 iniciada com:
 - testes unitarios e testes de API para autenticacao e contas
 
 O projeto ainda nao possui endpoints de transacoes, dashboard mensal ou bills.
+O projeto ainda nao possui dashboard mensal ou bills.
 
 ## Stack atual
 
@@ -112,6 +113,22 @@ Regras atuais:
 - a listagem retorna apenas contas do usuario autenticado
 - atualizacao respeita ownership por `userId`
 - validacoes do dominio continuam centralizadas em `FinancialAccount`
+
+## Categorias e transacoes
+
+Endpoints disponiveis:
+
+- `GET /api/categories`
+- `GET /api/transactions`
+- `POST /api/transactions`
+- `PUT /api/transactions/{id}`
+
+Regras atuais:
+
+- categorias listam categorias de sistema e categorias do usuario autenticado
+- transacoes respeitam ownership por `userId`
+- transacoes exigem conta financeira do usuario autenticado
+- categoria, quando informada, deve ser visivel ao usuario e compativel com o tipo da transacao
 
 ## Banco local
 
