@@ -55,3 +55,20 @@ For each completed step:
 2. Automated tests pass
 3. Manual validation steps are documented when needed
 4. Key tradeoffs are documented briefly
+
+## Version control rules
+
+The agent must use git commits to keep track of changes.
+
+Rules:
+
+- Every meaningful step must be committed
+- Commit messages must follow conventional commits
+- Never commit broken builds
+- Tests must pass before committing
+
+Before committing:
+1. Run build
+2. Run tests
+3. Confirm success
+4. Then commit
