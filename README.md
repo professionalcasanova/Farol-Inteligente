@@ -4,7 +4,7 @@ Farol e um assistente financeiro pessoal para o mercado brasileiro, construido c
 
 ## Estado atual
 
-Sprint 1 e Sprint 2 concluidas com:
+Sprint 1, Sprint 2 e Sprint 3 concluidas com:
 
 - estrutura base da solution em .NET
 - dominio inicial
@@ -182,3 +182,7 @@ Fechamento detalhado da Sprint 1:
 Fechamento detalhado da Sprint 2:
 
 - [docs/sprints/sprint-2.md](docs/sprints/sprint-2.md)
+
+Fechamento detalhado da Sprint 3:
+
+- [docs/sprints/sprint-3.md](docs/sprints/sprint-3.md)
