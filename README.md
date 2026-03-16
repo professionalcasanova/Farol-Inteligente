@@ -4,7 +4,7 @@ Farol e um assistente financeiro pessoal para o mercado brasileiro, construido c
 
 ## Estado atual
 
-Sprint 1, Sprint 2, Sprint 3 e Sprint 4 concluidas com:
+Sprint 1, Sprint 2, Sprint 3 e Sprint 4 concluidas, com Sprint 5 em andamento:
 
 - estrutura base da solution em .NET
 - dominio inicial
@@ -17,7 +17,8 @@ Sprint 1, Sprint 2, Sprint 3 e Sprint 4 concluidas com:
 - endpoint de resumo mensal
 - endpoints de orcamento mensal por categoria
 - endpoint de importacao CSV de transacoes com categorizacao simples por regras
-- testes unitarios e testes de API para autenticacao, contas, categorias, transacoes, resumo mensal, orcamento e importacao CSV
+- endpoint de insight de dinheiro livre
+- testes unitarios e testes de API para autenticacao, contas, categorias, transacoes, resumo mensal, orcamento, importacao CSV e insights
 
 O projeto ainda nao possui bills.
 
@@ -179,6 +180,22 @@ Fluxo atual:
 - usa `categoryName` quando valido
 - tenta categorizacao simples por regras quando `categoryName` vier vazio
 - linhas invalidas sao ignoradas com erro registrado no resumo
+
+## Insights
+
+Endpoint disponivel:
+
+- `GET /api/insights/free-money?month={m}&year={y}`
+
+Retorno atual:
+
+- `totalIncome`
+- `totalExpense`
+- `balance`
+- `totalPlannedBudget`
+- `totalBudgetSpent`
+- `totalBudgetRemaining`
+- `freeToSpend`
 
 ## Banco local
 
