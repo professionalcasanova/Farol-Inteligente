@@ -15,7 +15,6 @@ Sprint 1 concluida e Sprint 2 iniciada com:
 - endpoints de contas financeiras
 - testes unitarios e testes de API para autenticacao e contas
 
-O projeto ainda nao possui endpoints de transacoes, dashboard mensal ou bills.
 O projeto ainda nao possui dashboard mensal ou bills.
 
 ## Stack atual
@@ -55,7 +54,7 @@ docker compose up -d
 $env:DOTNET_CLI_HOME='c:\Users\masuc\Desktop\PensarNoNome\.dotnet'
 $env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE='1'
 dotnet restore Farol.sln
-dotnet build Farol.sln --no-restore -m:1 -v minimal
+dotnet build Farol.sln --no-restore -c Release -m:1 -v minimal
 ```
 
 ### 3. Aplicar migration
@@ -71,7 +70,7 @@ dotnet build Farol.sln --no-restore -m:1 -v minimal
 ### 4. Subir a API
 
 ```powershell
-dotnet run --project src/Farol.Api/Farol.Api.csproj --no-build
+dotnet run --project src/Farol.Api/Farol.Api.csproj -c Release --no-build
 ```
 
 Swagger:
@@ -81,7 +80,7 @@ Swagger:
 ### 5. Rodar testes
 
 ```powershell
-dotnet test tests/Farol.Tests/Farol.Tests.csproj -m:1 -v minimal
+dotnet test tests/Farol.Tests/Farol.Tests.csproj --no-build -c Release -m:1 -v minimal
 ```
 
 ## Autenticacao atual
