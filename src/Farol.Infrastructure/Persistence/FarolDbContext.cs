@@ -1,3 +1,4 @@
+using Farol.Domain.Budgets;
 using Farol.Domain.Categories;
 using Farol.Domain.Ledger;
 using Farol.Domain.Users;
@@ -11,6 +12,8 @@ public sealed class FarolDbContext(DbContextOptions<FarolDbContext> options) : D
     public DbSet<FinancialAccount> FinancialAccounts => Set<FinancialAccount>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Transaction> Transactions => Set<Transaction>();
+    public DbSet<MonthlyBudget> MonthlyBudgets => Set<MonthlyBudget>();
+    public DbSet<MonthlyBudgetCategory> MonthlyBudgetCategories => Set<MonthlyBudgetCategory>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

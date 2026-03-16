@@ -15,7 +15,8 @@ Sprint 1 e Sprint 2 concluidas com:
 - endpoints de contas financeiras
 - endpoints de categorias e transacoes
 - endpoint de resumo mensal
-- testes unitarios e testes de API para autenticacao, contas, categorias, transacoes e resumo mensal
+- endpoints de orcamento mensal por categoria
+- testes unitarios e testes de API para autenticacao, contas, categorias, transacoes, resumo mensal e orcamento
 
 O projeto ainda nao possui bills.
 
@@ -148,6 +149,20 @@ Retorno atual:
 - `totalExpense`
 - `balance`
 - `byCategory`
+
+## Orcamento mensal
+
+Endpoints disponiveis:
+
+- `POST /api/budgets/monthly`
+- `GET /api/budgets/monthly?month={m}&year={y}`
+
+Retorno atual:
+
+- `totalPlanned`
+- `totalSpent`
+- `totalRemaining`
+- `categories`
 
 ## Banco local
 
