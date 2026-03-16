@@ -4,7 +4,7 @@ Farol e um assistente financeiro pessoal para o mercado brasileiro, construido c
 
 ## Estado atual
 
-Sprint 1 concluida com:
+Sprint 1 concluida e Sprint 2 iniciada com:
 
 - estrutura base da solution em .NET
 - dominio inicial
@@ -12,9 +12,10 @@ Sprint 1 concluida com:
 - migration inicial aplicada
 - seed de categorias de sistema
 - autenticacao minima com JWT
-- testes unitarios para dominio e autenticacao
+- endpoints de contas financeiras
+- testes unitarios e testes de API para autenticacao e contas
 
-O projeto ainda nao possui endpoints de contas financeiras, transacoes ou dashboard mensal.
+O projeto ainda nao possui endpoints de transacoes, dashboard mensal ou bills.
 
 ## Stack atual
 
@@ -95,6 +96,22 @@ Resposta atual:
 - `userId`
 - `name`
 - `email`
+
+## Contas financeiras
+
+Endpoints disponiveis:
+
+- `POST /api/accounts`
+- `GET /api/accounts`
+- `PUT /api/accounts/{id}`
+
+Regras atuais:
+
+- endpoints protegidos com JWT
+- cada conta pertence a um unico usuario
+- a listagem retorna apenas contas do usuario autenticado
+- atualizacao respeita ownership por `userId`
+- validacoes do dominio continuam centralizadas em `FinancialAccount`
 
 ## Banco local
 

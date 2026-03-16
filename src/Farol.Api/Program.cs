@@ -1,4 +1,5 @@
 using System.Text;
+using Farol.Api.Common;
 using Farol.Infrastructure.Auth;
 using Farol.Infrastructure.Persistence;
 using Farol.Infrastructure.Seeding;
@@ -30,6 +31,7 @@ builder.Services.AddSwaggerGen(options =>
     };
 
     options.AddSecurityDefinition(JwtBearerDefaults.AuthenticationScheme, securityScheme);
+    options.OperationFilter<AuthorizeOperationFilter>();
 });
 
 var jwtSection = builder.Configuration.GetSection("Jwt");
@@ -64,7 +66,10 @@ builder.Services.AddScoped<JwtTokenService>();
 
 var app = builder.Build();
 
-await DatabaseSeeder.SeedSystemCategoriesAsync(app.Services, app.Lifetime.ApplicationStopping);
+if (!app.Environment.IsEnvironment("Testing"))
+{
+    await DatabaseSeeder.SeedSystemCategoriesAsync(app.Services, app.Lifetime.ApplicationStopping);
+}
 
 if (app.Environment.IsDevelopment())
 {
@@ -72,9 +77,15 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsEnvironment("Testing"))
+{
+    app.UseHttpsRedirection();
+}
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+public partial class Program;
