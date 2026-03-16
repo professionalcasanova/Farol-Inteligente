@@ -4,7 +4,7 @@ Farol e um assistente financeiro pessoal para o mercado brasileiro, construido c
 
 ## Estado atual
 
-Sprint 1 concluida e Sprint 2 iniciada com:
+Sprint 1 e Sprint 2 concluidas com:
 
 - estrutura base da solution em .NET
 - dominio inicial
@@ -13,7 +13,9 @@ Sprint 1 concluida e Sprint 2 iniciada com:
 - seed de categorias de sistema
 - autenticacao minima com JWT
 - endpoints de contas financeiras
-- testes unitarios e testes de API para autenticacao e contas
+- endpoints de categorias e transacoes
+- endpoint de resumo mensal
+- testes unitarios e testes de API para autenticacao, contas, categorias, transacoes e resumo mensal
 
 O projeto ainda nao possui bills.
 
@@ -161,3 +163,7 @@ Retorno atual:
 Fechamento detalhado da Sprint 1:
 
 - [docs/sprints/sprint-1.md](docs/sprints/sprint-1.md)
+
+Fechamento detalhado da Sprint 2:
+
+- [docs/sprints/sprint-2.md](docs/sprints/sprint-2.md)
