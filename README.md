@@ -15,7 +15,7 @@ Sprint 1 concluida e Sprint 2 iniciada com:
 - endpoints de contas financeiras
 - testes unitarios e testes de API para autenticacao e contas
 
-O projeto ainda nao possui dashboard mensal ou bills.
+O projeto ainda nao possui bills.
 
 ## Stack atual
 
@@ -128,6 +128,24 @@ Regras atuais:
 - transacoes respeitam ownership por `userId`
 - transacoes exigem conta financeira do usuario autenticado
 - categoria, quando informada, deve ser visivel ao usuario e compativel com o tipo da transacao
+
+## Resumo mensal
+
+Endpoint disponivel:
+
+- `GET /api/dashboard/monthly-summary`
+
+Parametros:
+
+- `month`
+- `year`
+
+Retorno atual:
+
+- `totalIncome`
+- `totalExpense`
+- `balance`
+- `byCategory`
 
 ## Banco local
 
