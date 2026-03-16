@@ -5,6 +5,7 @@
 
 # dotenv files
 .env
+.dotnet/.dotnet/TelemetryStorageService/
 
 # User-specific files
 *.rsuser
