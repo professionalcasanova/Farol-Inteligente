@@ -4,12 +4,12 @@ Farol e um assistente financeiro pessoal para o mercado brasileiro, construido c
 
 ## Estado atual
 
-Sprint 1, Sprint 2, Sprint 3, Sprint 4, Sprint 5 e Sprint 6 concluidas, com Sprint 7 em andamento:
+Sprint 1, Sprint 2, Sprint 3, Sprint 4, Sprint 5, Sprint 6 e Sprint 7 concluidas com:
 
 - estrutura base da solution em .NET
 - dominio inicial
 - persistencia com EF Core e PostgreSQL
-- migration inicial aplicada
+- migrations aplicadas para a persistencia atual
 - seed de categorias de sistema
 - autenticacao minima com JWT
 - endpoints de contas financeiras
@@ -19,13 +19,14 @@ Sprint 1, Sprint 2, Sprint 3, Sprint 4, Sprint 5 e Sprint 6 concluidas, com Spri
 - endpoint de importacao CSV de transacoes com categorizacao simples por regras
 - endpoint de insight de dinheiro livre
 - modulo minimo de bills/vencimentos no backend e no front MVP
+- endpoint de resumo de bills no dashboard
 - front-end MVP em `web/` com Next.js, TypeScript e Tailwind CSS
 - login web com persistencia temporaria de `accessToken` em `localStorage` para demo local
-- dashboard web com resumo mensal, orcamento e dinheiro livre
-- telas web de transacoes, orcamento e importacao CSV consumindo a API existente
-- testes unitarios e testes de API para autenticacao, contas, categorias, transacoes, resumo mensal, orcamento, importacao CSV e insights
+- dashboard web com resumo mensal, bills, orcamento e dinheiro livre
+- telas web de transacoes, orcamento, importacao CSV e bills consumindo a API existente
+- testes unitarios e testes de API para autenticacao, contas, categorias, transacoes, resumo mensal, orcamento, importacao CSV, insights e bills
 
-O projeto ainda nao possui bills.
+O produto segue em estagio de MVP local com foco em demonstracao.
 
 ## Stack atual
 
@@ -71,7 +72,7 @@ dotnet restore Farol.sln
 dotnet build Farol.sln --no-restore -c Release -m:1 -v minimal
 ```
 
-### 3. Aplicar migration
+### 3. Aplicar migrations
 
 ```powershell
 & "$env:USERPROFILE\.dotnet\tools\dotnet-ef.exe" database update `
@@ -186,6 +187,22 @@ Retorno atual:
 - `balance`
 - `byCategory`
 
+## Bills no dashboard
+
+Endpoint disponivel:
+
+- `GET /api/dashboard/bills-summary?month={m}&year={y}`
+
+Retorno atual:
+
+- `totalPending`
+- `totalOverdue`
+- `totalPaid`
+- `countPending`
+- `countOverdue`
+- `countPaid`
+- `upcoming`
+
 ## Orcamento mensal
 
 Endpoints disponiveis:
@@ -282,3 +299,7 @@ Fechamento detalhado da Sprint 5:
 Fechamento detalhado da Sprint 6:
 
 - [docs/sprints/sprint-6.md](docs/sprints/sprint-6.md)
+
+Fechamento detalhado da Sprint 7:
+
+- [docs/sprints/sprint-7.md](docs/sprints/sprint-7.md)
