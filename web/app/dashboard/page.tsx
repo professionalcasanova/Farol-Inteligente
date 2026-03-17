@@ -9,16 +9,19 @@ import {
   accountTypeOptions,
   ApiError,
   createAccount,
+  getBillsSummary,
   getFreeMoney,
   getMonthlyBudget,
   getMonthlySummary,
   listAccounts,
   type AccountResponse,
+  type BillsSummaryResponse,
   type FreeMoneyResponse,
   type MonthlyBudgetResponse,
   type MonthlySummaryResponse,
 } from "@/lib/api";
 import {
+  formatDate,
   formatCurrency,
   getCurrentMonthInputValue,
   parseMonthInputValue,
@@ -32,6 +35,7 @@ type AccountFormState = {
 
 type DashboardData = {
   accounts: AccountResponse[];
+  billsSummary: BillsSummaryResponse;
   budget: MonthlyBudgetResponse;
   freeMoney: FreeMoneyResponse;
   summary: MonthlySummaryResponse;
@@ -71,12 +75,13 @@ export default function DashboardPage() {
       setLoadError("");
 
       try {
-        const [summary, freeMoney, budget, accounts] = await Promise.all([
+        const [summary, billsSummary, freeMoney, budget, accounts] = await Promise.all([
           getMonthlySummary(
             accessToken,
             monthAndYear.month,
             monthAndYear.year,
           ),
+          getBillsSummary(accessToken, monthAndYear.month, monthAndYear.year),
           getFreeMoney(accessToken, monthAndYear.month, monthAndYear.year),
           getMonthlyBudget(
             accessToken,
@@ -90,6 +95,7 @@ export default function DashboardPage() {
           setLoadError("");
           setData({
             accounts,
+            billsSummary,
             budget,
             freeMoney,
             summary,
@@ -409,6 +415,96 @@ export default function DashboardPage() {
                   {isCreatingAccount ? "Criando conta..." : "Criar conta rapida"}
                 </button>
               </form>
+            </article>
+          </section>
+
+          <section className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
+            <article className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
+              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
+                Bills do mes
+              </div>
+              <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
+                Vencimentos em destaque
+              </h2>
+
+              <div className="mt-6 grid gap-4 md:grid-cols-3">
+                {[
+                  {
+                    label: "A pagar",
+                    total: data.billsSummary.totalPending,
+                    count: data.billsSummary.countPending,
+                    tone: "bg-[color:rgba(217,119,6,0.12)] text-[var(--color-warm)]",
+                  },
+                  {
+                    label: "Vencido",
+                    total: data.billsSummary.totalOverdue,
+                    count: data.billsSummary.countOverdue,
+                    tone: "bg-[color:rgba(185,28,28,0.1)] text-red-700",
+                  },
+                  {
+                    label: "Pago",
+                    total: data.billsSummary.totalPaid,
+                    count: data.billsSummary.countPaid,
+                    tone: "bg-[color:rgba(29,130,93,0.12)] text-[var(--color-success)]",
+                  },
+                ].map((item) => (
+                  <article
+                    className="rounded-[24px] border border-[var(--color-line)] bg-white p-4"
+                    key={item.label}
+                  >
+                    <div className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${item.tone}`}>
+                      {item.label}
+                    </div>
+                    <div className="mt-4 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
+                      {formatCurrency(item.total)}
+                    </div>
+                    <div className="mt-2 text-xs text-[var(--color-muted)]">
+                      {item.count} {item.count === 1 ? "conta" : "contas"}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </article>
+
+            <article className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
+              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
+                Proximas contas
+              </div>
+              <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
+                Ate 5 vencimentos pendentes
+              </h2>
+
+              <div className="mt-6 space-y-3">
+                {data.billsSummary.upcoming.length === 0 ? (
+                  <div className="rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
+                    Nenhuma conta pendente para este mes.
+                  </div>
+                ) : (
+                  data.billsSummary.upcoming.map((bill) => (
+                    <div
+                      className="flex flex-col gap-3 rounded-[24px] border border-[var(--color-line)] bg-white px-5 py-4 md:flex-row md:items-center md:justify-between"
+                      key={bill.id}
+                    >
+                      <div>
+                        <div className="text-sm font-semibold text-[var(--color-foreground)]">
+                          {bill.description}
+                        </div>
+                        <div className="mt-1 text-xs text-[var(--color-muted)]">
+                          Vence em {formatDate(bill.dueOn)}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="rounded-full border border-[color:rgba(217,119,6,0.14)] bg-[color:rgba(217,119,6,0.12)] px-3 py-1 text-xs font-semibold text-[var(--color-warm)]">
+                          Pendente
+                        </span>
+                        <div className="text-sm font-semibold text-[var(--color-foreground)]">
+                          {formatCurrency(bill.amount)}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </article>
           </section>
 

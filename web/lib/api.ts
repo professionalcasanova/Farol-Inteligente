@@ -101,6 +101,24 @@ export type BillResponse = {
   status: BillStatus;
 };
 
+export type BillsSummaryUpcomingResponse = {
+  id: string;
+  description: string;
+  amount: number;
+  dueOn: string;
+  status: BillStatus;
+};
+
+export type BillsSummaryResponse = {
+  totalPending: number;
+  totalOverdue: number;
+  totalPaid: number;
+  countPending: number;
+  countOverdue: number;
+  countPaid: number;
+  upcoming: BillsSummaryUpcomingResponse[];
+};
+
 export const transactionTypeOptions: Array<{
   value: TransactionType;
   label: string;
@@ -265,6 +283,17 @@ export async function getMonthlySummary(
 ) {
   return apiRequest<MonthlySummaryResponse>(
     `/api/dashboard/monthly-summary?month=${month}&year=${year}`,
+    { token },
+  );
+}
+
+export async function getBillsSummary(
+  token: string,
+  month: number,
+  year: number,
+) {
+  return apiRequest<BillsSummaryResponse>(
+    `/api/dashboard/bills-summary?month=${month}&year=${year}`,
     { token },
   );
 }
