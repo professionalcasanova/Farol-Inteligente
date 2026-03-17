@@ -4,7 +4,7 @@ Farol e um assistente financeiro pessoal para o mercado brasileiro, construido c
 
 ## Estado atual
 
-Sprint 1, Sprint 2, Sprint 3, Sprint 4 e Sprint 5 concluidas com:
+Sprint 1, Sprint 2, Sprint 3, Sprint 4, Sprint 5 e Sprint 6 concluidas com:
 
 - estrutura base da solution em .NET
 - dominio inicial
@@ -18,6 +18,10 @@ Sprint 1, Sprint 2, Sprint 3, Sprint 4 e Sprint 5 concluidas com:
 - endpoints de orcamento mensal por categoria
 - endpoint de importacao CSV de transacoes com categorizacao simples por regras
 - endpoint de insight de dinheiro livre
+- front-end MVP em `web/` com Next.js, TypeScript e Tailwind CSS
+- login web com persistencia temporaria de `accessToken` em `localStorage` para demo local
+- dashboard web com resumo mensal, orcamento e dinheiro livre
+- telas web de transacoes, orcamento e importacao CSV consumindo a API existente
 - testes unitarios e testes de API para autenticacao, contas, categorias, transacoes, resumo mensal, orcamento, importacao CSV e insights
 
 O projeto ainda nao possui bills.
@@ -26,6 +30,9 @@ O projeto ainda nao possui bills.
 
 - .NET 10
 - ASP.NET Core Web API
+- Next.js
+- TypeScript
+- Tailwind CSS
 - EF Core
 - PostgreSQL
 - xUnit
@@ -39,6 +46,7 @@ src/
   Farol.Api/
   Farol.Domain/
   Farol.Infrastructure/
+web/
 tests/
   Farol.Tests/
 docs/
@@ -87,6 +95,31 @@ Swagger:
 ```powershell
 dotnet test tests/Farol.Tests/Farol.Tests.csproj --no-build -c Release -m:1 -v minimal
 ```
+
+### 6. Rodar o front-end MVP
+
+Crie `web/.env.local` com:
+
+```env
+NEXT_PUBLIC_API_BASE_URL=http://localhost:5258
+```
+
+Depois, em outro terminal:
+
+```powershell
+Set-Location web
+npm install
+npm run dev
+```
+
+Aplicacao web:
+
+- `http://localhost:3000`
+
+Observacao:
+
+- o `localStorage` e usado apenas como decisao temporaria de MVP para demo local
+- nao existe refresh token nesta etapa
 
 ## Autenticacao atual
 
@@ -227,3 +260,7 @@ Fechamento detalhado da Sprint 4:
 Fechamento detalhado da Sprint 5:
 
 - [docs/sprints/sprint-5.md](docs/sprints/sprint-5.md)
+
+Fechamento detalhado da Sprint 6:
+
+- [docs/sprints/sprint-6.md](docs/sprints/sprint-6.md)

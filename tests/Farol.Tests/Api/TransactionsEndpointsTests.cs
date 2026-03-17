@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Globalization;
 using Farol.Api.Modules.Auth;
 using Farol.Api.Modules.Transactions;
 using Farol.Domain.Categories;
@@ -59,6 +60,53 @@ public sealed class TransactionsEndpointsTests : IClassFixture<FarolApiFactory>
         Assert.Equal(seed.CategoryId, transaction.CategoryId);
         Assert.Equal(TransactionType.Expense, transaction.Type);
         Assert.Equal(150.75m, transaction.Amount);
+    }
+
+    [Fact]
+    public async Task PostTransactions_ShouldAcceptDecimalAmountUnderPtBrCulture()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var originalCulture = CultureInfo.DefaultThreadCurrentCulture;
+        var originalUiCulture = CultureInfo.DefaultThreadCurrentUICulture;
+        var ptBr = new CultureInfo("pt-BR");
+
+        CultureInfo.DefaultThreadCurrentCulture = ptBr;
+        CultureInfo.DefaultThreadCurrentUICulture = ptBr;
+
+        try
+        {
+            var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+            var seed = await SeedOwnedAccountAndSystemCategoryAsync(
+                "maria@email.com",
+                "Conta Corrente",
+                "Salario",
+                CategoryType.Income);
+
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+            var response = await client.PostAsJsonAsync("/api/transactions", new CreateTransactionRequest
+            {
+                FinancialAccountId = seed.AccountId,
+                CategoryId = seed.CategoryId,
+                Type = TransactionType.Income,
+                Amount = 0.01m,
+                Description = "Ajuste",
+                OccurredOn = new DateOnly(2026, 3, 16)
+            });
+
+            response.EnsureSuccessStatusCode();
+
+            var transaction = await response.Content.ReadFromJsonAsync<TransactionResponse>();
+
+            Assert.NotNull(transaction);
+            Assert.Equal(0.01m, transaction.Amount);
+        }
+        finally
+        {
+            CultureInfo.DefaultThreadCurrentCulture = originalCulture;
+            CultureInfo.DefaultThreadCurrentUICulture = originalUiCulture;
+        }
     }
 
     [Fact]
