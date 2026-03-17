@@ -1,4 +1,5 @@
 using Farol.Api.Common;
+using Farol.Domain.Bills;
 using Farol.Domain.Ledger;
 using Farol.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
@@ -12,6 +13,10 @@ namespace Farol.Api.Modules.Dashboard;
 [Route("api/dashboard")]
 public sealed class DashboardController(FarolDbContext dbContext) : ControllerBase
 {
+    private const string PendingStatus = "pending";
+    private const string PaidStatus = "paid";
+    private const string OverdueStatus = "overdue";
+
     [HttpGet("monthly-summary")]
     public async Task<ActionResult<MonthlySummaryResponse>> GetMonthlySummary(
         [FromQuery] MonthlySummaryRequest request,
@@ -89,5 +94,87 @@ public sealed class DashboardController(FarolDbContext dbContext) : ControllerBa
             Balance = totalIncome - totalExpense,
             ByCategory = byCategory
         });
+    }
+
+    [HttpGet("bills-summary")]
+    public async Task<ActionResult<BillsSummaryResponse>> GetBillsSummary(
+        [FromQuery] MonthlySummaryRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!AuthenticatedUser.TryGetUserId(User, out var userId))
+        {
+            return Unauthorized(new { message = "Invalid access token." });
+        }
+
+        DateOnly periodStart;
+
+        try
+        {
+            periodStart = new DateOnly(request.Year, request.Month, 1);
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return BadRequest(new { message = "Month and year are invalid." });
+        }
+
+        var periodEnd = periodStart.AddMonths(1);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        var bills = await dbContext.Bills
+            .AsNoTracking()
+            .Where(bill =>
+                bill.UserId == userId &&
+                bill.DueOn >= periodStart &&
+                bill.DueOn < periodEnd)
+            .OrderBy(bill => bill.DueOn)
+            .ThenBy(bill => bill.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
+
+        var pendingBills = bills
+            .Where(bill => !bill.IsPaid && bill.DueOn >= today)
+            .ToList();
+
+        var overdueBills = bills
+            .Where(bill => !bill.IsPaid && bill.DueOn < today)
+            .ToList();
+
+        var paidBills = bills
+            .Where(bill => bill.IsPaid)
+            .ToList();
+
+        var upcoming = pendingBills
+            .OrderBy(bill => bill.DueOn)
+            .ThenBy(bill => bill.CreatedAtUtc)
+            .Take(5)
+            .Select(bill => new BillsSummaryUpcomingResponse
+            {
+                Id = bill.Id,
+                Description = bill.Description,
+                Amount = bill.Amount,
+                DueOn = bill.DueOn,
+                Status = ResolveBillStatus(bill, today)
+            })
+            .ToList();
+
+        return Ok(new BillsSummaryResponse
+        {
+            TotalPending = pendingBills.Sum(bill => bill.Amount),
+            TotalOverdue = overdueBills.Sum(bill => bill.Amount),
+            TotalPaid = paidBills.Sum(bill => bill.Amount),
+            CountPending = pendingBills.Count,
+            CountOverdue = overdueBills.Count,
+            CountPaid = paidBills.Count,
+            Upcoming = upcoming
+        });
+    }
+
+    private static string ResolveBillStatus(Bill bill, DateOnly today)
+    {
+        if (bill.IsPaid)
+        {
+            return PaidStatus;
+        }
+
+        return bill.DueOn < today ? OverdueStatus : PendingStatus;
     }
 }
