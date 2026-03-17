@@ -15,7 +15,9 @@ import {
   getFreeMoney,
   getMonthlyBudget,
   getMonthlySummary,
+  listBills,
   listAccounts,
+  listTransactions,
   type AccountResponse,
   type AlertsResponse,
   type BillsSummaryResponse,
@@ -42,6 +44,11 @@ type DashboardData = {
   billsSummary: BillsSummaryResponse;
   budget: MonthlyBudgetResponse;
   freeMoney: FreeMoneyResponse;
+  onboarding: {
+    hasAccount: boolean;
+    hasBill: boolean;
+    hasTransaction: boolean;
+  };
   summary: MonthlySummaryResponse;
 };
 
@@ -61,6 +68,12 @@ const alertSeverityStyles = {
     "bg-[color:rgba(217,119,6,0.12)] text-[var(--color-warm)] border-[color:rgba(217,119,6,0.14)]",
 } as const;
 
+const checklistItemStyles = {
+  completed:
+    "border-[color:rgba(29,130,93,0.14)] bg-[color:rgba(220,252,231,0.76)]",
+  pending: "border-[var(--color-line)] bg-white",
+} as const;
+
 export default function DashboardPage() {
   const { session, isLoading, logout } = useProtectedSession();
   const [monthValue, setMonthValue] = useState(getCurrentMonthInputValue());
@@ -77,6 +90,34 @@ export default function DashboardPage() {
     [monthValue],
   );
 
+  const checklistItems = data
+    ? [
+        {
+          completed: data.onboarding.hasAccount,
+          description: "Crie a base para organizar entradas, saidas e importacoes.",
+          href: "/dashboard#quick-account",
+          label: "Criar sua primeira conta",
+        },
+        {
+          completed: data.onboarding.hasTransaction,
+          description: "Registre uma entrada para liberar saldo, resumo mensal e dinheiro livre.",
+          href: "/transactions",
+          label: "Registrar uma entrada (salario)",
+        },
+        {
+          completed: data.onboarding.hasBill,
+          description: "Adicione um vencimento para ativar bills, agenda e alertas.",
+          href: "/bills",
+          label: "Adicionar uma conta a pagar",
+        },
+      ]
+    : [];
+
+  const completedChecklistItemsCount = checklistItems.filter(
+    (item) => item.completed,
+  ).length;
+  const shouldShowOnboarding = checklistItems.some((item) => !item.completed);
+
   useEffect(() => {
     if (!session) {
       return;
@@ -90,7 +131,16 @@ export default function DashboardPage() {
       setLoadError("");
 
       try {
-        const [summary, alerts, billsSummary, freeMoney, budget, accounts] = await Promise.all([
+        const [
+          summary,
+          alerts,
+          billsSummary,
+          freeMoney,
+          budget,
+          accounts,
+          transactions,
+          bills,
+        ] = await Promise.all([
           getMonthlySummary(
             accessToken,
             monthAndYear.month,
@@ -105,6 +155,8 @@ export default function DashboardPage() {
             monthAndYear.year,
           ),
           listAccounts(accessToken),
+          listTransactions(accessToken),
+          listBills(accessToken),
         ]);
 
         if (!isCancelled) {
@@ -115,6 +167,11 @@ export default function DashboardPage() {
             billsSummary,
             budget,
             freeMoney,
+            onboarding: {
+              hasAccount: accounts.length > 0,
+              hasBill: bills.length > 0,
+              hasTransaction: transactions.length > 0,
+            },
             summary,
           });
         }
@@ -169,6 +226,10 @@ export default function DashboardPage() {
           ? {
               ...current,
               accounts,
+              onboarding: {
+                ...current.onboarding,
+                hasAccount: accounts.length > 0,
+              },
             }
           : current,
       );
@@ -229,6 +290,51 @@ export default function DashboardPage() {
         />
       ) : (
         <div className="space-y-6">
+          {shouldShowOnboarding ? (
+            <section className="rounded-[28px] border border-[color:rgba(15,118,110,0.14)] bg-[var(--color-accent-soft)] p-6">
+              <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
+                    Comece por aqui
+                  </div>
+                  <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
+                    Primeiro valor em poucos passos
+                  </h2>
+                  <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--color-muted)]">
+                    O checklist some automaticamente quando voce conclui os tres passos principais.
+                  </p>
+                </div>
+                <div className="text-sm font-medium text-[var(--color-foreground)]">
+                  {completedChecklistItemsCount} de 3 concluidos
+                </div>
+              </div>
+
+              <div className="mt-6 grid gap-3 lg:grid-cols-3">
+                {checklistItems.map((item) => (
+                  <Link
+                    className={`rounded-[24px] border px-5 py-4 transition hover:border-[var(--color-accent)] ${item.completed ? checklistItemStyles.completed : checklistItemStyles.pending}`}
+                    href={item.href}
+                    key={item.label}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-semibold text-[var(--color-foreground)]">
+                          [{item.completed ? "x" : " "}] {item.label}
+                        </div>
+                        <div className="mt-2 text-sm leading-6 text-[var(--color-muted)]">
+                          {item.description}
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-accent)]">
+                        {item.completed ? "Concluido" : "Abrir"}
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
           <section className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
             <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
               Alertas do mes
@@ -408,7 +514,10 @@ export default function DashboardPage() {
               </div>
             </article>
 
-            <article className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
+            <article
+              className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6"
+              id="quick-account"
+            >
               <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
                 Contas e preparacao
               </div>
