@@ -4,7 +4,7 @@ Farol e um assistente financeiro pessoal para o mercado brasileiro, construido c
 
 ## Estado atual
 
-Sprint 1, Sprint 2, Sprint 3, Sprint 4, Sprint 5 e Sprint 6 concluidas com:
+Sprint 1, Sprint 2, Sprint 3, Sprint 4, Sprint 5 e Sprint 6 concluidas, com Sprint 7 em andamento:
 
 - estrutura base da solution em .NET
 - dominio inicial
@@ -18,6 +18,7 @@ Sprint 1, Sprint 2, Sprint 3, Sprint 4, Sprint 5 e Sprint 6 concluidas com:
 - endpoints de orcamento mensal por categoria
 - endpoint de importacao CSV de transacoes com categorizacao simples por regras
 - endpoint de insight de dinheiro livre
+- modulo minimo de bills/vencimentos no backend e no front MVP
 - front-end MVP em `web/` com Next.js, TypeScript e Tailwind CSS
 - login web com persistencia temporaria de `accessToken` em `localStorage` para demo local
 - dashboard web com resumo mensal, orcamento e dinheiro livre
@@ -213,6 +214,23 @@ Fluxo atual:
 - usa `categoryName` quando valido
 - tenta categorizacao simples por regras quando `categoryName` vier vazio
 - linhas invalidas sao ignoradas com erro registrado no resumo
+
+## Bills
+
+Endpoints disponiveis:
+
+- `POST /api/bills`
+- `GET /api/bills`
+- `PATCH /api/bills/{id}/pay`
+- `PATCH /api/bills/{id}/unpay`
+
+Fluxo atual:
+
+- bills pertencem ao usuario autenticado
+- criacao com descricao, valor e vencimento
+- listagem com filtros simples por `month`, `year` e `status`
+- marcacao e desmarcacao de pagamento
+- pagina web `/bills` para demonstracao do fluxo
 
 ## Insights
 

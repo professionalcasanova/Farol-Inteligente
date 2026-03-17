@@ -3,6 +3,7 @@ import type { StoredSession } from "@/lib/auth";
 export type TransactionType = 1 | 2;
 export type CategoryType = 1 | 2;
 export type FinancialAccountType = 1 | 2 | 3 | 4;
+export type BillStatus = "pending" | "paid" | "overdue";
 
 export type AuthResponse = StoredSession;
 
@@ -87,6 +88,17 @@ export type ImportTransactionsCsvResponse = {
   importedRows: number;
   skippedRows: number;
   errors: ImportTransactionsCsvErrorResponse[];
+};
+
+export type BillResponse = {
+  id: string;
+  description: string;
+  amount: number;
+  dueOn: string;
+  isPaid: boolean;
+  paidAtUtc: string | null;
+  createdAtUtc: string;
+  status: BillStatus;
 };
 
 export const transactionTypeOptions: Array<{
@@ -312,4 +324,60 @@ export async function importTransactionsCsv(
       body: formData,
     },
   );
+}
+
+export async function listBills(
+  token: string,
+  filters?: {
+    month?: number;
+    year?: number;
+    status?: BillStatus | "";
+  },
+) {
+  const query = new URLSearchParams();
+
+  if (filters?.month && filters?.year) {
+    query.set("month", String(filters.month));
+    query.set("year", String(filters.year));
+  }
+
+  if (filters?.status) {
+    query.set("status", filters.status);
+  }
+
+  const queryString = query.toString();
+
+  return apiRequest<BillResponse[]>(
+    `/api/bills${queryString ? `?${queryString}` : ""}`,
+    { token },
+  );
+}
+
+export async function createBill(
+  token: string,
+  payload: {
+    description: string;
+    amount: number;
+    dueOn: string;
+  },
+) {
+  return apiRequest<BillResponse>("/api/bills", {
+    method: "POST",
+    token,
+    body: payload,
+  });
+}
+
+export async function payBill(token: string, billId: string) {
+  return apiRequest<BillResponse>(`/api/bills/${billId}/pay`, {
+    method: "PATCH",
+    token,
+  });
+}
+
+export async function unpayBill(token: string, billId: string) {
+  return apiRequest<BillResponse>(`/api/bills/${billId}/unpay`, {
+    method: "PATCH",
+    token,
+  });
 }
