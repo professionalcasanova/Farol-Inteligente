@@ -1,3 +1,4 @@
+using Farol.Domain.Bills;
 using Farol.Domain.Budgets;
 using Farol.Domain.Categories;
 using Farol.Domain.Ledger;
@@ -12,6 +13,7 @@ public sealed class FarolDbContext(DbContextOptions<FarolDbContext> options) : D
     public DbSet<FinancialAccount> FinancialAccounts => Set<FinancialAccount>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Transaction> Transactions => Set<Transaction>();
+    public DbSet<Bill> Bills => Set<Bill>();
     public DbSet<MonthlyBudget> MonthlyBudgets => Set<MonthlyBudget>();
     public DbSet<MonthlyBudgetCategory> MonthlyBudgetCategories => Set<MonthlyBudgetCategory>();
 
