@@ -85,6 +85,7 @@ export type AlertResponse = {
   severity: AlertSeverity;
   message: string;
   amount: number;
+  actionUrl?: string | null;
 };
 
 export type AlertsResponse = {

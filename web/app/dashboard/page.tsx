@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { LoadErrorState } from "@/components/load-error-state";
@@ -260,8 +261,18 @@ export default function DashboardPage() {
                           {alert.message}
                         </div>
                       </div>
-                      <div className="text-sm font-semibold text-[var(--color-foreground)]">
-                        {formatCurrency(alert.amount)}
+                      <div className="flex flex-col items-start gap-3 md:items-end">
+                        <div className="text-sm font-semibold text-[var(--color-foreground)]">
+                          {formatCurrency(alert.amount)}
+                        </div>
+                        {alert.actionUrl ? (
+                          <Link
+                            className="rounded-full border border-[var(--color-line)] px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-[var(--color-accent-soft)]"
+                            href={alert.actionUrl}
+                          >
+                            Resolver agora
+                          </Link>
+                        ) : null}
                       </div>
                     </div>
                   </article>
