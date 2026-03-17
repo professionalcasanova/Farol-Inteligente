@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { LoadingScreen } from "@/components/loading-screen";
 import { ApiError, login } from "@/lib/api";
 import { readStoredSession, writeStoredSession } from "@/lib/auth";
 
@@ -11,11 +12,15 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
 
   useEffect(() => {
     if (readStoredSession()) {
       router.replace("/dashboard");
+      return;
     }
+
+    setIsCheckingSession(false);
   }, [router]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -36,6 +41,10 @@ export default function LoginPage() {
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  if (isCheckingSession) {
+    return <LoadingScreen message="Verificando sua sessao..." />;
   }
 
   return (

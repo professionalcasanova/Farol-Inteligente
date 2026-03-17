@@ -14,16 +14,27 @@ export function useProtectedSession() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const storedSession = readStoredSession();
+    function syncSessionFromStorage() {
+      const storedSession = readStoredSession();
 
-    if (!storedSession) {
+      if (!storedSession) {
+        clearStoredSession();
+        setSession(null);
+        setIsLoading(false);
+        router.replace("/login");
+        return;
+      }
+
+      setSession(storedSession);
       setIsLoading(false);
-      router.replace("/login");
-      return;
     }
 
-    setSession(storedSession);
-    setIsLoading(false);
+    syncSessionFromStorage();
+    window.addEventListener("storage", syncSessionFromStorage);
+
+    return () => {
+      window.removeEventListener("storage", syncSessionFromStorage);
+    };
   }, [router]);
 
   const logout = useCallback(() => {

@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { LoadErrorState } from "@/components/load-error-state";
 import { LoadingScreen } from "@/components/loading-screen";
 import {
   ApiError,
@@ -47,10 +48,12 @@ export default function TransactionsPage() {
   const [categories, setCategories] = useState<CategoryResponse[]>([]);
   const [transactions, setTransactions] = useState<TransactionResponse[]>([]);
   const [form, setForm] = useState<TransactionFormState>(defaultFormState);
-  const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [formError, setFormError] = useState("");
   const [success, setSuccess] = useState("");
   const [isFetching, setIsFetching] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   const visibleCategories = useMemo(
     () => categories.filter((category) => category.type === form.type),
@@ -67,7 +70,7 @@ export default function TransactionsPage() {
 
     async function load() {
       setIsFetching(true);
-      setError("");
+      setLoadError("");
 
       try {
         const [accountsResponse, categoriesResponse, transactionsResponse] =
@@ -96,7 +99,7 @@ export default function TransactionsPage() {
         }
 
         if (!isCancelled) {
-          setError(
+          setLoadError(
             caughtError instanceof Error
               ? caughtError.message
               : "Nao foi possivel carregar as transacoes.",
@@ -114,7 +117,7 @@ export default function TransactionsPage() {
     return () => {
       isCancelled = true;
     };
-  }, [logout, session]);
+  }, [logout, reloadKey, session]);
 
   useEffect(() => {
     if (
@@ -137,7 +140,7 @@ export default function TransactionsPage() {
 
     const accessToken = session.accessToken;
     setIsSubmitting(true);
-    setError("");
+    setFormError("");
     setSuccess("");
 
     try {
@@ -164,7 +167,7 @@ export default function TransactionsPage() {
         return;
       }
 
-      setError(
+      setFormError(
         caughtError instanceof Error
           ? caughtError.message
           : "Nao foi possivel criar a transacao.",
@@ -185,9 +188,9 @@ export default function TransactionsPage() {
       session={session}
       title="Transacoes"
     >
-      {error ? (
+      {formError ? (
         <div className="mb-6 rounded-[24px] border border-[color:rgba(185,28,28,0.14)] bg-[color:rgba(254,226,226,0.8)] px-5 py-4 text-sm text-red-700">
-          {error}
+          {formError}
         </div>
       ) : null}
 
@@ -199,6 +202,12 @@ export default function TransactionsPage() {
 
       {isFetching ? (
         <LoadingScreen message="Carregando contas, categorias e transacoes..." />
+      ) : loadError ? (
+        <LoadErrorState
+          message={loadError}
+          onRetry={() => setReloadKey((current) => current + 1)}
+          title="Nao foi possivel carregar as transacoes"
+        />
       ) : (
         <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
           <section className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">

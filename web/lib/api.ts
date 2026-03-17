@@ -129,6 +129,7 @@ type RequestOptions = {
 
 async function apiRequest<T>(path: string, options: RequestOptions = {}) {
   const headers = new Headers();
+  headers.set("Accept", "application/json");
 
   if (options.token) {
     headers.set("Authorization", `Bearer ${options.token}`);
@@ -141,11 +142,18 @@ async function apiRequest<T>(path: string, options: RequestOptions = {}) {
     body = JSON.stringify(options.body);
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method: options.method ?? "GET",
-    headers,
-    body,
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      method: options.method ?? "GET",
+      headers,
+      body,
+      cache: "no-store",
+    });
+  } catch {
+    throw new ApiError("Nao foi possivel conectar com a API do Farol.", 0);
+  }
 
   if (!response.ok) {
     const contentType = response.headers.get("content-type") ?? "";

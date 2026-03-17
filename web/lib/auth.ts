@@ -7,6 +7,21 @@ export type StoredSession = {
 
 const SESSION_STORAGE_KEY = "farol.session";
 
+function isStoredSession(value: unknown): value is StoredSession {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+
+  return (
+    typeof candidate.accessToken === "string" &&
+    typeof candidate.userId === "string" &&
+    typeof candidate.name === "string" &&
+    typeof candidate.email === "string"
+  );
+}
+
 export function readStoredSession(): StoredSession | null {
   if (typeof window === "undefined") {
     return null;
@@ -19,7 +34,14 @@ export function readStoredSession(): StoredSession | null {
   }
 
   try {
-    return JSON.parse(rawValue) as StoredSession;
+    const parsedValue = JSON.parse(rawValue) as unknown;
+
+    if (!isStoredSession(parsedValue)) {
+      window.localStorage.removeItem(SESSION_STORAGE_KEY);
+      return null;
+    }
+
+    return parsedValue;
   } catch {
     window.localStorage.removeItem(SESSION_STORAGE_KEY);
     return null;
@@ -31,7 +53,15 @@ export function writeStoredSession(session: StoredSession) {
     return;
   }
 
-  window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+  window.localStorage.setItem(
+    SESSION_STORAGE_KEY,
+    JSON.stringify({
+      accessToken: session.accessToken,
+      userId: session.userId,
+      name: session.name,
+      email: session.email,
+    } satisfies StoredSession),
+  );
 }
 
 export function clearStoredSession() {

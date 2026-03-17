@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { LoadErrorState } from "@/components/load-error-state";
 import { LoadingScreen } from "@/components/loading-screen";
 import { MonthPicker } from "@/components/month-picker";
 import {
@@ -45,10 +46,12 @@ export default function DashboardPage() {
   const { session, isLoading, logout } = useProtectedSession();
   const [monthValue, setMonthValue] = useState(getCurrentMonthInputValue());
   const [data, setData] = useState<DashboardData | null>(null);
-  const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [accountError, setAccountError] = useState("");
   const [isFetching, setIsFetching] = useState(true);
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
   const [accountForm, setAccountForm] = useState<AccountFormState>(defaultAccountForm);
+  const [reloadKey, setReloadKey] = useState(0);
 
   const monthAndYear = useMemo(
     () => parseMonthInputValue(monthValue),
@@ -65,7 +68,7 @@ export default function DashboardPage() {
 
     async function load() {
       setIsFetching(true);
-      setError("");
+      setLoadError("");
 
       try {
         const [summary, freeMoney, budget, accounts] = await Promise.all([
@@ -84,6 +87,7 @@ export default function DashboardPage() {
         ]);
 
         if (!isCancelled) {
+          setLoadError("");
           setData({
             accounts,
             budget,
@@ -98,7 +102,7 @@ export default function DashboardPage() {
         }
 
         if (!isCancelled) {
-          setError(
+          setLoadError(
             caughtError instanceof Error
               ? caughtError.message
               : "Nao foi possivel carregar o dashboard.",
@@ -116,7 +120,7 @@ export default function DashboardPage() {
     return () => {
       isCancelled = true;
     };
-  }, [logout, monthAndYear.month, monthAndYear.year, session]);
+  }, [logout, monthAndYear.month, monthAndYear.year, reloadKey, session]);
 
   async function handleCreateAccount(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -127,7 +131,7 @@ export default function DashboardPage() {
 
     const accessToken = session.accessToken;
     setIsCreatingAccount(true);
-    setError("");
+    setAccountError("");
 
     try {
       await createAccount(accessToken, {
@@ -152,7 +156,7 @@ export default function DashboardPage() {
         return;
       }
 
-      setError(
+      setAccountError(
         caughtError instanceof Error
           ? caughtError.message
           : "Nao foi possivel criar a conta agora.",
@@ -180,14 +184,26 @@ export default function DashboardPage() {
       session={session}
       title="Dashboard financeiro"
     >
-      {error ? (
+      {accountError ? (
         <div className="mb-6 rounded-[24px] border border-[color:rgba(185,28,28,0.14)] bg-[color:rgba(254,226,226,0.8)] px-5 py-4 text-sm text-red-700">
-          {error}
+          {accountError}
         </div>
       ) : null}
 
-      {isFetching || !data ? (
+      {isFetching ? (
         <LoadingScreen message="Atualizando o resumo do mes..." />
+      ) : loadError ? (
+        <LoadErrorState
+          message={loadError}
+          onRetry={() => setReloadKey((current) => current + 1)}
+          title="Nao foi possivel abrir o dashboard"
+        />
+      ) : !data ? (
+        <LoadErrorState
+          message="O dashboard nao retornou dados para este mes."
+          onRetry={() => setReloadKey((current) => current + 1)}
+          title="Dashboard indisponivel"
+        />
       ) : (
         <div className="space-y-6">
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

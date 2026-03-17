@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { LoadErrorState } from "@/components/load-error-state";
 import { LoadingScreen } from "@/components/loading-screen";
 import {
   ApiError,
@@ -18,9 +19,11 @@ export default function ImportsPage() {
   const [accountId, setAccountId] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [result, setResult] = useState<ImportTransactionsCsvResponse | null>(null);
-  const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [importError, setImportError] = useState("");
   const [isFetching, setIsFetching] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (!session) {
@@ -32,7 +35,7 @@ export default function ImportsPage() {
 
     async function load() {
       setIsFetching(true);
-      setError("");
+      setLoadError("");
 
       try {
         const response = await listAccounts(accessToken);
@@ -50,7 +53,7 @@ export default function ImportsPage() {
         }
 
         if (!isCancelled) {
-          setError(
+          setLoadError(
             caughtError instanceof Error
               ? caughtError.message
               : "Nao foi possivel carregar as contas.",
@@ -68,19 +71,24 @@ export default function ImportsPage() {
     return () => {
       isCancelled = true;
     };
-  }, [logout, session]);
+  }, [logout, reloadKey, session]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!session || !file) {
-      setError("Selecione um arquivo CSV antes de importar.");
+      setImportError("Selecione um arquivo CSV antes de importar.");
+      return;
+    }
+
+    if (!accountId) {
+      setImportError("Selecione uma conta financeira para a importacao.");
       return;
     }
 
     const accessToken = session.accessToken;
     setIsSubmitting(true);
-    setError("");
+    setImportError("");
 
     try {
       const response = await importTransactionsCsv(accessToken, {
@@ -95,7 +103,7 @@ export default function ImportsPage() {
         return;
       }
 
-      setError(
+      setImportError(
         caughtError instanceof Error
           ? caughtError.message
           : "Nao foi possivel importar o arquivo.",
@@ -116,14 +124,20 @@ export default function ImportsPage() {
       session={session}
       title="Importacao CSV"
     >
-      {error ? (
+      {importError ? (
         <div className="mb-6 rounded-[24px] border border-[color:rgba(185,28,28,0.14)] bg-[color:rgba(254,226,226,0.8)] px-5 py-4 text-sm text-red-700">
-          {error}
+          {importError}
         </div>
       ) : null}
 
       {isFetching ? (
         <LoadingScreen message="Carregando contas para importacao..." />
+      ) : loadError ? (
+        <LoadErrorState
+          message={loadError}
+          onRetry={() => setReloadKey((current) => current + 1)}
+          title="Nao foi possivel carregar a importacao"
+        />
       ) : (
         <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
           <section className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">

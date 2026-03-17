@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { LoadErrorState } from "@/components/load-error-state";
 import { LoadingScreen } from "@/components/loading-screen";
 import { MonthPicker } from "@/components/month-picker";
 import {
@@ -33,11 +34,13 @@ export default function BudgetPage() {
   const [rows, setRows] = useState<BudgetRow[]>([
     { id: 1, categoryId: "", planned: "" },
   ]);
-  const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [formError, setFormError] = useState("");
   const [success, setSuccess] = useState("");
   const [isFetching, setIsFetching] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const rowSeedRef = useRef(2);
+  const [reloadKey, setReloadKey] = useState(0);
 
   const monthAndYear = useMemo(
     () => parseMonthInputValue(monthValue),
@@ -54,7 +57,7 @@ export default function BudgetPage() {
 
     async function load() {
       setIsFetching(true);
-      setError("");
+      setLoadError("");
 
       try {
         const [categoriesResponse, budgetResponse] = await Promise.all([
@@ -97,7 +100,7 @@ export default function BudgetPage() {
         }
 
         if (!isCancelled) {
-          setError(
+          setLoadError(
             caughtError instanceof Error
               ? caughtError.message
               : "Nao foi possivel carregar o orcamento.",
@@ -115,7 +118,7 @@ export default function BudgetPage() {
     return () => {
       isCancelled = true;
     };
-  }, [logout, monthAndYear.month, monthAndYear.year, session]);
+  }, [logout, monthAndYear.month, monthAndYear.year, reloadKey, session]);
 
   function addRow() {
     setRows((current) => [
@@ -163,13 +166,13 @@ export default function BudgetPage() {
       new Set(categories.map((item) => item.categoryId)).size !== categories.length;
 
     if (hasDuplicateCategories) {
-      setError("Cada categoria pode aparecer apenas uma vez no orcamento.");
+      setFormError("Cada categoria pode aparecer apenas uma vez no orcamento.");
       setSuccess("");
       return;
     }
 
     setIsSubmitting(true);
-    setError("");
+    setFormError("");
     setSuccess("");
 
     try {
@@ -202,7 +205,7 @@ export default function BudgetPage() {
         return;
       }
 
-      setError(
+      setFormError(
         caughtError instanceof Error
           ? caughtError.message
           : "Nao foi possivel salvar o orcamento.",
@@ -230,9 +233,9 @@ export default function BudgetPage() {
       session={session}
       title="Orcamento mensal"
     >
-      {error ? (
+      {formError ? (
         <div className="mb-6 rounded-[24px] border border-[color:rgba(185,28,28,0.14)] bg-[color:rgba(254,226,226,0.8)] px-5 py-4 text-sm text-red-700">
-          {error}
+          {formError}
         </div>
       ) : null}
 
@@ -242,8 +245,20 @@ export default function BudgetPage() {
         </div>
       ) : null}
 
-      {isFetching || !budget ? (
+      {isFetching ? (
         <LoadingScreen message="Carregando orcamento do mes..." />
+      ) : loadError ? (
+        <LoadErrorState
+          message={loadError}
+          onRetry={() => setReloadKey((current) => current + 1)}
+          title="Nao foi possivel carregar o orcamento"
+        />
+      ) : !budget ? (
+        <LoadErrorState
+          message="O orcamento do mes nao retornou dados."
+          onRetry={() => setReloadKey((current) => current + 1)}
+          title="Orcamento indisponivel"
+        />
       ) : (
         <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
           <section className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
