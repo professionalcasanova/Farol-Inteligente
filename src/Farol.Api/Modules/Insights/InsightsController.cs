@@ -87,7 +87,8 @@ public sealed class InsightsController(FarolDbContext dbContext) : ControllerBas
                 Type = OverdueBillsAlertType,
                 Severity = HighSeverity,
                 Message = "Voce tem contas vencidas que precisam de atencao imediata.",
-                Amount = snapshot.TotalOverdueBills
+                Amount = snapshot.TotalOverdueBills,
+                ActionUrl = "/bills?status=overdue"
             });
         }
 
@@ -98,7 +99,8 @@ public sealed class InsightsController(FarolDbContext dbContext) : ControllerBas
                 Type = LowBalanceAlertType,
                 Severity = MediumSeverity,
                 Message = "Seu dinheiro livre para o mes esta baixo.",
-                Amount = snapshot.FreeToSpend
+                Amount = snapshot.FreeToSpend,
+                ActionUrl = "/dashboard"
             });
         }
 
@@ -109,7 +111,8 @@ public sealed class InsightsController(FarolDbContext dbContext) : ControllerBas
                 Type = BudgetOverspentAlertType,
                 Severity = HighSeverity,
                 Message = "Seu orcamento do mes ja foi estourado.",
-                Amount = snapshot.TotalBudgetSpent - snapshot.TotalPlannedBudget
+                Amount = snapshot.TotalBudgetSpent - snapshot.TotalPlannedBudget,
+                ActionUrl = "/budget"
             });
         }
 
@@ -120,7 +123,8 @@ public sealed class InsightsController(FarolDbContext dbContext) : ControllerBas
                 Type = ManyPendingBillsAlertType,
                 Severity = MediumSeverity,
                 Message = "Voce ainda tem muitas contas para pagar neste mes.",
-                Amount = snapshot.TotalPendingBills
+                Amount = snapshot.TotalPendingBills,
+                ActionUrl = "/bills"
             });
         }
 

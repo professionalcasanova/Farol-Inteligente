@@ -52,6 +52,7 @@ public sealed class FinancialAlertsInsightsEndpointsTests : IClassFixture<FarolA
         Assert.Equal("overdue_bills", alert.Type);
         Assert.Equal("high", alert.Severity);
         Assert.Equal(300m, alert.Amount);
+        Assert.Equal("/bills?status=overdue", alert.ActionUrl);
         Assert.Contains("contas vencidas", alert.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -85,6 +86,7 @@ public sealed class FinancialAlertsInsightsEndpointsTests : IClassFixture<FarolA
         Assert.Equal("low_balance", alert.Type);
         Assert.Equal("medium", alert.Severity);
         Assert.Equal(150m, alert.Amount);
+        Assert.Equal("/dashboard", alert.ActionUrl);
         Assert.Contains("dinheiro livre", alert.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -124,6 +126,7 @@ public sealed class FinancialAlertsInsightsEndpointsTests : IClassFixture<FarolA
         Assert.Equal("budget_overspent", alert.Type);
         Assert.Equal("high", alert.Severity);
         Assert.Equal(50m, alert.Amount);
+        Assert.Equal("/budget", alert.ActionUrl);
         Assert.Contains("orcamento", alert.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -157,6 +160,7 @@ public sealed class FinancialAlertsInsightsEndpointsTests : IClassFixture<FarolA
         Assert.Equal("many_pending_bills", alert.Type);
         Assert.Equal("medium", alert.Severity);
         Assert.Equal(600m, alert.Amount);
+        Assert.Equal("/bills", alert.ActionUrl);
         Assert.Contains("contas para pagar", alert.Message, StringComparison.OrdinalIgnoreCase);
     }
 
