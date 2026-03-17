@@ -1,0 +1,311 @@
+using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using Farol.Api.Modules.Auth;
+using Farol.Api.Modules.Insights;
+using Farol.Domain.Bills;
+using Farol.Domain.Budgets;
+using Farol.Domain.Categories;
+using Farol.Domain.Ledger;
+using Farol.Infrastructure.Persistence;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace Farol.Tests.Api;
+
+public sealed class FinancialAlertsInsightsEndpointsTests : IClassFixture<FarolApiFactory>
+{
+    private readonly FarolApiFactory _factory;
+
+    public FinancialAlertsInsightsEndpointsTests(FarolApiFactory factory)
+    {
+        _factory = factory;
+    }
+
+    [Fact]
+    public async Task GetAlerts_ShouldRequireAuthentication()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/api/insights/alerts?month=3&year=2026");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetAlerts_ShouldReturnOverdueBillsAlert()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        await SeedBillAsync("maria@email.com", "Energia", 300m, today.AddDays(-2));
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await client.GetFromJsonAsync<AlertsResponse>(
+            $"/api/insights/alerts?month={today.Month}&year={today.Year}");
+
+        Assert.NotNull(response);
+        var alert = Assert.Single(response.Alerts);
+        Assert.Equal("overdue_bills", alert.Type);
+        Assert.Equal("high", alert.Severity);
+        Assert.Equal(300m, alert.Amount);
+        Assert.Contains("contas vencidas", alert.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task GetAlerts_ShouldReturnLowBalanceAlert()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var seed = await SeedAccountAndCategoriesAsync(
+            "maria@email.com",
+            ("Salario", CategoryType.Income),
+            ("Alimentacao", CategoryType.Expense));
+
+        await SeedTransactionsAsync(
+            "maria@email.com",
+            seed.AccountId,
+            [
+                (today, "Salario", 1000m, TransactionType.Income, seed.CategoryIds["Salario"]),
+                (today, "Mercado", 850m, TransactionType.Expense, seed.CategoryIds["Alimentacao"])
+            ]);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await client.GetFromJsonAsync<AlertsResponse>(
+            $"/api/insights/alerts?month={today.Month}&year={today.Year}");
+
+        Assert.NotNull(response);
+        var alert = Assert.Single(response.Alerts);
+        Assert.Equal("low_balance", alert.Type);
+        Assert.Equal("medium", alert.Severity);
+        Assert.Equal(150m, alert.Amount);
+        Assert.Contains("dinheiro livre", alert.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task GetAlerts_ShouldReturnBudgetOverspentAlert()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var seed = await SeedAccountAndCategoriesAsync(
+            "maria@email.com",
+            ("Salario", CategoryType.Income),
+            ("Alimentacao", CategoryType.Expense));
+
+        await SeedBudgetAsync(
+            "maria@email.com",
+            today.Month,
+            today.Year,
+            (seed.CategoryIds["Alimentacao"], 100m));
+
+        await SeedTransactionsAsync(
+            "maria@email.com",
+            seed.AccountId,
+            [
+                (today, "Salario", 2000m, TransactionType.Income, seed.CategoryIds["Salario"]),
+                (today, "Mercado", 150m, TransactionType.Expense, seed.CategoryIds["Alimentacao"])
+            ]);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await client.GetFromJsonAsync<AlertsResponse>(
+            $"/api/insights/alerts?month={today.Month}&year={today.Year}");
+
+        Assert.NotNull(response);
+        var alert = Assert.Single(response.Alerts);
+        Assert.Equal("budget_overspent", alert.Type);
+        Assert.Equal("high", alert.Severity);
+        Assert.Equal(50m, alert.Amount);
+        Assert.Contains("orcamento", alert.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task GetAlerts_ShouldReturnManyPendingBillsAlert()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var seed = await SeedAccountAndCategoriesAsync(
+            "maria@email.com",
+            ("Salario", CategoryType.Income));
+
+        await SeedTransactionsAsync(
+            "maria@email.com",
+            seed.AccountId,
+            [
+                (today, "Salario", 1000m, TransactionType.Income, seed.CategoryIds["Salario"])
+            ]);
+
+        await SeedBillAsync("maria@email.com", "Aluguel", 600m, today.AddDays(2));
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await client.GetFromJsonAsync<AlertsResponse>(
+            $"/api/insights/alerts?month={today.Month}&year={today.Year}");
+
+        Assert.NotNull(response);
+        var alert = Assert.Single(response.Alerts);
+        Assert.Equal("many_pending_bills", alert.Type);
+        Assert.Equal("medium", alert.Severity);
+        Assert.Equal(600m, alert.Amount);
+        Assert.Contains("contas para pagar", alert.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task GetAlerts_ShouldReturnEmptyWhenNoRulesMatch()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await client.GetFromJsonAsync<AlertsResponse>(
+            $"/api/insights/alerts?month={today.Month}&year={today.Year}");
+
+        Assert.NotNull(response);
+        Assert.Empty(response.Alerts);
+    }
+
+    [Fact]
+    public async Task GetAlerts_ShouldBeIsolatedByAuthenticatedUser()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var joaoToken = await RegisterAndGetTokenAsync(client, "joao@email.com");
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        await SeedBillAsync("maria@email.com", "Energia", 300m, today.AddDays(-2));
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", joaoToken);
+
+        var response = await client.GetFromJsonAsync<AlertsResponse>(
+            $"/api/insights/alerts?month={today.Month}&year={today.Year}");
+
+        Assert.NotNull(response);
+        Assert.Empty(response.Alerts);
+    }
+
+    private async Task<(Guid AccountId, Dictionary<string, Guid> CategoryIds)> SeedAccountAndCategoriesAsync(
+        string email,
+        params (string Name, CategoryType Type)[] categoryDefinitions)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<FarolDbContext>();
+        var userId = dbContext.Users.Single(user => user.Email == email).Id;
+        var account = new FinancialAccount(userId, $"Conta {email}", FinancialAccountType.BankAccount);
+        var categoryIds = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+
+        dbContext.FinancialAccounts.Add(account);
+
+        foreach (var (name, type) in categoryDefinitions)
+        {
+            var category = Category.CreateSystem(name, type);
+            dbContext.Categories.Add(category);
+            categoryIds[name] = category.Id;
+        }
+
+        await dbContext.SaveChangesAsync();
+
+        return (account.Id, categoryIds);
+    }
+
+    private async Task SeedBudgetAsync(
+        string email,
+        int month,
+        int year,
+        params (Guid CategoryId, decimal PlannedAmount)[] items)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<FarolDbContext>();
+        var userId = dbContext.Users.Single(user => user.Email == email).Id;
+        var budget = new MonthlyBudget(userId, month, year);
+
+        dbContext.MonthlyBudgets.Add(budget);
+
+        foreach (var (categoryId, plannedAmount) in items)
+        {
+            var category = dbContext.Categories.Single(item => item.Id == categoryId);
+            dbContext.MonthlyBudgetCategories.Add(new MonthlyBudgetCategory(budget.Id, category, plannedAmount));
+        }
+
+        await dbContext.SaveChangesAsync();
+    }
+
+    private async Task SeedTransactionsAsync(
+        string email,
+        Guid accountId,
+        IReadOnlyList<(DateOnly OccurredOn, string Description, decimal Amount, TransactionType Type, Guid CategoryId)> items)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<FarolDbContext>();
+        var userId = dbContext.Users.Single(user => user.Email == email).Id;
+        var account = dbContext.FinancialAccounts.Single(item => item.Id == accountId && item.UserId == userId);
+
+        foreach (var item in items)
+        {
+            var category = dbContext.Categories.Single(category => category.Id == item.CategoryId);
+            dbContext.Transactions.Add(new Transaction(
+                account,
+                item.Type,
+                item.Amount,
+                item.Description,
+                item.OccurredOn,
+                category));
+        }
+
+        await dbContext.SaveChangesAsync();
+    }
+
+    private async Task<Guid> SeedBillAsync(
+        string email,
+        string description,
+        decimal amount,
+        DateOnly dueOn,
+        bool isPaid = false)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<FarolDbContext>();
+        var userId = dbContext.Users.Single(user => user.Email == email).Id;
+        var bill = new Bill(userId, description, amount, dueOn);
+
+        if (isPaid)
+        {
+            bill.MarkAsPaid(new DateTimeOffset(2026, 3, 17, 12, 0, 0, TimeSpan.Zero));
+        }
+
+        dbContext.Bills.Add(bill);
+        await dbContext.SaveChangesAsync();
+
+        return bill.Id;
+    }
+
+    private static async Task<string> RegisterAndGetTokenAsync(HttpClient client, string email)
+    {
+        var response = await client.PostAsJsonAsync("/api/auth/register", new RegisterRequest
+        {
+            Name = "Usuario Teste",
+            Email = email,
+            Password = "123456"
+        });
+
+        response.EnsureSuccessStatusCode();
+
+        var authResponse = await response.Content.ReadFromJsonAsync<AuthResponse>();
+
+        Assert.NotNull(authResponse);
+
+        return authResponse.AccessToken;
+    }
+}
