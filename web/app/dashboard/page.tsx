@@ -7,6 +7,7 @@ import { LoadingScreen } from "@/components/loading-screen";
 import { MonthPicker } from "@/components/month-picker";
 import {
   accountTypeOptions,
+  getAlerts,
   ApiError,
   createAccount,
   getBillsSummary,
@@ -15,6 +16,7 @@ import {
   getMonthlySummary,
   listAccounts,
   type AccountResponse,
+  type AlertsResponse,
   type BillsSummaryResponse,
   type FreeMoneyResponse,
   type MonthlyBudgetResponse,
@@ -35,6 +37,7 @@ type AccountFormState = {
 
 type DashboardData = {
   accounts: AccountResponse[];
+  alerts: AlertsResponse;
   billsSummary: BillsSummaryResponse;
   budget: MonthlyBudgetResponse;
   freeMoney: FreeMoneyResponse;
@@ -45,6 +48,17 @@ const defaultAccountForm: AccountFormState = {
   name: "",
   type: 2,
 };
+
+const alertSeverityLabels = {
+  high: "Alto",
+  medium: "Medio",
+} as const;
+
+const alertSeverityStyles = {
+  high: "bg-[color:rgba(185,28,28,0.1)] text-red-700 border-[color:rgba(185,28,28,0.14)]",
+  medium:
+    "bg-[color:rgba(217,119,6,0.12)] text-[var(--color-warm)] border-[color:rgba(217,119,6,0.14)]",
+} as const;
 
 export default function DashboardPage() {
   const { session, isLoading, logout } = useProtectedSession();
@@ -75,12 +89,13 @@ export default function DashboardPage() {
       setLoadError("");
 
       try {
-        const [summary, billsSummary, freeMoney, budget, accounts] = await Promise.all([
+        const [summary, alerts, billsSummary, freeMoney, budget, accounts] = await Promise.all([
           getMonthlySummary(
             accessToken,
             monthAndYear.month,
             monthAndYear.year,
           ),
+          getAlerts(accessToken, monthAndYear.month, monthAndYear.year),
           getBillsSummary(accessToken, monthAndYear.month, monthAndYear.year),
           getFreeMoney(accessToken, monthAndYear.month, monthAndYear.year),
           getMonthlyBudget(
@@ -95,6 +110,7 @@ export default function DashboardPage() {
           setLoadError("");
           setData({
             accounts,
+            alerts,
             billsSummary,
             budget,
             freeMoney,
@@ -212,6 +228,48 @@ export default function DashboardPage() {
         />
       ) : (
         <div className="space-y-6">
+          <section className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
+            <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
+              Alertas do mes
+            </div>
+            <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
+              O que merece atencao agora
+            </h2>
+
+            <div className="mt-6 grid gap-3">
+              {data.alerts.alerts.length === 0 ? (
+                <div className="rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
+                  Nenhum alerta importante para este mes no momento.
+                </div>
+              ) : (
+                data.alerts.alerts.map((alert, index) => (
+                  <article
+                    className="rounded-[24px] border border-[var(--color-line)] bg-white px-5 py-4"
+                    key={`${alert.type}-${index}`}
+                  >
+                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span
+                            className={`rounded-full border px-3 py-1 text-xs font-semibold ${alertSeverityStyles[alert.severity]}`}
+                          >
+                            Prioridade {alertSeverityLabels[alert.severity]}
+                          </span>
+                        </div>
+                        <div className="mt-3 text-sm font-semibold text-[var(--color-foreground)]">
+                          {alert.message}
+                        </div>
+                      </div>
+                      <div className="text-sm font-semibold text-[var(--color-foreground)]">
+                        {formatCurrency(alert.amount)}
+                      </div>
+                    </div>
+                  </article>
+                ))
+              )}
+            </div>
+          </section>
+
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {[
               {

@@ -78,6 +78,19 @@ export type FreeMoneyResponse = {
   freeToSpend: number;
 };
 
+export type AlertSeverity = "high" | "medium";
+
+export type AlertResponse = {
+  type: string;
+  severity: AlertSeverity;
+  message: string;
+  amount: number;
+};
+
+export type AlertsResponse = {
+  alerts: AlertResponse[];
+};
+
 export type ImportTransactionsCsvErrorResponse = {
   rowNumber: number;
   message: string;
@@ -301,6 +314,13 @@ export async function getBillsSummary(
 export async function getFreeMoney(token: string, month: number, year: number) {
   return apiRequest<FreeMoneyResponse>(
     `/api/insights/free-money?month=${month}&year=${year}`,
+    { token },
+  );
+}
+
+export async function getAlerts(token: string, month: number, year: number) {
+  return apiRequest<AlertsResponse>(
+    `/api/insights/alerts?month=${month}&year=${year}`,
     { token },
   );
 }
