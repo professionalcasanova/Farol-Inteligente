@@ -4,7 +4,7 @@ Farol e um assistente financeiro pessoal para o mercado brasileiro, construido c
 
 ## Estado atual
 
-Sprint 1, Sprint 2, Sprint 3, Sprint 4, Sprint 5, Sprint 6 e Sprint 7 concluidas com:
+Sprint 1 a Sprint 10 concluidas, com MVP fechado para demonstracao local:
 
 - estrutura base da solution em .NET
 - dominio inicial
@@ -18,15 +18,19 @@ Sprint 1, Sprint 2, Sprint 3, Sprint 4, Sprint 5, Sprint 6 e Sprint 7 concluidas
 - endpoints de orcamento mensal por categoria
 - endpoint de importacao CSV de transacoes com categorizacao simples por regras
 - endpoint de insight de dinheiro livre
+- endpoint de alertas financeiros
 - modulo minimo de bills/vencimentos no backend e no front MVP
 - endpoint de resumo de bills no dashboard
 - front-end MVP em `web/` com Next.js, TypeScript e Tailwind CSS
 - login web com persistencia temporaria de `accessToken` em `localStorage` para demo local
-- dashboard web com resumo mensal, bills, orcamento e dinheiro livre
+- dashboard web com resumo mensal, bills, orcamento, dinheiro livre, alertas e onboarding
+- alertas web acionaveis com redirecionamento para a proxima acao
 - telas web de transacoes, orcamento, importacao CSV e bills consumindo a API existente
+- fluxo de onboarding simples para primeiro valor do usuario
+- polimento de microcopy, CTAs e estados vazios para demonstracao
 - testes unitarios e testes de API para autenticacao, contas, categorias, transacoes, resumo mensal, orcamento, importacao CSV, insights e bills
 
-O produto segue em estagio de MVP local com foco em demonstracao.
+O MVP esta fechado para demonstracao local.
 
 ## Stack atual
 
@@ -251,11 +255,12 @@ Fluxo atual:
 
 ## Insights
 
-Endpoint disponivel:
+Endpoints disponiveis:
 
 - `GET /api/insights/free-money?month={m}&year={y}`
+- `GET /api/insights/alerts?month={m}&year={y}`
 
-Retorno atual:
+Retorno atual de `free-money`:
 
 - `totalIncome`
 - `totalExpense`
@@ -264,6 +269,15 @@ Retorno atual:
 - `totalBudgetSpent`
 - `totalBudgetRemaining`
 - `freeToSpend`
+
+Retorno atual de `alerts`:
+
+- `alerts`
+- `type`
+- `severity`
+- `message`
+- `amount`
+- `actionUrl`
 
 ## Banco local
 
@@ -303,3 +317,7 @@ Fechamento detalhado da Sprint 6:
 Fechamento detalhado da Sprint 7:
 
 - [docs/sprints/sprint-7.md](docs/sprints/sprint-7.md)
+
+Fechamento detalhado da Sprint 10:
+
+- [docs/sprints/sprint-10.md](docs/sprints/sprint-10.md)
