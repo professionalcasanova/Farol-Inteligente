@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { LoadErrorState } from "@/components/load-error-state";
@@ -183,7 +184,15 @@ export default function TransactionsPage() {
 
   return (
     <AppShell
-      description="Registre entradas e saidas sem sair do MVP. A lista usa exatamente os dados ja persistidos pela API."
+      actions={
+        <Link
+          className="rounded-full border border-[var(--color-line)] px-4 py-3 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-white"
+          href="/dashboard"
+        >
+          Voltar ao dashboard
+        </Link>
+      }
+      description="Registre entradas e saidas sem sair do MVP. Cada lancamento ja atualiza saldo, dinheiro livre e alertas."
       onLogout={logout}
       session={session}
       title="Transacoes"
@@ -196,7 +205,21 @@ export default function TransactionsPage() {
 
       {success ? (
         <div className="mb-6 rounded-[24px] border border-[color:rgba(29,130,93,0.16)] bg-[color:rgba(220,252,231,0.8)] px-5 py-4 text-sm text-green-700">
-          {success}
+          <div>{success}</div>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <Link
+              className="rounded-full border border-[color:rgba(29,130,93,0.18)] px-4 py-2 text-sm font-medium text-green-700 transition hover:bg-white"
+              href="/dashboard"
+            >
+              Ver impacto no dashboard
+            </Link>
+            <Link
+              className="rounded-full border border-[color:rgba(29,130,93,0.18)] px-4 py-2 text-sm font-medium text-green-700 transition hover:bg-white"
+              href="/budget"
+            >
+              Ajustar orcamento
+            </Link>
+          </div>
         </div>
       ) : null}
 
@@ -221,7 +244,10 @@ export default function TransactionsPage() {
             {accounts.length === 0 ? (
               <div className="mt-6 rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
                 Voce precisa de ao menos uma conta financeira. Crie a primeira no
-                dashboard e volte aqui.
+                <Link className="font-semibold text-[var(--color-accent)]" href="/dashboard#quick-account">
+                  {" "}dashboard
+                </Link>{" "}
+                e volte aqui.
               </div>
             ) : (
               <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
@@ -368,7 +394,12 @@ export default function TransactionsPage() {
               {transactions.length === 0 ? (
                 <div className="rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
                   Nenhuma transacao encontrada. O primeiro lancamento ja atualiza
-                  o dashboard e o insight de dinheiro livre.
+                  o dashboard e o insight de dinheiro livre. Se quiser conferir
+                  o resultado depois, volte para{" "}
+                  <Link className="font-semibold text-[var(--color-accent)]" href="/dashboard">
+                    Dashboard
+                  </Link>
+                  .
                 </div>
               ) : (
                 transactions.map((transaction) => {

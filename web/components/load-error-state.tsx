@@ -22,12 +22,15 @@ export function LoadErrorState({
       <p className="mt-3 max-w-2xl text-sm leading-6 text-red-700">
         {message}
       </p>
+      <p className="mt-2 text-xs leading-6 text-red-700">
+        Se o problema continuar, confirme se a API e o banco local estao ativos.
+      </p>
       <button
         className="mt-5 rounded-2xl bg-[var(--color-foreground)] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[var(--color-accent)]"
         onClick={onRetry}
         type="button"
       >
-        Tentar novamente
+        Tentar de novo
       </button>
     </div>
   );

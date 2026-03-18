@@ -80,6 +80,7 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loadError, setLoadError] = useState("");
   const [accountError, setAccountError] = useState("");
+  const [accountSuccess, setAccountSuccess] = useState("");
   const [isFetching, setIsFetching] = useState(true);
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
   const [accountForm, setAccountForm] = useState<AccountFormState>(defaultAccountForm);
@@ -212,6 +213,7 @@ export default function DashboardPage() {
     const accessToken = session.accessToken;
     setIsCreatingAccount(true);
     setAccountError("");
+    setAccountSuccess("");
 
     try {
       await createAccount(accessToken, {
@@ -234,6 +236,9 @@ export default function DashboardPage() {
           : current,
       );
       setAccountForm(defaultAccountForm);
+      setAccountSuccess(
+        "Conta criada com sucesso. Agora voce ja pode registrar transacoes, bills ou importar um CSV.",
+      );
     } catch (caughtError) {
       if (caughtError instanceof ApiError && caughtError.status === 401) {
         logout();
@@ -268,6 +273,26 @@ export default function DashboardPage() {
       session={session}
       title="Dashboard financeiro"
     >
+      {accountSuccess ? (
+        <div className="mb-6 rounded-[24px] border border-[color:rgba(29,130,93,0.16)] bg-[color:rgba(220,252,231,0.8)] px-5 py-4 text-sm text-green-700">
+          <div>{accountSuccess}</div>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <Link
+              className="rounded-full border border-[color:rgba(29,130,93,0.18)] px-4 py-2 text-sm font-medium text-green-700 transition hover:bg-white"
+              href="/transactions"
+            >
+              Registrar transacao
+            </Link>
+            <Link
+              className="rounded-full border border-[color:rgba(29,130,93,0.18)] px-4 py-2 text-sm font-medium text-green-700 transition hover:bg-white"
+              href="/imports"
+            >
+              Importar CSV
+            </Link>
+          </div>
+        </div>
+      ) : null}
+
       {accountError ? (
         <div className="mb-6 rounded-[24px] border border-[color:rgba(185,28,28,0.14)] bg-[color:rgba(254,226,226,0.8)] px-5 py-4 text-sm text-red-700">
           {accountError}
@@ -336,6 +361,60 @@ export default function DashboardPage() {
           ) : null}
 
           <section className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
+            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
+                  Acoes rapidas
+                </div>
+                <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
+                  Proximo passo da demonstracao
+                </h2>
+              </div>
+              <div className="text-sm text-[var(--color-muted)]">
+                Escolha um fluxo e volte para acompanhar o impacto no dashboard.
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {[
+                {
+                  href: "/transactions",
+                  label: "Nova transacao",
+                  description: "Registre receita ou despesa e atualize o saldo na hora.",
+                },
+                {
+                  href: "/bills",
+                  label: "Nova bill",
+                  description: "Cadastre vencimentos e veja alertas aparecerem no mes.",
+                },
+                {
+                  href: "/budget",
+                  label: "Montar orcamento",
+                  description: "Defina limites por categoria e acompanhe o restante.",
+                },
+                {
+                  href: "/imports",
+                  label: "Importar CSV",
+                  description: "Puxe varias transacoes de uma vez para acelerar a demo.",
+                },
+              ].map((item) => (
+                <Link
+                  className="rounded-[24px] border border-[var(--color-line)] bg-white px-5 py-4 transition hover:border-[var(--color-accent)]"
+                  href={item.href}
+                  key={item.href}
+                >
+                  <div className="text-sm font-semibold text-[var(--color-foreground)]">
+                    {item.label}
+                  </div>
+                  <div className="mt-2 text-sm leading-6 text-[var(--color-muted)]">
+                    {item.description}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
             <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
               Alertas do mes
             </div>
@@ -346,7 +425,9 @@ export default function DashboardPage() {
             <div className="mt-6 grid gap-3">
               {data.alerts.alerts.length === 0 ? (
                 <div className="rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
-                  Nenhum alerta importante para este mes no momento.
+                  Nenhum alerta importante para este mes no momento. Se quiser
+                  avancar a demo agora, registre uma transacao, monte um
+                  orcamento ou adicione uma bill.
                 </div>
               ) : (
                 data.alerts.alerts.map((alert, index) => (
@@ -468,7 +549,12 @@ export default function DashboardPage() {
               <div className="mt-6 grid gap-3">
                 {data.budget.categories.length === 0 ? (
                   <div className="rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
-                    Ainda nao existe orcamento cadastrado para este mes.
+                    Ainda nao existe orcamento cadastrado para este mes. Monte
+                    seu primeiro planejamento em{" "}
+                    <Link className="font-semibold text-[var(--color-accent)]" href="/budget">
+                      Orcamento
+                    </Link>{" "}
+                    e depois volte aqui para acompanhar o restante.
                   </div>
                 ) : (
                   data.budget.categories.map((item) => (
@@ -529,7 +615,7 @@ export default function DashboardPage() {
                 {data.accounts.length === 0 ? (
                   <div className="rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-5 text-sm text-[var(--color-muted)]">
                     Nenhuma conta encontrada. Crie a primeira conta abaixo para
-                    liberar transacoes, orcamento e importacao CSV.
+                    liberar transacoes, bills, orcamento e importacao CSV.
                   </div>
                 ) : (
                   data.accounts.map((account) => (
@@ -655,7 +741,12 @@ export default function DashboardPage() {
               <div className="mt-6 space-y-3">
                 {data.billsSummary.upcoming.length === 0 ? (
                   <div className="rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
-                    Nenhuma conta pendente para este mes.
+                    Nenhuma conta pendente para este mes. Se quiser demonstrar
+                    vencimentos e alertas, crie uma nova bill em{" "}
+                    <Link className="font-semibold text-[var(--color-accent)]" href="/bills">
+                      Bills
+                    </Link>
+                    .
                   </div>
                 ) : (
                   data.billsSummary.upcoming.map((bill) => (
@@ -697,7 +788,12 @@ export default function DashboardPage() {
             <div className="mt-6 grid gap-3 md:grid-cols-2">
               {data.summary.byCategory.length === 0 ? (
                 <div className="rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
-                  Ainda nao ha transacoes registradas neste mes.
+                  Ainda nao ha transacoes registradas neste mes. Crie uma
+                  receita ou despesa em{" "}
+                  <Link className="font-semibold text-[var(--color-accent)]" href="/transactions">
+                    Transacoes
+                  </Link>{" "}
+                  para alimentar o dashboard.
                 </div>
               ) : (
                 data.summary.byCategory.map((item, index) => (

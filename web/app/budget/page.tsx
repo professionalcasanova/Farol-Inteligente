@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { LoadErrorState } from "@/components/load-error-state";
@@ -222,13 +223,21 @@ export default function BudgetPage() {
   return (
     <AppShell
       actions={
-        <MonthPicker
-          label="Mes do orcamento"
-          onChange={setMonthValue}
-          value={monthValue}
-        />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <MonthPicker
+            label="Mes do orcamento"
+            onChange={setMonthValue}
+            value={monthValue}
+          />
+          <Link
+            className="rounded-full border border-[var(--color-line)] px-4 py-3 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-white"
+            href="/dashboard"
+          >
+            Voltar ao dashboard
+          </Link>
+        </div>
       }
-      description="Monte ou substitua o orcamento mensal por categoria de despesa e acompanhe o restante em tempo real."
+      description="Monte ou substitua o orcamento mensal por categoria de despesa e acompanhe o restante em tempo real no dashboard."
       onLogout={logout}
       session={session}
       title="Orcamento mensal"
@@ -241,7 +250,15 @@ export default function BudgetPage() {
 
       {success ? (
         <div className="mb-6 rounded-[24px] border border-[color:rgba(29,130,93,0.16)] bg-[color:rgba(220,252,231,0.8)] px-5 py-4 text-sm text-green-700">
-          {success}
+          <div>{success}</div>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <Link
+              className="rounded-full border border-[color:rgba(29,130,93,0.18)] px-4 py-2 text-sm font-medium text-green-700 transition hover:bg-white"
+              href="/dashboard"
+            >
+              Voltar ao dashboard
+            </Link>
+          </div>
         </div>
       ) : null}
 
@@ -299,7 +316,9 @@ export default function BudgetPage() {
             <div className="mt-6 space-y-3">
               {budget.categories.length === 0 ? (
                 <div className="rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
-                  Nenhuma categoria orcada neste mes ainda.
+                  Nenhuma categoria orcada neste mes ainda. Use o formulario ao
+                  lado para montar o primeiro planejamento e depois volte ao
+                  dashboard para acompanhar gasto, restante e dinheiro livre.
                 </div>
               ) : (
                 budget.categories.map((item) => (

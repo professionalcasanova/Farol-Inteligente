@@ -15,6 +15,9 @@ export function LoadingScreen({
         <p className="text-lg font-semibold text-[var(--color-foreground)]">
           {message}
         </p>
+        <p className="mt-3 text-sm leading-6 text-[var(--color-muted)]">
+          Na primeira carga local, a API pode levar alguns segundos para responder.
+        </p>
       </div>
     </div>
   );

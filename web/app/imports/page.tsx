@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { LoadErrorState } from "@/components/load-error-state";
@@ -119,6 +120,14 @@ export default function ImportsPage() {
 
   return (
     <AppShell
+      actions={
+        <Link
+          className="rounded-full border border-[var(--color-line)] px-4 py-3 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-white"
+          href="/dashboard"
+        >
+          Voltar ao dashboard
+        </Link>
+      }
       description="Envie um CSV simples para uma conta existente e veja na hora quantas linhas entraram, quantas foram ignoradas e por que."
       onLogout={logout}
       session={session}
@@ -151,7 +160,11 @@ export default function ImportsPage() {
             {accounts.length === 0 ? (
               <div className="mt-6 rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
                 Nenhuma conta financeira encontrada. Crie uma conta no dashboard
-                antes de importar.
+                antes de importar. Se precisar, volte para{" "}
+                <Link className="font-semibold text-[var(--color-accent)]" href="/dashboard#quick-account">
+                  Dashboard
+                </Link>
+                .
               </div>
             ) : (
               <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
@@ -219,7 +232,9 @@ occurredOn,description,amount,type,categoryName
 
               {!result ? (
                 <div className="mt-6 rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
-                  O resumo aparece aqui depois do primeiro upload.
+                  O resumo aparece aqui depois do primeiro upload. Assim que a
+                  importacao terminar, voce ja pode revisar as transacoes e
+                  voltar ao dashboard.
                 </div>
               ) : (
                 <>
@@ -265,6 +280,21 @@ occurredOn,description,amount,type,categoryName
                         </div>
                       ))
                     )}
+                  </div>
+
+                  <div className="mt-6 flex flex-wrap gap-3">
+                    <Link
+                      className="rounded-full border border-[var(--color-line)] px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-white"
+                      href="/transactions"
+                    >
+                      Revisar transacoes
+                    </Link>
+                    <Link
+                      className="rounded-full border border-[var(--color-line)] px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-white"
+                      href="/dashboard"
+                    >
+                      Voltar ao dashboard
+                    </Link>
                   </div>
                 </>
               )}

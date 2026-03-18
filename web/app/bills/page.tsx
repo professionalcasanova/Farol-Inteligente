@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { LoadErrorState } from "@/components/load-error-state";
@@ -256,14 +257,20 @@ export default function BillsPage() {
             >
               {statusOptions.map((option) => (
                 <option key={option.value || "all"} value={option.value}>
-                  {option.label}
+              {option.label}
                 </option>
               ))}
             </select>
           </label>
+          <Link
+            className="rounded-full border border-[var(--color-line)] px-4 py-3 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-white"
+            href="/dashboard"
+          >
+            Voltar ao dashboard
+          </Link>
         </div>
       }
-      description="Acompanhe vencimentos, destaque atrasos e marque pagamentos sem sair do MVP."
+      description="Acompanhe vencimentos, destaque atrasos e marque pagamentos sem sair do MVP. O dashboard reflete tudo isso no mesmo mes."
       onLogout={logout}
       session={session}
       title="Bills e vencimentos"
@@ -276,7 +283,15 @@ export default function BillsPage() {
 
       {success ? (
         <div className="mb-6 rounded-[24px] border border-[color:rgba(29,130,93,0.16)] bg-[color:rgba(220,252,231,0.8)] px-5 py-4 text-sm text-green-700">
-          {success}
+          <div>{success}</div>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <Link
+              className="rounded-full border border-[color:rgba(29,130,93,0.18)] px-4 py-2 text-sm font-medium text-green-700 transition hover:bg-white"
+              href="/dashboard"
+            >
+              Ver resumo no dashboard
+            </Link>
+          </div>
         </div>
       ) : null}
 
@@ -377,7 +392,9 @@ export default function BillsPage() {
             <div className="mt-6 space-y-3">
               {bills.length === 0 ? (
                 <div className="rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
-                  Nenhuma bill encontrada para os filtros atuais.
+                  Nenhuma bill encontrada para os filtros atuais. Use o
+                  formulario ao lado para registrar o primeiro vencimento ou
+                  ajuste os filtros para rever outro mes.
                 </div>
               ) : (
                 bills.map((bill) => (
