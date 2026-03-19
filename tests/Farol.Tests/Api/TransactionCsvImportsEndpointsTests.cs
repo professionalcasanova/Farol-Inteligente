@@ -97,6 +97,102 @@ public sealed class TransactionCsvImportsEndpointsTests : IClassFixture<FarolApi
     }
 
     [Fact]
+    public async Task PostCsv_MissingFile_ReturnsBadRequest()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var seed = await SeedAccountAndCategoriesAsync("maria@email.com", ("Alimentacao", CategoryType.Expense));
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var content = new MultipartFormDataContent
+        {
+            { new StringContent(seed.AccountId.ToString()), "FinancialAccountId" }
+        };
+
+        var response = await client.PostAsync("/api/imports/transactions/csv", content);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+
+        Assert.NotNull(error);
+        Assert.Equal("CSV file is required.", error.Message);
+    }
+
+    [Fact]
+    public async Task PostCsv_EmptyFile_ReturnsBadRequest()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var seed = await SeedAccountAndCategoriesAsync("maria@email.com", ("Alimentacao", CategoryType.Expense));
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var content = CreateMultipartContent(seed.AccountId, string.Empty);
+
+        var response = await client.PostAsync("/api/imports/transactions/csv", content);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+
+        Assert.NotNull(error);
+        Assert.Equal("CSV file is required.", error.Message);
+    }
+
+    [Fact]
+    public async Task PostCsv_HeaderOnly_ReturnsBadRequest()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var seed = await SeedAccountAndCategoriesAsync("maria@email.com", ("Alimentacao", CategoryType.Expense));
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var content = CreateMultipartContent(seed.AccountId, """
+            occurredOn,description,amount,type,categoryName
+            """);
+
+        var response = await client.PostAsync("/api/imports/transactions/csv", content);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+
+        Assert.NotNull(error);
+        Assert.Equal("CSV file must contain at least one data row.", error.Message);
+    }
+
+    [Fact]
+    public async Task PostCsv_InvalidHeader_ReturnsBadRequest()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var seed = await SeedAccountAndCategoriesAsync("maria@email.com", ("Alimentacao", CategoryType.Expense));
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var content = CreateMultipartContent(seed.AccountId, """
+            date,description,amount,type,category
+            2026-03-02,Mercado,120.50,Expense,Alimentacao
+            """);
+
+        var response = await client.PostAsync("/api/imports/transactions/csv", content);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+
+        Assert.NotNull(error);
+        Assert.Equal("CSV header is invalid. Expected: occurredOn,description,amount,type,categoryName.", error.Message);
+    }
+
+    [Fact]
     public async Task PostCsv_ShouldSkipInvalidRowAndReturnError()
     {
         await _factory.ResetDatabaseAsync();
@@ -129,6 +225,35 @@ public sealed class TransactionCsvImportsEndpointsTests : IClassFixture<FarolApi
         var dbContext = scope.ServiceProvider.GetRequiredService<FarolDbContext>();
 
         Assert.Single(dbContext.Transactions);
+    }
+
+    [Fact]
+    public async Task PostCsv_UnknownExplicitCategory_ReturnsOkWithSkippedRow()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var seed = await SeedAccountAndCategoriesAsync("maria@email.com", ("Alimentacao", CategoryType.Expense));
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var content = CreateMultipartContent(seed.AccountId, """
+            occurredOn,description,amount,type,categoryName
+            2026-03-02,Mercado,120.50,Expense,CategoriaInexistente
+            """);
+
+        var response = await client.PostAsync("/api/imports/transactions/csv", content);
+
+        response.EnsureSuccessStatusCode();
+
+        var summary = await response.Content.ReadFromJsonAsync<ImportTransactionsCsvResponse>();
+
+        Assert.NotNull(summary);
+        Assert.Equal(1, summary.TotalRows);
+        Assert.Equal(0, summary.ImportedRows);
+        Assert.Equal(1, summary.SkippedRows);
+        Assert.Single(summary.Errors);
+        Assert.Contains("unknown category", summary.Errors[0].Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -220,6 +345,37 @@ public sealed class TransactionCsvImportsEndpointsTests : IClassFixture<FarolApi
     }
 
     [Fact]
+    public async Task PostCsv_BlankLines_ShouldSkipBlankRowsAndImportValidRows()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var seed = await SeedAccountAndCategoriesAsync("maria@email.com", ("Alimentacao", CategoryType.Expense));
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var content = CreateMultipartContent(seed.AccountId, """
+            occurredOn,description,amount,type,categoryName
+
+            2026-03-02,Mercado,120.50,Expense,Alimentacao
+
+            """);
+
+        var response = await client.PostAsync("/api/imports/transactions/csv", content);
+
+        response.EnsureSuccessStatusCode();
+
+        var summary = await response.Content.ReadFromJsonAsync<ImportTransactionsCsvResponse>();
+
+        Assert.NotNull(summary);
+        Assert.Equal(2, summary.TotalRows);
+        Assert.Equal(1, summary.ImportedRows);
+        Assert.Equal(1, summary.SkippedRows);
+        Assert.Single(summary.Errors);
+        Assert.All(summary.Errors, error => Assert.Contains("empty", error.Message, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task PostCsv_ShouldNotMixDataBetweenUsers()
     {
         await _factory.ResetDatabaseAsync();
@@ -301,5 +457,10 @@ public sealed class TransactionCsvImportsEndpointsTests : IClassFixture<FarolApi
         Assert.NotNull(authResponse);
 
         return authResponse.AccessToken;
+    }
+
+    private sealed class ErrorResponse
+    {
+        public string? Message { get; init; }
     }
 }

@@ -133,6 +133,145 @@ public sealed class TransactionsEndpointsTests : IClassFixture<FarolApiFactory>
     }
 
     [Fact]
+    public async Task PostTransactions_NonexistentAccount_ReturnsBadRequest()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var categoryId = await SeedSystemCategoryAsync("Moradia", CategoryType.Expense);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await client.PostAsJsonAsync("/api/transactions", new CreateTransactionRequest
+        {
+            FinancialAccountId = Guid.NewGuid(),
+            CategoryId = categoryId,
+            Type = TransactionType.Expense,
+            Amount = 100m,
+            Description = "Aluguel",
+            OccurredOn = new DateOnly(2026, 3, 16)
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+
+        Assert.NotNull(error);
+        Assert.Equal("Financial account is invalid.", error.Message);
+    }
+
+    [Fact]
+    public async Task PostTransactions_AccountFromAnotherUser_ReturnsBadRequest()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var mariaToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        await RegisterAndGetTokenAsync(client, "joao@email.com");
+        var joaoAccountId = await SeedOwnedAccountAsync("joao@email.com", "Conta Joao");
+        var categoryId = await SeedSystemCategoryAsync("Moradia", CategoryType.Expense);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", mariaToken);
+
+        var response = await client.PostAsJsonAsync("/api/transactions", new CreateTransactionRequest
+        {
+            FinancialAccountId = joaoAccountId,
+            CategoryId = categoryId,
+            Type = TransactionType.Expense,
+            Amount = 100m,
+            Description = "Aluguel",
+            OccurredOn = new DateOnly(2026, 3, 16)
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+
+        Assert.NotNull(error);
+        Assert.Equal("Financial account is invalid.", error.Message);
+    }
+
+    [Fact]
+    public async Task PostTransactions_NonexistentCategory_ReturnsBadRequest()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var accountId = await SeedOwnedAccountAsync("maria@email.com", "Conta Corrente");
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await client.PostAsJsonAsync("/api/transactions", new CreateTransactionRequest
+        {
+            FinancialAccountId = accountId,
+            CategoryId = Guid.NewGuid(),
+            Type = TransactionType.Expense,
+            Amount = 100m,
+            Description = "Mercado",
+            OccurredOn = new DateOnly(2026, 3, 16)
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+
+        Assert.NotNull(error);
+        Assert.Equal("Category is invalid.", error.Message);
+    }
+
+    [Fact]
+    public async Task PostTransactions_CategoryFromAnotherUser_ReturnsBadRequest()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var mariaToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        await RegisterAndGetTokenAsync(client, "joao@email.com");
+        var accountId = await SeedOwnedAccountAsync("maria@email.com", "Conta Corrente");
+        var joaoCategoryId = await SeedUserOwnedCategoryAsync("joao@email.com", "Moradia", CategoryType.Expense);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", mariaToken);
+
+        var response = await client.PostAsJsonAsync("/api/transactions", new CreateTransactionRequest
+        {
+            FinancialAccountId = accountId,
+            CategoryId = joaoCategoryId,
+            Type = TransactionType.Expense,
+            Amount = 100m,
+            Description = "Mercado",
+            OccurredOn = new DateOnly(2026, 3, 16)
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+
+        Assert.NotNull(error);
+        Assert.Equal("Category is invalid.", error.Message);
+    }
+
+    [Fact]
+    public async Task PostTransactions_InvalidAmount_ReturnsBadRequest()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var seed = await SeedOwnedAccountAndSystemCategoryAsync("maria@email.com", "Conta Corrente", "Moradia", CategoryType.Expense);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await client.PostAsJsonAsync("/api/transactions", new CreateTransactionRequest
+        {
+            FinancialAccountId = seed.AccountId,
+            CategoryId = seed.CategoryId,
+            Type = TransactionType.Expense,
+            Amount = 0m,
+            Description = "Mercado",
+            OccurredOn = new DateOnly(2026, 3, 16)
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task GetTransactions_ShouldReturnOnlyTransactionsFromAuthenticatedUser()
     {
         await _factory.ResetDatabaseAsync();
@@ -221,6 +360,73 @@ public sealed class TransactionsEndpointsTests : IClassFixture<FarolApiFactory>
         Assert.Equal(500m, updatedTransaction.Amount);
     }
 
+    [Fact]
+    public async Task PutTransactions_FromAnotherUser_ReturnsNotFound()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var joaoToken = await RegisterAndGetTokenAsync(client, "joao@email.com");
+        var mariaToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var joaoSeed = await SeedOwnedAccountAndSystemCategoryAsync("joao@email.com", "Conta Joao", "Moradia", CategoryType.Expense);
+        var mariaAccountId = await SeedOwnedAccountAsync("maria@email.com", "Conta Maria");
+        var mariaCategoryId = await SeedSystemCategoryAsync("Salario", CategoryType.Income);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", joaoToken);
+
+        var createResponse = await client.PostAsJsonAsync("/api/transactions", new CreateTransactionRequest
+        {
+            FinancialAccountId = joaoSeed.AccountId,
+            CategoryId = joaoSeed.CategoryId,
+            Type = TransactionType.Expense,
+            Amount = 80m,
+            Description = "Mercado",
+            OccurredOn = new DateOnly(2026, 3, 14)
+        });
+
+        createResponse.EnsureSuccessStatusCode();
+
+        var createdTransaction = await createResponse.Content.ReadFromJsonAsync<TransactionResponse>();
+
+        Assert.NotNull(createdTransaction);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", mariaToken);
+
+        var response = await client.PutAsJsonAsync($"/api/transactions/{createdTransaction.Id}", new UpdateTransactionRequest
+        {
+            FinancialAccountId = mariaAccountId,
+            CategoryId = mariaCategoryId,
+            Type = TransactionType.Income,
+            Amount = 500m,
+            Description = "Reembolso",
+            OccurredOn = new DateOnly(2026, 3, 15)
+        });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PutTransactions_NonexistentTransaction_ReturnsNotFound()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var seed = await SeedOwnedAccountAndSystemCategoryAsync("maria@email.com", "Conta Corrente", "Moradia", CategoryType.Expense);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await client.PutAsJsonAsync($"/api/transactions/{Guid.NewGuid()}", new UpdateTransactionRequest
+        {
+            FinancialAccountId = seed.AccountId,
+            CategoryId = seed.CategoryId,
+            Type = TransactionType.Expense,
+            Amount = 80m,
+            Description = "Mercado",
+            OccurredOn = new DateOnly(2026, 3, 14)
+        });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
     private async Task<(Guid AccountId, Guid CategoryId)> SeedOwnedAccountAndSystemCategoryAsync(
         string email,
         string accountName,
@@ -238,6 +444,44 @@ public sealed class TransactionsEndpointsTests : IClassFixture<FarolApiFactory>
         await dbContext.SaveChangesAsync();
 
         return (account.Id, category.Id);
+    }
+
+    private async Task<Guid> SeedOwnedAccountAsync(string email, string accountName)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<FarolDbContext>();
+        var userId = dbContext.Users.Single(user => user.Email == email).Id;
+        var account = new FinancialAccount(userId, accountName, FinancialAccountType.BankAccount);
+
+        dbContext.FinancialAccounts.Add(account);
+        await dbContext.SaveChangesAsync();
+
+        return account.Id;
+    }
+
+    private async Task<Guid> SeedSystemCategoryAsync(string categoryName, CategoryType categoryType)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<FarolDbContext>();
+        var category = Category.CreateSystem(categoryName, categoryType);
+
+        dbContext.Categories.Add(category);
+        await dbContext.SaveChangesAsync();
+
+        return category.Id;
+    }
+
+    private async Task<Guid> SeedUserOwnedCategoryAsync(string email, string categoryName, CategoryType categoryType)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<FarolDbContext>();
+        var userId = dbContext.Users.Single(user => user.Email == email).Id;
+        var category = Category.CreateUserOwned(userId, categoryName, categoryType);
+
+        dbContext.Categories.Add(category);
+        await dbContext.SaveChangesAsync();
+
+        return category.Id;
     }
 
     private async Task<Guid> SeedVisibleCategoryAsync(string email, string categoryName, CategoryType categoryType)
@@ -269,5 +513,10 @@ public sealed class TransactionsEndpointsTests : IClassFixture<FarolApiFactory>
         Assert.NotNull(authResponse);
 
         return authResponse.AccessToken;
+    }
+
+    private sealed class ErrorResponse
+    {
+        public string? Message { get; init; }
     }
 }

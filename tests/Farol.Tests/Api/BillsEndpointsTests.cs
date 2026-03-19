@@ -160,6 +160,56 @@ public sealed class BillsEndpointsTests : IClassFixture<FarolApiFactory>
     }
 
     [Fact]
+    public async Task PatchPay_NonexistentBill_ReturnsNotFound()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var request = new HttpRequestMessage(HttpMethod.Patch, $"/api/bills/{Guid.NewGuid()}/pay");
+
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PatchUnpay_NonexistentBill_ReturnsNotFound()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var request = new HttpRequestMessage(HttpMethod.Patch, $"/api/bills/{Guid.NewGuid()}/unpay");
+
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PatchUnpay_BillFromAnotherUser_ReturnsNotFound()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var mariaToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        await RegisterAndGetTokenAsync(client, "joao@email.com");
+        var joaoBillId = await SeedBillAsync("joao@email.com", "Aluguel", 1200m, new DateOnly(2026, 3, 10), isPaid: true);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", mariaToken);
+
+        using var request = new HttpRequestMessage(HttpMethod.Patch, $"/api/bills/{joaoBillId}/unpay");
+
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
     public async Task GetBills_ShouldFilterByStatus()
     {
         await _factory.ResetDatabaseAsync();
@@ -179,6 +229,77 @@ public sealed class BillsEndpointsTests : IClassFixture<FarolApiFactory>
         Assert.Single(bills);
         Assert.Equal("Internet", bills[0].Description);
         Assert.Equal("overdue", bills[0].Status);
+    }
+
+    [Fact]
+    public async Task GetBills_InvalidStatus_ReturnsBadRequest()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await client.GetAsync("/api/bills?status=invalid");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+
+        Assert.NotNull(error);
+        Assert.Equal("Bill status is invalid. Use pending, paid or overdue.", error.Message);
+    }
+
+    [Fact]
+    public async Task GetBills_MonthWithoutYear_ReturnsBadRequest()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await client.GetAsync("/api/bills?month=3");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+
+        Assert.NotNull(error);
+        Assert.Equal("Month and year must be provided together.", error.Message);
+    }
+
+    [Fact]
+    public async Task GetBills_YearWithoutMonth_ReturnsBadRequest()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await client.GetAsync("/api/bills?year=2026");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+
+        Assert.NotNull(error);
+        Assert.Equal("Month and year must be provided together.", error.Message);
+    }
+
+    [Fact]
+    public async Task GetBills_InvalidMonthOrYear_ReturnsBadRequest()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await client.GetAsync("/api/bills?month=13&year=2026");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
@@ -239,5 +360,10 @@ public sealed class BillsEndpointsTests : IClassFixture<FarolApiFactory>
         Assert.NotNull(authResponse);
 
         return authResponse.AccessToken;
+    }
+
+    private sealed class ErrorResponse
+    {
+        public string? Message { get; init; }
     }
 }
