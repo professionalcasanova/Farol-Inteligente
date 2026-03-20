@@ -5,7 +5,10 @@ export type StoredSession = {
   email: string;
 };
 
+export type AuthNotice = "session-expired";
+
 const SESSION_STORAGE_KEY = "farol.session";
+const AUTH_NOTICE_STORAGE_KEY = "farol.auth.notice";
 
 function isStoredSession(value: unknown): value is StoredSession {
   if (!value || typeof value !== "object") {
@@ -70,4 +73,28 @@ export function clearStoredSession() {
   }
 
   window.localStorage.removeItem(SESSION_STORAGE_KEY);
+}
+
+export function writeAuthNotice(notice: AuthNotice) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.sessionStorage.setItem(AUTH_NOTICE_STORAGE_KEY, notice);
+}
+
+export function consumeAuthNotice(): AuthNotice | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const notice = window.sessionStorage.getItem(AUTH_NOTICE_STORAGE_KEY);
+
+  if (notice !== "session-expired") {
+    window.sessionStorage.removeItem(AUTH_NOTICE_STORAGE_KEY);
+    return null;
+  }
+
+  window.sessionStorage.removeItem(AUTH_NOTICE_STORAGE_KEY);
+  return notice;
 }

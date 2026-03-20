@@ -49,7 +49,7 @@ export default function ImportsPage() {
         setAccountId(response[0]?.id ?? "");
       } catch (caughtError) {
         if (caughtError instanceof ApiError && caughtError.status === 401) {
-          logout();
+          logout("session-expired");
           return;
         }
 
@@ -100,7 +100,7 @@ export default function ImportsPage() {
       setResult(response);
     } catch (caughtError) {
       if (caughtError instanceof ApiError && caughtError.status === 401) {
-        logout();
+        logout("session-expired");
         return;
       }
 

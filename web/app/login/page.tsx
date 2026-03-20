@@ -3,14 +3,19 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LoadingScreen } from "@/components/loading-screen";
-import { ApiError, login } from "@/lib/api";
-import { readStoredSession, writeStoredSession } from "@/lib/auth";
+import { getFriendlyApiMessage, login } from "@/lib/api";
+import {
+  consumeAuthNotice,
+  readStoredSession,
+  writeStoredSession,
+} from "@/lib/auth";
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
 
@@ -20,6 +25,12 @@ export default function LoginPage() {
       return;
     }
 
+    const authNotice = consumeAuthNotice();
+
+    if (authNotice === "session-expired") {
+      setNotice("Sua sessao expirou. Entre novamente para continuar.");
+    }
+
     setIsCheckingSession(false);
   }, [router]);
 
@@ -27,17 +38,19 @@ export default function LoginPage() {
     event.preventDefault();
     setIsSubmitting(true);
     setError("");
+    setNotice("");
 
     try {
       const session = await login(email, password);
       writeStoredSession(session);
       router.replace("/dashboard");
     } catch (caughtError) {
-      if (caughtError instanceof ApiError) {
-        setError(caughtError.message);
-      } else {
-        setError("Nao foi possivel entrar agora.");
-      }
+      setError(
+        getFriendlyApiMessage(
+          caughtError,
+          "Nao foi possivel entrar agora. Tente novamente em alguns instantes.",
+        ),
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -96,6 +109,12 @@ export default function LoginPage() {
           </div>
 
           <form className="space-y-5" onSubmit={handleSubmit}>
+            {notice ? (
+              <div className="rounded-2xl border border-[color:rgba(15,118,110,0.16)] bg-[color:rgba(204,251,241,0.7)] px-4 py-3 text-sm text-[var(--color-foreground)]">
+                {notice}
+              </div>
+            ) : null}
+
             <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
               <span>Email</span>
               <input

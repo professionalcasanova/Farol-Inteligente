@@ -5,12 +5,15 @@ import { useRouter } from "next/navigation";
 import {
   clearStoredSession,
   readStoredSession,
+  writeAuthNotice,
   type StoredSession,
 } from "@/lib/auth";
 
 type SessionRouter = {
   replace: (href: string) => void;
 };
+
+type LogoutReason = "manual" | "session-expired";
 
 export function resolveProtectedSession(router: SessionRouter) {
   const storedSession = readStoredSession();
@@ -24,8 +27,16 @@ export function resolveProtectedSession(router: SessionRouter) {
   return storedSession;
 }
 
-export function logoutProtectedSession(router: SessionRouter) {
+export function logoutProtectedSession(
+  router: SessionRouter,
+  reason: LogoutReason = "manual",
+) {
   clearStoredSession();
+
+  if (reason === "session-expired") {
+    writeAuthNotice("session-expired");
+  }
+
   router.replace("/login");
 }
 
@@ -56,8 +67,8 @@ export function useProtectedSession() {
     };
   }, [router]);
 
-  const logout = useCallback(() => {
-    logoutProtectedSession(router);
+  const logout = useCallback((reason: LogoutReason = "manual") => {
+    logoutProtectedSession(router, reason);
     setSession(null);
   }, [router]);
 

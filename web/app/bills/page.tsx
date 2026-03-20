@@ -118,7 +118,7 @@ export default function BillsPage() {
         setBills(response);
       } catch (caughtError) {
         if (caughtError instanceof ApiError && caughtError.status === 401) {
-          logout();
+          logout("session-expired");
           return;
         }
 
@@ -184,7 +184,7 @@ export default function BillsPage() {
       setSuccess("Bill criada com sucesso.");
     } catch (caughtError) {
       if (caughtError instanceof ApiError && caughtError.status === 401) {
-        logout();
+        logout("session-expired");
         return;
       }
 
@@ -219,7 +219,7 @@ export default function BillsPage() {
       await refreshBills();
     } catch (caughtError) {
       if (caughtError instanceof ApiError && caughtError.status === 401) {
-        logout();
+        logout("session-expired");
         return;
       }
 

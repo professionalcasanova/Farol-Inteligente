@@ -95,7 +95,7 @@ export default function TransactionsPage() {
         }));
       } catch (caughtError) {
         if (caughtError instanceof ApiError && caughtError.status === 401) {
-          logout();
+          logout("session-expired");
           return;
         }
 
@@ -164,7 +164,7 @@ export default function TransactionsPage() {
       }));
     } catch (caughtError) {
       if (caughtError instanceof ApiError && caughtError.status === 401) {
-        logout();
+        logout("session-expired");
         return;
       }
 

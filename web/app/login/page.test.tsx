@@ -2,7 +2,12 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import LoginPage from "@/app/login/page";
-import { readStoredSession, writeStoredSession, type StoredSession } from "@/lib/auth";
+import {
+  readStoredSession,
+  writeAuthNotice,
+  writeStoredSession,
+  type StoredSession,
+} from "@/lib/auth";
 import { ApiError, login } from "@/lib/api";
 
 const replace = vi.fn();
@@ -36,6 +41,7 @@ describe("LoginPage", () => {
     replace.mockReset();
     mockedLogin.mockReset();
     window.localStorage.clear();
+    window.sessionStorage.clear();
   });
 
   async function fillAndSubmit() {
@@ -71,13 +77,19 @@ describe("LoginPage", () => {
   });
 
   it("Login_SubmitInvalidCredentials_ShowsFriendlyError", async () => {
-    mockedLogin.mockRejectedValue(new ApiError("Email ou senha invalidos.", 401));
+    mockedLogin.mockRejectedValue(
+      new ApiError("Invalid email or password.", 401),
+    );
 
     render(<LoginPage />);
 
     await fillAndSubmit();
 
-    expect(await screen.findByText("Email ou senha invalidos.")).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        "Email ou senha invalidos. Confira os dados e tente novamente.",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("Login_WhenApiReturnsUnexpectedError_ShowsGenericFriendlyError", async () => {
@@ -87,7 +99,11 @@ describe("LoginPage", () => {
 
     await fillAndSubmit();
 
-    expect(await screen.findByText("Nao foi possivel entrar agora.")).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        "Nao foi possivel entrar agora. Tente novamente em alguns instantes.",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("Login_WhenAlreadyAuthenticated_RedirectsToDashboard", async () => {
@@ -98,5 +114,17 @@ describe("LoginPage", () => {
     await waitFor(() => {
       expect(replace).toHaveBeenCalledWith("/dashboard");
     });
+  });
+
+  it("Login_WhenSessionExpiredNoticeExists_ShowsFriendlyNotice", async () => {
+    writeAuthNotice("session-expired");
+
+    render(<LoginPage />);
+
+    expect(
+      await screen.findByText(
+        "Sua sessao expirou. Entre novamente para continuar.",
+      ),
+    ).toBeInTheDocument();
   });
 });

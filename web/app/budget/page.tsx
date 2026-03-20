@@ -96,7 +96,7 @@ export default function BudgetPage() {
         }
       } catch (caughtError) {
         if (caughtError instanceof ApiError && caughtError.status === 401) {
-          logout();
+          logout("session-expired");
           return;
         }
 
@@ -202,7 +202,7 @@ export default function BudgetPage() {
       setSuccess("Orcamento salvo com sucesso.");
     } catch (caughtError) {
       if (caughtError instanceof ApiError && caughtError.status === 401) {
-        logout();
+        logout("session-expired");
         return;
       }
 

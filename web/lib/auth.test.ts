@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  consumeAuthNotice,
   clearStoredSession,
   readStoredSession,
+  writeAuthNotice,
   writeStoredSession,
   type StoredSession,
 } from "@/lib/auth";
@@ -41,5 +43,12 @@ describe("auth storage", () => {
     clearStoredSession();
 
     expect(readStoredSession()).toBeNull();
+  });
+
+  it("ConsumeAuthNotice_WithPersistedNotice_ReturnsAndClearsNotice", () => {
+    writeAuthNotice("session-expired");
+
+    expect(consumeAuthNotice()).toBe("session-expired");
+    expect(consumeAuthNotice()).toBeNull();
   });
 });

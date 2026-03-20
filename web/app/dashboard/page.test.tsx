@@ -3,6 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import DashboardPage from "@/app/dashboard/page";
 import {
+  ApiError,
   getAlerts,
   getBillsSummary,
   getFreeMoney,
@@ -250,7 +251,12 @@ describe("DashboardPage", () => {
       isLoading: false,
       logout: vi.fn(),
     });
-    mockedGetMonthlySummary.mockRejectedValue(new Error("Falha de rede"));
+    mockedGetMonthlySummary.mockRejectedValue(
+      new ApiError(
+        "Npgsql.PostgresException: relation \"bills\" does not exist at DashboardController.cs:117",
+        500,
+      ),
+    );
     mockedGetAlerts.mockResolvedValue({ alerts: [] });
     mockedGetBillsSummary.mockResolvedValue({
       totalPending: 0,
@@ -288,6 +294,61 @@ describe("DashboardPage", () => {
 
     expect(await screen.findByText("Falha ao carregar")).toBeInTheDocument();
     expect(screen.getByText("Nao foi possivel abrir o dashboard")).toBeInTheDocument();
-    expect(screen.getByText("Falha de rede")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Nao foi possivel carregar o dashboard agora. Confira se a API local esta ativa e tente novamente.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("Dashboard_WhenSessionExpires_TriggersConsistentLogout", async () => {
+    const logout = vi.fn();
+
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout,
+    });
+    mockedGetMonthlySummary.mockRejectedValue(
+      new ApiError("Invalid access token.", 401),
+    );
+    mockedGetAlerts.mockResolvedValue({ alerts: [] });
+    mockedGetBillsSummary.mockResolvedValue({
+      totalPending: 0,
+      totalOverdue: 0,
+      totalPaid: 0,
+      countPending: 0,
+      countOverdue: 0,
+      countPaid: 0,
+      upcoming: [],
+    });
+    mockedGetFreeMoney.mockResolvedValue({
+      month: 3,
+      year: 2026,
+      totalIncome: 0,
+      totalExpense: 0,
+      balance: 0,
+      totalPlannedBudget: 0,
+      totalBudgetSpent: 0,
+      totalBudgetRemaining: 0,
+      freeToSpend: 0,
+    });
+    mockedGetMonthlyBudget.mockResolvedValue({
+      month: 3,
+      year: 2026,
+      totalPlanned: 0,
+      totalSpent: 0,
+      totalRemaining: 0,
+      categories: [],
+    });
+    mockedListAccounts.mockResolvedValue([]);
+    mockedListTransactions.mockResolvedValue([]);
+    mockedListBills.mockResolvedValue([]);
+
+    render(<DashboardPage />);
+
+    await waitFor(() => {
+      expect(logout).toHaveBeenCalledWith("session-expired");
+    });
   });
 });

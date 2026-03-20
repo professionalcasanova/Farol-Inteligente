@@ -165,6 +165,62 @@ export class ApiError extends Error {
   }
 }
 
+const defaultMessageMap: Record<string, string> = {
+  "Invalid access token.": "Sua sessao expirou. Entre novamente para continuar.",
+  "Invalid email or password.":
+    "Email ou senha invalidos. Confira os dados e tente novamente.",
+  "Email and password are required.": "Informe email e senha para entrar.",
+};
+
+const technicalMessagePatterns = [
+  /exception/i,
+  /npgsql/i,
+  /system\./i,
+  /microsoft\./i,
+  /at\s+.+\.cs:\d+/i,
+  /stack trace/i,
+  /relation\s+\"/i,
+  /<html/i,
+];
+
+export function isUnauthorizedApiError(error: unknown) {
+  return error instanceof ApiError && error.status === 401;
+}
+
+export function getFriendlyApiMessage(
+  error: unknown,
+  fallback: string,
+  options?: {
+    messageMap?: Record<string, string>;
+  },
+) {
+  if (!(error instanceof ApiError)) {
+    return fallback;
+  }
+
+  if (error.status === 0) {
+    return "Nao foi possivel falar com a API do Farol agora. Confira se o backend local esta ativo e tente novamente.";
+  }
+
+  const rawMessage = error.message.trim();
+  const mappedMessage =
+    options?.messageMap?.[rawMessage] ?? defaultMessageMap[rawMessage];
+
+  if (mappedMessage) {
+    return mappedMessage;
+  }
+
+  if (
+    !rawMessage ||
+    technicalMessagePatterns.some((pattern) => pattern.test(rawMessage)) ||
+    rawMessage.length > 220
+  ) {
+    return fallback;
+  }
+
+  return rawMessage;
+}
+
 type RequestOptions = {
   method?: string;
   token?: string;

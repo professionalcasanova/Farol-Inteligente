@@ -8,13 +8,14 @@ import { LoadingScreen } from "@/components/loading-screen";
 import { MonthPicker } from "@/components/month-picker";
 import {
   accountTypeOptions,
-  getAlerts,
-  ApiError,
   createAccount,
+  getAlerts,
   getBillsSummary,
+  getFriendlyApiMessage,
   getFreeMoney,
   getMonthlyBudget,
   getMonthlySummary,
+  isUnauthorizedApiError,
   listBills,
   listAccounts,
   listTransactions,
@@ -177,16 +178,17 @@ export default function DashboardPage() {
           });
         }
       } catch (caughtError) {
-        if (caughtError instanceof ApiError && caughtError.status === 401) {
-          logout();
+        if (isUnauthorizedApiError(caughtError)) {
+          logout("session-expired");
           return;
         }
 
         if (!isCancelled) {
           setLoadError(
-            caughtError instanceof Error
-              ? caughtError.message
-              : "Nao foi possivel carregar o dashboard.",
+            getFriendlyApiMessage(
+              caughtError,
+              "Nao foi possivel carregar o dashboard agora. Confira se a API local esta ativa e tente novamente.",
+            ),
           );
         }
       } finally {
@@ -240,15 +242,27 @@ export default function DashboardPage() {
         "Conta criada com sucesso. Agora voce ja pode registrar transacoes, bills ou importar um CSV.",
       );
     } catch (caughtError) {
-      if (caughtError instanceof ApiError && caughtError.status === 401) {
-        logout();
+      if (isUnauthorizedApiError(caughtError)) {
+        logout("session-expired");
         return;
       }
 
       setAccountError(
-        caughtError instanceof Error
-          ? caughtError.message
-          : "Nao foi possivel criar a conta agora.",
+        getFriendlyApiMessage(
+          caughtError,
+          "Nao foi possivel criar a conta agora. Revise os dados e tente novamente.",
+          {
+            messageMap: {
+              "Name is required.": "Informe o nome da conta para continuar.",
+              "Financial account name is required.":
+                "Informe o nome da conta para continuar.",
+              "Financial account name cannot exceed 120 characters.":
+                "O nome da conta ficou longo demais. Tente um nome menor.",
+              "Financial account type is invalid.":
+                "Selecione um tipo de conta valido.",
+            },
+          },
+        ),
       );
     } finally {
       setIsCreatingAccount(false);

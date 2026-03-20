@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { readStoredSession, writeStoredSession, type StoredSession } from "@/lib/auth";
+import {
+  consumeAuthNotice,
+  readStoredSession,
+  writeStoredSession,
+  type StoredSession,
+} from "@/lib/auth";
 import {
   logoutProtectedSession,
   resolveProtectedSession,
@@ -15,6 +20,7 @@ const session: StoredSession = {
 describe("protected session helpers", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    window.sessionStorage.clear();
   });
 
   it("UseProtectedSession_WithoutToken_RedirectsToLogin", () => {
@@ -51,6 +57,21 @@ describe("protected session helpers", () => {
     logoutProtectedSession(router);
 
     expect(readStoredSession()).toBeNull();
+    expect(router.replace).toHaveBeenCalledWith("/login");
+  });
+
+  it("Logout_WhenSessionExpired_PersistsSingleUseNotice", () => {
+    const router = {
+      replace: vi.fn(),
+    };
+
+    writeStoredSession(session);
+
+    logoutProtectedSession(router, "session-expired");
+
+    expect(readStoredSession()).toBeNull();
+    expect(consumeAuthNotice()).toBe("session-expired");
+    expect(consumeAuthNotice()).toBeNull();
     expect(router.replace).toHaveBeenCalledWith("/login");
   });
 });
