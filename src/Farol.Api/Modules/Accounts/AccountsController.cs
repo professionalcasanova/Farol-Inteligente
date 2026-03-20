@@ -19,12 +19,12 @@ public sealed class AccountsController(FarolDbContext dbContext) : ControllerBas
     {
         if (!AuthenticatedUser.TryGetUserId(User, out var userId))
         {
-            return Unauthorized(new { message = "Invalid access token." });
+            return Unauthorized(new ErrorResponse("Invalid access token."));
         }
 
         if (string.IsNullOrWhiteSpace(request.Name))
         {
-            return BadRequest(new { message = "Name is required." });
+            return BadRequest(new ErrorResponse("Name is required."));
         }
 
         FinancialAccount account;
@@ -35,7 +35,7 @@ public sealed class AccountsController(FarolDbContext dbContext) : ControllerBas
         }
         catch (ArgumentException exception)
         {
-            return BadRequest(new { message = exception.Message });
+            return BadRequest(new ErrorResponse(exception.Message));
         }
 
         dbContext.FinancialAccounts.Add(account);
@@ -49,7 +49,7 @@ public sealed class AccountsController(FarolDbContext dbContext) : ControllerBas
     {
         if (!AuthenticatedUser.TryGetUserId(User, out var userId))
         {
-            return Unauthorized(new { message = "Invalid access token." });
+            return Unauthorized(new ErrorResponse("Invalid access token."));
         }
 
         var accounts = await dbContext.FinancialAccounts
@@ -77,12 +77,12 @@ public sealed class AccountsController(FarolDbContext dbContext) : ControllerBas
     {
         if (!AuthenticatedUser.TryGetUserId(User, out var userId))
         {
-            return Unauthorized(new { message = "Invalid access token." });
+            return Unauthorized(new ErrorResponse("Invalid access token."));
         }
 
         if (string.IsNullOrWhiteSpace(request.Name))
         {
-            return BadRequest(new { message = "Name is required." });
+            return BadRequest(new ErrorResponse("Name is required."));
         }
 
         var account = await dbContext.FinancialAccounts
@@ -90,7 +90,7 @@ public sealed class AccountsController(FarolDbContext dbContext) : ControllerBas
 
         if (account is null)
         {
-            return NotFound();
+            return NotFound(new ErrorResponse("Financial account was not found."));
         }
 
         try
@@ -108,7 +108,7 @@ public sealed class AccountsController(FarolDbContext dbContext) : ControllerBas
         }
         catch (ArgumentException exception)
         {
-            return BadRequest(new { message = exception.Message });
+            return BadRequest(new ErrorResponse(exception.Message));
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);

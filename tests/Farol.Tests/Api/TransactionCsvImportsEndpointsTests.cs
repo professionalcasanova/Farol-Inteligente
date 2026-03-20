@@ -93,7 +93,12 @@ public sealed class TransactionCsvImportsEndpointsTests : IClassFixture<FarolApi
 
         var response = await client.PostAsync("/api/imports/transactions/csv", content);
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+
+        Assert.NotNull(error);
+        Assert.Equal("Financial account was not found.", error.Message);
     }
 
     [Fact]

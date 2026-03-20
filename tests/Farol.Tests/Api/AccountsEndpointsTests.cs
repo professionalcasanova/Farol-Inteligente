@@ -26,6 +26,11 @@ public sealed class AccountsEndpointsTests : IClassFixture<FarolApiFactory>
         var response = await client.GetAsync("/api/accounts");
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+
+        Assert.NotNull(error);
+        Assert.Equal("Invalid access token.", error.Message);
     }
 
     [Fact]
@@ -139,5 +144,10 @@ public sealed class AccountsEndpointsTests : IClassFixture<FarolApiFactory>
         Assert.NotNull(authResponse);
 
         return authResponse.AccessToken;
+    }
+
+    private sealed class ErrorResponse
+    {
+        public string? Message { get; init; }
     }
 }

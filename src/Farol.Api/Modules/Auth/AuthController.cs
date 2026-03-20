@@ -1,3 +1,4 @@
+using Farol.Api.Common;
 using Farol.Domain.Users;
 using Farol.Infrastructure.Auth;
 using Farol.Infrastructure.Persistence;
@@ -24,7 +25,7 @@ public sealed class AuthController(
             string.IsNullOrWhiteSpace(request.Email) ||
             string.IsNullOrWhiteSpace(request.Password))
         {
-            return BadRequest(new { message = "Name, email and password are required." });
+            return BadRequest(new ErrorResponse("Name, email and password are required."));
         }
 
         var normalizedEmail = NormalizeEmail(request.Email);
@@ -33,7 +34,7 @@ public sealed class AuthController(
 
         if (emailAlreadyInUse)
         {
-            return Conflict(new { message = "Email is already in use." });
+            return Conflict(new ErrorResponse("Email is already in use."));
         }
 
         User user;
@@ -44,7 +45,7 @@ public sealed class AuthController(
         }
         catch (ArgumentException exception)
         {
-            return BadRequest(new { message = exception.Message });
+            return BadRequest(new ErrorResponse(exception.Message));
         }
 
         var passwordHash = passwordService.HashPassword(user, request.Password);
@@ -63,7 +64,7 @@ public sealed class AuthController(
     {
         if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
         {
-            return BadRequest(new { message = "Email and password are required." });
+            return BadRequest(new ErrorResponse("Email and password are required."));
         }
 
         var normalizedEmail = NormalizeEmail(request.Email);
@@ -72,7 +73,7 @@ public sealed class AuthController(
 
         if (user is null || !passwordService.VerifyPassword(user, request.Password))
         {
-            return Unauthorized(new { message = "Invalid email or password." });
+            return Unauthorized(new ErrorResponse("Invalid email or password."));
         }
 
         return Ok(CreateAuthResponse(user));

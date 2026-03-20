@@ -23,7 +23,7 @@ public sealed class BillsController(FarolDbContext dbContext) : ControllerBase
     {
         if (!AuthenticatedUser.TryGetUserId(User, out var userId))
         {
-            return Unauthorized(new { message = "Invalid access token." });
+            return Unauthorized(new ErrorResponse("Invalid access token."));
         }
 
         Bill bill;
@@ -36,7 +36,7 @@ public sealed class BillsController(FarolDbContext dbContext) : ControllerBase
             exception is ArgumentException or
             ArgumentOutOfRangeException)
         {
-            return BadRequest(new { message = exception.Message });
+            return BadRequest(new ErrorResponse(exception.Message));
         }
 
         dbContext.Bills.Add(bill);
@@ -52,17 +52,17 @@ public sealed class BillsController(FarolDbContext dbContext) : ControllerBase
     {
         if (!AuthenticatedUser.TryGetUserId(User, out var userId))
         {
-            return Unauthorized(new { message = "Invalid access token." });
+            return Unauthorized(new ErrorResponse("Invalid access token."));
         }
 
         if (request.Month.HasValue != request.Year.HasValue)
         {
-            return BadRequest(new { message = "Month and year must be provided together." });
+            return BadRequest(new ErrorResponse("Month and year must be provided together."));
         }
 
         if (!TryNormalizeStatus(request.Status, out var normalizedStatus))
         {
-            return BadRequest(new { message = "Bill status is invalid. Use pending, paid or overdue." });
+            return BadRequest(new ErrorResponse("Bill status is invalid. Use pending, paid or overdue."));
         }
 
         var today = GetToday();
@@ -80,7 +80,7 @@ public sealed class BillsController(FarolDbContext dbContext) : ControllerBase
             }
             catch (ArgumentOutOfRangeException)
             {
-                return BadRequest(new { message = "Month and year are invalid." });
+                return BadRequest(new ErrorResponse("Month and year are invalid."));
             }
 
             var periodEnd = periodStart.AddMonths(1);
@@ -108,7 +108,7 @@ public sealed class BillsController(FarolDbContext dbContext) : ControllerBase
     {
         if (!AuthenticatedUser.TryGetUserId(User, out var userId))
         {
-            return Unauthorized(new { message = "Invalid access token." });
+            return Unauthorized(new ErrorResponse("Invalid access token."));
         }
 
         var bill = await dbContext.Bills
@@ -116,7 +116,7 @@ public sealed class BillsController(FarolDbContext dbContext) : ControllerBase
 
         if (bill is null)
         {
-            return NotFound();
+            return NotFound(new ErrorResponse("Bill was not found."));
         }
 
         bill.MarkAsPaid();
@@ -130,7 +130,7 @@ public sealed class BillsController(FarolDbContext dbContext) : ControllerBase
     {
         if (!AuthenticatedUser.TryGetUserId(User, out var userId))
         {
-            return Unauthorized(new { message = "Invalid access token." });
+            return Unauthorized(new ErrorResponse("Invalid access token."));
         }
 
         var bill = await dbContext.Bills
@@ -138,7 +138,7 @@ public sealed class BillsController(FarolDbContext dbContext) : ControllerBase
 
         if (bill is null)
         {
-            return NotFound();
+            return NotFound(new ErrorResponse("Bill was not found."));
         }
 
         bill.MarkAsUnpaid();

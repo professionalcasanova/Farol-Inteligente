@@ -22,12 +22,12 @@ public sealed class ImportsController(FarolDbContext dbContext) : ControllerBase
     {
         if (!AuthenticatedUser.TryGetUserId(User, out var userId))
         {
-            return Unauthorized(new { message = "Invalid access token." });
+            return Unauthorized(new ErrorResponse("Invalid access token."));
         }
 
         if (request.File is null || request.File.Length == 0)
         {
-            return BadRequest(new { message = "CSV file is required." });
+            return BadRequest(new ErrorResponse("CSV file is required."));
         }
 
         var financialAccount = await dbContext.FinancialAccounts
@@ -37,7 +37,7 @@ public sealed class ImportsController(FarolDbContext dbContext) : ControllerBase
 
         if (financialAccount is null)
         {
-            return BadRequest(new { message = "Financial account is invalid." });
+            return NotFound(new ErrorResponse("Financial account was not found."));
         }
 
         using var reader = new StreamReader(
@@ -49,15 +49,12 @@ public sealed class ImportsController(FarolDbContext dbContext) : ControllerBase
 
         if (headerLine is null)
         {
-            return BadRequest(new { message = "CSV file is empty." });
+            return BadRequest(new ErrorResponse("CSV file is empty."));
         }
 
         if (!TransactionCsvParser.IsExpectedHeader(headerLine))
         {
-            return BadRequest(new
-            {
-                message = "CSV header is invalid. Expected: occurredOn,description,amount,type,categoryName."
-            });
+            return BadRequest(new ErrorResponse("CSV header is invalid. Expected: occurredOn,description,amount,type,categoryName."));
         }
 
         var visibleCategories = await dbContext.Categories
@@ -156,7 +153,7 @@ public sealed class ImportsController(FarolDbContext dbContext) : ControllerBase
 
         if (totalRows == 0)
         {
-            return BadRequest(new { message = "CSV file must contain at least one data row." });
+            return BadRequest(new ErrorResponse("CSV file must contain at least one data row."));
         }
 
         if (importedRows > 0)

@@ -1,8 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
 using Farol.Api.Modules.Auth;
-using Microsoft.AspNetCore.Http;
-
 namespace Farol.Tests.Api;
 
 public sealed class AuthEndpointsTests : IClassFixture<FarolApiFactory>
@@ -76,11 +74,10 @@ public sealed class AuthEndpointsTests : IClassFixture<FarolApiFactory>
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        var payload = await response.Content.ReadFromJsonAsync<HttpValidationProblemDetails>();
+        var payload = await response.Content.ReadFromJsonAsync<ErrorResponse>();
 
         Assert.NotNull(payload);
-        Assert.Equal("One or more validation errors occurred.", payload.Title);
-        Assert.Contains(nameof(RegisterRequest.Name), payload.Errors.Keys);
+        Assert.Contains("Name", payload.Message);
     }
 
     [Fact]

@@ -18,7 +18,7 @@ public sealed class TransactionsController(FarolDbContext dbContext) : Controlle
     {
         if (!AuthenticatedUser.TryGetUserId(User, out var userId))
         {
-            return Unauthorized(new { message = "Invalid access token." });
+            return Unauthorized(new ErrorResponse("Invalid access token."));
         }
 
         var transactions = await dbContext.Transactions
@@ -39,7 +39,7 @@ public sealed class TransactionsController(FarolDbContext dbContext) : Controlle
     {
         if (!AuthenticatedUser.TryGetUserId(User, out var userId))
         {
-            return Unauthorized(new { message = "Invalid access token." });
+            return Unauthorized(new ErrorResponse("Invalid access token."));
         }
 
         var account = await dbContext.FinancialAccounts
@@ -47,14 +47,14 @@ public sealed class TransactionsController(FarolDbContext dbContext) : Controlle
 
         if (account is null)
         {
-            return BadRequest(new { message = "Financial account is invalid." });
+            return NotFound(new ErrorResponse("Financial account was not found."));
         }
 
         var category = await FindVisibleCategoryAsync(userId, request.CategoryId, cancellationToken);
 
         if (request.CategoryId.HasValue && category is null)
         {
-            return BadRequest(new { message = "Category is invalid." });
+            return NotFound(new ErrorResponse("Category was not found."));
         }
 
         Transaction transaction;
@@ -74,7 +74,7 @@ public sealed class TransactionsController(FarolDbContext dbContext) : Controlle
             ArgumentOutOfRangeException or
             InvalidOperationException)
         {
-            return BadRequest(new { message = exception.Message });
+            return BadRequest(new ErrorResponse(exception.Message));
         }
 
         dbContext.Transactions.Add(transaction);
@@ -91,7 +91,7 @@ public sealed class TransactionsController(FarolDbContext dbContext) : Controlle
     {
         if (!AuthenticatedUser.TryGetUserId(User, out var userId))
         {
-            return Unauthorized(new { message = "Invalid access token." });
+            return Unauthorized(new ErrorResponse("Invalid access token."));
         }
 
         var transaction = await dbContext.Transactions
@@ -99,7 +99,7 @@ public sealed class TransactionsController(FarolDbContext dbContext) : Controlle
 
         if (transaction is null)
         {
-            return NotFound();
+            return NotFound(new ErrorResponse("Transaction was not found."));
         }
 
         var account = await dbContext.FinancialAccounts
@@ -107,14 +107,14 @@ public sealed class TransactionsController(FarolDbContext dbContext) : Controlle
 
         if (account is null)
         {
-            return BadRequest(new { message = "Financial account is invalid." });
+            return NotFound(new ErrorResponse("Financial account was not found."));
         }
 
         var category = await FindVisibleCategoryAsync(userId, request.CategoryId, cancellationToken);
 
         if (request.CategoryId.HasValue && category is null)
         {
-            return BadRequest(new { message = "Category is invalid." });
+            return NotFound(new ErrorResponse("Category was not found."));
         }
 
         try
@@ -141,7 +141,7 @@ public sealed class TransactionsController(FarolDbContext dbContext) : Controlle
             ArgumentOutOfRangeException or
             InvalidOperationException)
         {
-            return BadRequest(new { message = exception.Message });
+            return BadRequest(new ErrorResponse(exception.Message));
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);

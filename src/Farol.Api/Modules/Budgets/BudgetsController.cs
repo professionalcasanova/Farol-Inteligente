@@ -21,12 +21,12 @@ public sealed class BudgetsController(FarolDbContext dbContext) : ControllerBase
     {
         if (!AuthenticatedUser.TryGetUserId(User, out var userId))
         {
-            return Unauthorized(new { message = "Invalid access token." });
+            return Unauthorized(new ErrorResponse("Invalid access token."));
         }
 
         if (HasDuplicateCategories(request.Categories))
         {
-            return BadRequest(new { message = "Budget categories cannot be duplicated in the same payload." });
+            return BadRequest(new ErrorResponse("Budget categories cannot be duplicated in the same payload."));
         }
 
         var categoryIds = request.Categories
@@ -39,12 +39,12 @@ public sealed class BudgetsController(FarolDbContext dbContext) : ControllerBase
 
         if (categories.Count != categoryIds.Length)
         {
-            return BadRequest(new { message = "Budget contains invalid categories." });
+            return NotFound(new ErrorResponse("One or more categories were not found."));
         }
 
         if (categories.Any(category => category.Type != CategoryType.Expense))
         {
-            return BadRequest(new { message = "Budget categories must be expense categories." });
+            return BadRequest(new ErrorResponse("Budget categories must be expense categories."));
         }
 
         var existingBudget = await dbContext.MonthlyBudgets
@@ -73,7 +73,7 @@ public sealed class BudgetsController(FarolDbContext dbContext) : ControllerBase
             exception is ArgumentException or
             ArgumentOutOfRangeException)
         {
-            return BadRequest(new { message = exception.Message });
+            return BadRequest(new ErrorResponse(exception.Message));
         }
 
         dbContext.MonthlyBudgets.Add(budget);
@@ -91,7 +91,7 @@ public sealed class BudgetsController(FarolDbContext dbContext) : ControllerBase
                 ArgumentOutOfRangeException or
                 InvalidOperationException)
             {
-                return BadRequest(new { message = exception.Message });
+                return BadRequest(new ErrorResponse(exception.Message));
             }
         }
 
@@ -110,7 +110,7 @@ public sealed class BudgetsController(FarolDbContext dbContext) : ControllerBase
     {
         if (!AuthenticatedUser.TryGetUserId(User, out var userId))
         {
-            return Unauthorized(new { message = "Invalid access token." });
+            return Unauthorized(new ErrorResponse("Invalid access token."));
         }
 
         try
@@ -119,7 +119,7 @@ public sealed class BudgetsController(FarolDbContext dbContext) : ControllerBase
         }
         catch (ArgumentOutOfRangeException)
         {
-            return BadRequest(new { message = "Month and year are invalid." });
+            return BadRequest(new ErrorResponse("Month and year are invalid."));
         }
 
         var response = await BuildMonthlyBudgetResponseAsync(userId, month, year, cancellationToken);

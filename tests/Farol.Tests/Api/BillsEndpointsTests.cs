@@ -157,6 +157,11 @@ public sealed class BillsEndpointsTests : IClassFixture<FarolApiFactory>
         var response = await client.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+
+        Assert.NotNull(error);
+        Assert.Equal("Bill was not found.", error.Message);
     }
 
     [Fact]
@@ -173,6 +178,11 @@ public sealed class BillsEndpointsTests : IClassFixture<FarolApiFactory>
         var response = await client.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+
+        Assert.NotNull(error);
+        Assert.Equal("Bill was not found.", error.Message);
     }
 
     [Fact]
@@ -189,6 +199,11 @@ public sealed class BillsEndpointsTests : IClassFixture<FarolApiFactory>
         var response = await client.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+
+        Assert.NotNull(error);
+        Assert.Equal("Bill was not found.", error.Message);
     }
 
     [Fact]
@@ -207,6 +222,11 @@ public sealed class BillsEndpointsTests : IClassFixture<FarolApiFactory>
         var response = await client.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+
+        Assert.NotNull(error);
+        Assert.Equal("Bill was not found.", error.Message);
     }
 
     [Fact]
@@ -300,6 +320,11 @@ public sealed class BillsEndpointsTests : IClassFixture<FarolApiFactory>
         var response = await client.GetAsync("/api/bills?month=13&year=2026");
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+
+        Assert.NotNull(error);
+        Assert.Contains("Month", error.Message);
     }
 
     [Fact]

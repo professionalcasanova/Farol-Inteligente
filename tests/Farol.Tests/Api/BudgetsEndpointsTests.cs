@@ -181,6 +181,11 @@ public sealed class BudgetsEndpointsTests : IClassFixture<FarolApiFactory>
         });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+
+        Assert.NotNull(error);
+        Assert.Contains("Month", error.Message);
     }
 
     [Fact]
@@ -211,7 +216,7 @@ public sealed class BudgetsEndpointsTests : IClassFixture<FarolApiFactory>
     }
 
     [Fact]
-    public async Task PostMonthlyBudget_CategoryFromAnotherUser_ReturnsBadRequest()
+    public async Task PostMonthlyBudget_CategoryFromAnotherUser_ReturnsNotFound()
     {
         await _factory.ResetDatabaseAsync();
         using var client = _factory.CreateClient();
@@ -231,16 +236,16 @@ public sealed class BudgetsEndpointsTests : IClassFixture<FarolApiFactory>
             ]
         });
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
 
         var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
 
         Assert.NotNull(error);
-        Assert.Equal("Budget contains invalid categories.", error.Message);
+        Assert.Equal("One or more categories were not found.", error.Message);
     }
 
     [Fact]
-    public async Task PostMonthlyBudget_NonexistentCategory_ReturnsBadRequest()
+    public async Task PostMonthlyBudget_NonexistentCategory_ReturnsNotFound()
     {
         await _factory.ResetDatabaseAsync();
         using var client = _factory.CreateClient();
@@ -258,12 +263,12 @@ public sealed class BudgetsEndpointsTests : IClassFixture<FarolApiFactory>
             ]
         });
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
 
         var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
 
         Assert.NotNull(error);
-        Assert.Equal("Budget contains invalid categories.", error.Message);
+        Assert.Equal("One or more categories were not found.", error.Message);
     }
 
     [Fact]
@@ -287,6 +292,11 @@ public sealed class BudgetsEndpointsTests : IClassFixture<FarolApiFactory>
         });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+
+        Assert.NotNull(error);
+        Assert.Contains("Planned", error.Message);
     }
 
     [Fact]

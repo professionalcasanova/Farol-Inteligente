@@ -133,7 +133,7 @@ public sealed class TransactionsEndpointsTests : IClassFixture<FarolApiFactory>
     }
 
     [Fact]
-    public async Task PostTransactions_NonexistentAccount_ReturnsBadRequest()
+    public async Task PostTransactions_NonexistentAccount_ReturnsNotFound()
     {
         await _factory.ResetDatabaseAsync();
         using var client = _factory.CreateClient();
@@ -152,16 +152,16 @@ public sealed class TransactionsEndpointsTests : IClassFixture<FarolApiFactory>
             OccurredOn = new DateOnly(2026, 3, 16)
         });
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
 
         var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
 
         Assert.NotNull(error);
-        Assert.Equal("Financial account is invalid.", error.Message);
+        Assert.Equal("Financial account was not found.", error.Message);
     }
 
     [Fact]
-    public async Task PostTransactions_AccountFromAnotherUser_ReturnsBadRequest()
+    public async Task PostTransactions_AccountFromAnotherUser_ReturnsNotFound()
     {
         await _factory.ResetDatabaseAsync();
         using var client = _factory.CreateClient();
@@ -182,16 +182,16 @@ public sealed class TransactionsEndpointsTests : IClassFixture<FarolApiFactory>
             OccurredOn = new DateOnly(2026, 3, 16)
         });
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
 
         var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
 
         Assert.NotNull(error);
-        Assert.Equal("Financial account is invalid.", error.Message);
+        Assert.Equal("Financial account was not found.", error.Message);
     }
 
     [Fact]
-    public async Task PostTransactions_NonexistentCategory_ReturnsBadRequest()
+    public async Task PostTransactions_NonexistentCategory_ReturnsNotFound()
     {
         await _factory.ResetDatabaseAsync();
         using var client = _factory.CreateClient();
@@ -210,16 +210,16 @@ public sealed class TransactionsEndpointsTests : IClassFixture<FarolApiFactory>
             OccurredOn = new DateOnly(2026, 3, 16)
         });
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
 
         var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
 
         Assert.NotNull(error);
-        Assert.Equal("Category is invalid.", error.Message);
+        Assert.Equal("Category was not found.", error.Message);
     }
 
     [Fact]
-    public async Task PostTransactions_CategoryFromAnotherUser_ReturnsBadRequest()
+    public async Task PostTransactions_CategoryFromAnotherUser_ReturnsNotFound()
     {
         await _factory.ResetDatabaseAsync();
         using var client = _factory.CreateClient();
@@ -240,12 +240,12 @@ public sealed class TransactionsEndpointsTests : IClassFixture<FarolApiFactory>
             OccurredOn = new DateOnly(2026, 3, 16)
         });
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
 
         var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
 
         Assert.NotNull(error);
-        Assert.Equal("Category is invalid.", error.Message);
+        Assert.Equal("Category was not found.", error.Message);
     }
 
     [Fact]
@@ -402,6 +402,11 @@ public sealed class TransactionsEndpointsTests : IClassFixture<FarolApiFactory>
         });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+
+        Assert.NotNull(error);
+        Assert.Equal("Transaction was not found.", error.Message);
     }
 
     [Fact]
@@ -425,6 +430,11 @@ public sealed class TransactionsEndpointsTests : IClassFixture<FarolApiFactory>
         });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+
+        Assert.NotNull(error);
+        Assert.Equal("Transaction was not found.", error.Message);
     }
 
     private async Task<(Guid AccountId, Guid CategoryId)> SeedOwnedAccountAndSystemCategoryAsync(
