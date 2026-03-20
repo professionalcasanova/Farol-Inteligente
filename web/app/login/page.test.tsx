@@ -87,7 +87,7 @@ describe("LoginPage", () => {
 
     expect(
       await screen.findByText(
-        "Email ou senha invalidos. Confira os dados e tente novamente.",
+        "E-mail ou senha inválidos. Confira os dados e tente novamente.",
       ),
     ).toBeInTheDocument();
   });
@@ -101,7 +101,7 @@ describe("LoginPage", () => {
 
     expect(
       await screen.findByText(
-        "Nao foi possivel entrar agora. Tente novamente em alguns instantes.",
+        "Não foi possível entrar agora. Tente novamente em alguns instantes.",
       ),
     ).toBeInTheDocument();
   });
@@ -123,7 +123,7 @@ describe("LoginPage", () => {
 
     expect(
       await screen.findByText(
-        "Sua sessao expirou. Entre novamente para continuar.",
+        "Sua sessão expirou. Entre novamente para continuar.",
       ),
     ).toBeInTheDocument();
   });

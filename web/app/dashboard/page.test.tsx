@@ -190,7 +190,7 @@ describe("DashboardPage", () => {
 
     expect(await screen.findByText("Comece por aqui")).toBeInTheDocument();
     expect(screen.getByText(/Criar sua primeira conta/)).toBeInTheDocument();
-    expect(screen.getByText(/Registrar uma entrada \(salario\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Registrar uma entrada \(salário\)/)).toBeInTheDocument();
     expect(screen.getByText(/Adicionar uma conta a pagar/)).toBeInTheDocument();
   });
 
@@ -238,7 +238,7 @@ describe("DashboardPage", () => {
 
     render(<DashboardPage />);
 
-    expect(await screen.findByText("Acoes rapidas")).toBeInTheDocument();
+    expect(await screen.findByText("Ações rápidas")).toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.queryByText("Comece por aqui")).not.toBeInTheDocument();
@@ -293,10 +293,10 @@ describe("DashboardPage", () => {
     render(<DashboardPage />);
 
     expect(await screen.findByText("Falha ao carregar")).toBeInTheDocument();
-    expect(screen.getByText("Nao foi possivel abrir o dashboard")).toBeInTheDocument();
+    expect(screen.getByText("Não foi possível abrir o dashboard")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Nao foi possivel carregar o dashboard agora. Confira se a API local esta ativa e tente novamente.",
+        "Não foi possível carregar o dashboard agora. Confira se a API local está ativa e tente novamente.",
       ),
     ).toBeInTheDocument();
   });

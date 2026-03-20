@@ -6,8 +6,9 @@ import { AppShell } from "@/components/app-shell";
 import { LoadErrorState } from "@/components/load-error-state";
 import { LoadingScreen } from "@/components/loading-screen";
 import {
-  ApiError,
+  getFriendlyApiMessage,
   importTransactionsCsv,
+  isUnauthorizedApiError,
   listAccounts,
   type AccountResponse,
   type ImportTransactionsCsvResponse,
@@ -48,16 +49,17 @@ export default function ImportsPage() {
         setAccounts(response);
         setAccountId(response[0]?.id ?? "");
       } catch (caughtError) {
-        if (caughtError instanceof ApiError && caughtError.status === 401) {
+        if (isUnauthorizedApiError(caughtError)) {
           logout("session-expired");
           return;
         }
 
         if (!isCancelled) {
           setLoadError(
-            caughtError instanceof Error
-              ? caughtError.message
-              : "Nao foi possivel carregar as contas.",
+            getFriendlyApiMessage(
+              caughtError,
+              "Não foi possível preparar a importação agora. Confira se a API local está ativa e tente novamente.",
+            ),
           );
         }
       } finally {
@@ -83,7 +85,7 @@ export default function ImportsPage() {
     }
 
     if (!accountId) {
-      setImportError("Selecione uma conta financeira para a importacao.");
+      setImportError("Selecione uma conta financeira para a importação.");
       return;
     }
 
@@ -99,15 +101,16 @@ export default function ImportsPage() {
 
       setResult(response);
     } catch (caughtError) {
-      if (caughtError instanceof ApiError && caughtError.status === 401) {
+      if (isUnauthorizedApiError(caughtError)) {
         logout("session-expired");
         return;
       }
 
       setImportError(
-        caughtError instanceof Error
-          ? caughtError.message
-          : "Nao foi possivel importar o arquivo.",
+        getFriendlyApiMessage(
+          caughtError,
+          "Não foi possível importar o arquivo agora. Revise o CSV e tente novamente.",
+        ),
       );
     } finally {
       setIsSubmitting(false);
@@ -128,10 +131,10 @@ export default function ImportsPage() {
           Voltar ao dashboard
         </Link>
       }
-      description="Envie um CSV simples para uma conta existente e veja na hora quantas linhas entraram, quantas foram ignoradas e por que."
+      description="Envie um CSV simples para uma conta existente e veja na hora quantas linhas entraram, quantas foram ignoradas e por quê."
       onLogout={logout}
       session={session}
-      title="Importacao CSV"
+      title="Importação CSV"
     >
       {importError ? (
         <div className="mb-6 rounded-[24px] border border-[color:rgba(185,28,28,0.14)] bg-[color:rgba(254,226,226,0.8)] px-5 py-4 text-sm text-red-700">
@@ -140,12 +143,12 @@ export default function ImportsPage() {
       ) : null}
 
       {isFetching ? (
-        <LoadingScreen message="Carregando contas para importacao..." />
+        <LoadingScreen message="Carregando contas para importação..." />
       ) : loadError ? (
         <LoadErrorState
           message={loadError}
           onRetry={() => setReloadKey((current) => current + 1)}
-          title="Nao foi possivel carregar a importacao"
+          title="Não foi possível abrir a importação"
         />
       ) : (
         <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
@@ -154,14 +157,17 @@ export default function ImportsPage() {
               Upload
             </div>
             <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
-              Importar transacoes
+              Importar transações
             </h2>
 
             {accounts.length === 0 ? (
               <div className="mt-6 rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
                 Nenhuma conta financeira encontrada. Crie uma conta no dashboard
                 antes de importar. Se precisar, volte para{" "}
-                <Link className="font-semibold text-[var(--color-accent)]" href="/dashboard#quick-account">
+                <Link
+                  className="font-semibold text-[var(--color-accent)]"
+                  href="/dashboard#quick-account"
+                >
                   Dashboard
                 </Link>
                 .
@@ -212,7 +218,7 @@ export default function ImportsPage() {
                 Formato esperado
               </div>
               <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
-                CSV simples e explicito
+                CSV simples e explícito
               </h2>
               <pre className="mt-6 overflow-x-auto rounded-[24px] border border-[var(--color-line)] bg-white p-4 text-sm leading-7 text-[var(--color-foreground)]">
 occurredOn,description,amount,type,categoryName
@@ -227,13 +233,13 @@ occurredOn,description,amount,type,categoryName
                 Resultado
               </div>
               <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
-                Resumo da importacao
+                Resumo da importação
               </h2>
 
               {!result ? (
                 <div className="mt-6 rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
                   O resumo aparece aqui depois do primeiro upload. Assim que a
-                  importacao terminar, voce ja pode revisar as transacoes e
+                  importação terminar, você já pode revisar as transações e
                   voltar ao dashboard.
                 </div>
               ) : (
@@ -266,9 +272,14 @@ occurredOn,description,amount,type,categoryName
                   </div>
 
                   <div className="mt-6 space-y-3">
-                    {result.errors.length === 0 ? (
+                    {result.totalRows === 0 ? (
+                      <div className="rounded-[24px] border border-[color:rgba(15,118,110,0.16)] bg-[color:rgba(204,251,241,0.7)] px-5 py-4 text-sm text-[var(--color-foreground)]">
+                        O arquivo foi recebido, mas ele só tinha o cabeçalho.
+                        Adicione linhas de transação para importar dados reais.
+                      </div>
+                    ) : result.errors.length === 0 ? (
                       <div className="rounded-[24px] border border-[color:rgba(29,130,93,0.16)] bg-[color:rgba(220,252,231,0.8)] px-5 py-4 text-sm text-green-700">
-                        Nenhum erro encontrado no arquivo enviado.
+                        Importação concluída sem erros.
                       </div>
                     ) : (
                       result.errors.map((item) => (
@@ -287,7 +298,7 @@ occurredOn,description,amount,type,categoryName
                       className="rounded-full border border-[var(--color-line)] px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-white"
                       href="/transactions"
                     >
-                      Revisar transacoes
+                      Revisar transações
                     </Link>
                     <Link
                       className="rounded-full border border-[var(--color-line)] px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-white"

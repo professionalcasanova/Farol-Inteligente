@@ -60,7 +60,7 @@ const defaultAccountForm: AccountFormState = {
 
 const alertSeverityLabels = {
   high: "Alto",
-  medium: "Medio",
+  medium: "Médio",
 } as const;
 
 const alertSeverityStyles = {
@@ -96,7 +96,7 @@ export default function DashboardPage() {
     ? [
         {
           completed: data.onboarding.hasAccount,
-          description: "Crie a base para organizar entradas, saidas e importacoes.",
+          description: "Crie a base para organizar entradas, saídas e importações.",
           href: "/dashboard#quick-account",
           label: "Criar sua primeira conta",
         },
@@ -104,7 +104,7 @@ export default function DashboardPage() {
           completed: data.onboarding.hasTransaction,
           description: "Registre uma entrada para liberar saldo, resumo mensal e dinheiro livre.",
           href: "/transactions",
-          label: "Registrar uma entrada (salario)",
+          label: "Registrar uma entrada (salário)",
         },
         {
           completed: data.onboarding.hasBill,
@@ -187,7 +187,7 @@ export default function DashboardPage() {
           setLoadError(
             getFriendlyApiMessage(
               caughtError,
-              "Nao foi possivel carregar o dashboard agora. Confira se a API local esta ativa e tente novamente.",
+              "Não foi possível carregar o dashboard agora. Confira se a API local está ativa e tente novamente.",
             ),
           );
         }
@@ -239,7 +239,7 @@ export default function DashboardPage() {
       );
       setAccountForm(defaultAccountForm);
       setAccountSuccess(
-        "Conta criada com sucesso. Agora voce ja pode registrar transacoes, bills ou importar um CSV.",
+        "Conta criada com sucesso. Agora você já pode registrar transações, bills ou importar um CSV.",
       );
     } catch (caughtError) {
       if (isUnauthorizedApiError(caughtError)) {
@@ -250,7 +250,7 @@ export default function DashboardPage() {
       setAccountError(
         getFriendlyApiMessage(
           caughtError,
-          "Nao foi possivel criar a conta agora. Revise os dados e tente novamente.",
+          "Não foi possível criar a conta agora. Revise os dados e tente novamente.",
           {
             messageMap: {
               "Name is required.": "Informe o nome da conta para continuar.",
@@ -259,7 +259,7 @@ export default function DashboardPage() {
               "Financial account name cannot exceed 120 characters.":
                 "O nome da conta ficou longo demais. Tente um nome menor.",
               "Financial account type is invalid.":
-                "Selecione um tipo de conta valido.",
+                "Selecione um tipo de conta válido.",
             },
           },
         ),
@@ -277,12 +277,12 @@ export default function DashboardPage() {
     <AppShell
       actions={
         <MonthPicker
-          label="Mes de referencia"
+          label="Mês de referência"
           onChange={setMonthValue}
           value={monthValue}
         />
       }
-      description="Acompanhe o mes com uma leitura rapida de receitas, despesas, orcamento e dinheiro livre."
+      description="Acompanhe o mês com uma leitura rápida de receitas, despesas, orçamento e dinheiro livre."
       onLogout={logout}
       session={session}
       title="Dashboard financeiro"
@@ -295,7 +295,7 @@ export default function DashboardPage() {
               className="rounded-full border border-[color:rgba(29,130,93,0.18)] px-4 py-2 text-sm font-medium text-green-700 transition hover:bg-white"
               href="/transactions"
             >
-              Registrar transacao
+              Registrar transação
             </Link>
             <Link
               className="rounded-full border border-[color:rgba(29,130,93,0.18)] px-4 py-2 text-sm font-medium text-green-700 transition hover:bg-white"
@@ -314,18 +314,18 @@ export default function DashboardPage() {
       ) : null}
 
       {isFetching ? (
-        <LoadingScreen message="Atualizando o resumo do mes..." />
+        <LoadingScreen message="Atualizando o resumo do mês..." />
       ) : loadError ? (
         <LoadErrorState
           message={loadError}
           onRetry={() => setReloadKey((current) => current + 1)}
-          title="Nao foi possivel abrir o dashboard"
+          title="Não foi possível abrir o dashboard"
         />
       ) : !data ? (
         <LoadErrorState
-          message="O dashboard nao retornou dados para este mes."
+          message="O dashboard não retornou dados para este mês."
           onRetry={() => setReloadKey((current) => current + 1)}
-          title="Dashboard indisponivel"
+          title="Dashboard indisponível"
         />
       ) : (
         <div className="space-y-6">
@@ -340,11 +340,11 @@ export default function DashboardPage() {
                     Primeiro valor em poucos passos
                   </h2>
                   <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--color-muted)]">
-                    O checklist some automaticamente quando voce conclui os tres passos principais.
+                    O checklist some automaticamente quando você conclui os três passos principais.
                   </p>
                 </div>
                 <div className="text-sm font-medium text-[var(--color-foreground)]">
-                  {completedChecklistItemsCount} de 3 concluidos
+                  {completedChecklistItemsCount} de 3 concluídos
                 </div>
               </div>
 
@@ -365,7 +365,7 @@ export default function DashboardPage() {
                         </div>
                       </div>
                       <div className="shrink-0 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-accent)]">
-                        {item.completed ? "Concluido" : "Abrir"}
+                        {item.completed ? "Concluído" : "Abrir"}
                       </div>
                     </div>
                   </Link>
@@ -378,10 +378,10 @@ export default function DashboardPage() {
             <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
               <div>
                 <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
-                  Acoes rapidas
+                  Ações rápidas
                 </div>
                 <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
-                  Proximo passo da demonstracao
+                  Próximo passo da demonstração
                 </h2>
               </div>
               <div className="text-sm text-[var(--color-muted)]">
@@ -393,7 +393,7 @@ export default function DashboardPage() {
               {[
                 {
                   href: "/transactions",
-                  label: "Nova transacao",
+                  label: "Nova transação",
                   description: "Registre receita ou despesa e atualize o saldo na hora.",
                 },
                 {
@@ -403,13 +403,13 @@ export default function DashboardPage() {
                 },
                 {
                   href: "/budget",
-                  label: "Montar orcamento",
+                  label: "Montar orçamento",
                   description: "Defina limites por categoria e acompanhe o restante.",
                 },
                 {
                   href: "/imports",
                   label: "Importar CSV",
-                  description: "Puxe varias transacoes de uma vez para acelerar a demo.",
+                  description: "Puxe várias transações de uma vez para acelerar a demo.",
                 },
               ].map((item) => (
                 <Link
@@ -430,7 +430,7 @@ export default function DashboardPage() {
 
           <section className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
             <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
-              Alertas do mes
+              Alertas do mês
             </div>
             <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
               O que merece atencao agora
@@ -440,8 +440,8 @@ export default function DashboardPage() {
               {data.alerts.alerts.length === 0 ? (
                 <div className="rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
                   Nenhum alerta importante para este mes no momento. Se quiser
-                  avancar a demo agora, registre uma transacao, monte um
-                  orcamento ou adicione uma bill.
+                  avançar a demo agora, registre uma transação, monte um
+                  orçamento ou adicione uma bill.
                 </div>
               ) : (
                 data.alerts.alerts.map((alert, index) => (
@@ -526,7 +526,7 @@ export default function DashboardPage() {
               <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                 <div>
                   <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
-                    Orcamento do mes
+                    Orçamento do mês
                   </div>
                   <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
                     Reserva e execucao
@@ -563,10 +563,10 @@ export default function DashboardPage() {
               <div className="mt-6 grid gap-3">
                 {data.budget.categories.length === 0 ? (
                   <div className="rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
-                    Ainda nao existe orcamento cadastrado para este mes. Monte
+                    Ainda não existe orçamento cadastrado para este mês. Monte
                     seu primeiro planejamento em{" "}
                     <Link className="font-semibold text-[var(--color-accent)]" href="/budget">
-                      Orcamento
+                      Orçamento
                     </Link>{" "}
                     e depois volte aqui para acompanhar o restante.
                   </div>
@@ -581,7 +581,7 @@ export default function DashboardPage() {
                           {item.categoryName}
                         </div>
                         <div className="mt-1 text-xs text-[var(--color-muted)]">
-                          Categoria acompanhada no orcamento.
+                          Categoria acompanhada no orçamento.
                         </div>
                       </div>
                       <div>
@@ -619,17 +619,17 @@ export default function DashboardPage() {
               id="quick-account"
             >
               <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
-                Contas e preparacao
+                Contas e preparação
               </div>
               <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
-                Base para transacoes e importacao
+                Base para transações e importação
               </h2>
 
               <div className="mt-6 space-y-3">
                 {data.accounts.length === 0 ? (
                   <div className="rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-5 text-sm text-[var(--color-muted)]">
                     Nenhuma conta encontrada. Crie a primeira conta abaixo para
-                    liberar transacoes, bills, orcamento e importacao CSV.
+                    liberar transações, bills, orçamento e importação CSV.
                   </div>
                 ) : (
                   data.accounts.map((account) => (
@@ -690,7 +690,7 @@ export default function DashboardPage() {
                   disabled={isCreatingAccount}
                   type="submit"
                 >
-                  {isCreatingAccount ? "Criando conta..." : "Criar conta rapida"}
+                  {isCreatingAccount ? "Criando conta..." : "Criar conta rápida"}
                 </button>
               </form>
             </article>
@@ -699,7 +699,7 @@ export default function DashboardPage() {
           <section className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
             <article className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
               <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
-                Bills do mes
+                Bills do mês
               </div>
               <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
                 Vencimentos em destaque
@@ -746,16 +746,16 @@ export default function DashboardPage() {
 
             <article className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
               <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
-                Proximas contas
+                Próximas contas
               </div>
               <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
-                Ate 5 vencimentos pendentes
+                Até 5 vencimentos pendentes
               </h2>
 
               <div className="mt-6 space-y-3">
                 {data.billsSummary.upcoming.length === 0 ? (
                   <div className="rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
-                    Nenhuma conta pendente para este mes. Se quiser demonstrar
+                    Nenhuma conta pendente para este mês. Se quiser demonstrar
                     vencimentos e alertas, crie uma nova bill em{" "}
                     <Link className="font-semibold text-[var(--color-accent)]" href="/bills">
                       Bills
@@ -796,16 +796,16 @@ export default function DashboardPage() {
               Leitura por categoria
             </div>
             <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
-              Onde o mes esta concentrado
+              Onde o mês está concentrado
             </h2>
 
             <div className="mt-6 grid gap-3 md:grid-cols-2">
               {data.summary.byCategory.length === 0 ? (
                 <div className="rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
-                  Ainda nao ha transacoes registradas neste mes. Crie uma
+                  Ainda não há transações registradas neste mês. Crie uma
                   receita ou despesa em{" "}
                   <Link className="font-semibold text-[var(--color-accent)]" href="/transactions">
-                    Transacoes
+                    Transações
                   </Link>{" "}
                   para alimentar o dashboard.
                 </div>

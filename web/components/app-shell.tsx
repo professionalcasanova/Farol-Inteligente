@@ -104,7 +104,7 @@ export function AppShell({
                 visao do mes
               </div>
               <div className="mt-2 text-sm leading-6 text-[var(--color-foreground)]">
-                Receitas, despesas, orcamento e dinheiro livre no mesmo fluxo.
+                Receitas, despesas, orçamento e dinheiro livre no mesmo fluxo.
               </div>
             </div>
             {actions}

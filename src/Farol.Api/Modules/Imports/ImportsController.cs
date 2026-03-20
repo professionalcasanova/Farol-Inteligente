@@ -25,9 +25,14 @@ public sealed class ImportsController(FarolDbContext dbContext) : ControllerBase
             return Unauthorized(new ErrorResponse("Invalid access token."));
         }
 
-        if (request.File is null || request.File.Length == 0)
+        if (request.File is null)
         {
-            return BadRequest(new ErrorResponse("CSV file is required."));
+            return BadRequest(new ErrorResponse("Selecione um arquivo CSV para importar."));
+        }
+
+        if (request.File.Length == 0)
+        {
+            return BadRequest(new ErrorResponse("O arquivo CSV está vazio."));
         }
 
         var financialAccount = await dbContext.FinancialAccounts
@@ -49,12 +54,12 @@ public sealed class ImportsController(FarolDbContext dbContext) : ControllerBase
 
         if (headerLine is null)
         {
-            return BadRequest(new ErrorResponse("CSV file is empty."));
+            return BadRequest(new ErrorResponse("O arquivo CSV está vazio."));
         }
 
         if (!TransactionCsvParser.IsExpectedHeader(headerLine))
         {
-            return BadRequest(new ErrorResponse("CSV header is invalid. Expected: occurredOn,description,amount,type,categoryName."));
+            return BadRequest(new ErrorResponse("O cabeçalho do CSV é inválido. Use: occurredOn,description,amount,type,categoryName."));
         }
 
         var visibleCategories = await dbContext.Categories
@@ -76,12 +81,6 @@ public sealed class ImportsController(FarolDbContext dbContext) : ControllerBase
 
             if (string.IsNullOrWhiteSpace(line))
             {
-                totalRows++;
-                errors.Add(new ImportTransactionsCsvErrorResponse
-                {
-                    RowNumber = rowNumber,
-                    Message = $"Row {rowNumber} is empty."
-                });
                 continue;
             }
 
@@ -106,7 +105,7 @@ public sealed class ImportsController(FarolDbContext dbContext) : ControllerBase
                     errors.Add(new ImportTransactionsCsvErrorResponse
                     {
                         RowNumber = rowNumber,
-                        Message = $"Row {rowNumber} references an unknown category."
+                        Message = "A categoria informada não foi encontrada."
                     });
                     continue;
                 }
@@ -121,7 +120,7 @@ public sealed class ImportsController(FarolDbContext dbContext) : ControllerBase
                 errors.Add(new ImportTransactionsCsvErrorResponse
                 {
                     RowNumber = rowNumber,
-                    Message = $"Row {rowNumber} contains a category incompatible with the transaction type."
+                    Message = "A categoria informada não combina com o tipo da transação."
                 });
                 continue;
             }
@@ -153,7 +152,13 @@ public sealed class ImportsController(FarolDbContext dbContext) : ControllerBase
 
         if (totalRows == 0)
         {
-            return BadRequest(new ErrorResponse("CSV file must contain at least one data row."));
+            return Ok(new ImportTransactionsCsvResponse
+            {
+                TotalRows = 0,
+                ImportedRows = 0,
+                SkippedRows = 0,
+                Errors = Array.Empty<ImportTransactionsCsvErrorResponse>()
+            });
         }
 
         if (importedRows > 0)

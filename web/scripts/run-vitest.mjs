@@ -12,6 +12,7 @@ const testFiles = [
   "app/page.test.tsx",
   "app/login/page.test.tsx",
   "app/dashboard/page.test.tsx",
+  "app/imports/page.test.tsx",
 ];
 
 for (const testFile of testFiles) {

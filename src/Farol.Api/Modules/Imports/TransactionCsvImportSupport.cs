@@ -179,7 +179,7 @@ internal static class TransactionCsvParser
 
         if (columns.Count != ExpectedHeader.Length)
         {
-            error = $"Row {rowNumber} must contain exactly {ExpectedHeader.Length} columns.";
+            error = $"A linha precisa ter exatamente {ExpectedHeader.Length} colunas.";
             return false;
         }
 
@@ -190,7 +190,7 @@ internal static class TransactionCsvParser
                 DateTimeStyles.None,
                 out var occurredOn))
         {
-            error = $"Row {rowNumber} has an invalid occurredOn value.";
+            error = "A data em occurredOn está inválida.";
             return false;
         }
 
@@ -198,7 +198,7 @@ internal static class TransactionCsvParser
 
         if (string.IsNullOrWhiteSpace(description))
         {
-            error = $"Row {rowNumber} must provide a description.";
+            error = "A descrição é obrigatória.";
             return false;
         }
 
@@ -208,13 +208,13 @@ internal static class TransactionCsvParser
                 CultureInfo.InvariantCulture,
                 out var amount))
         {
-            error = $"Row {rowNumber} has an invalid amount value.";
+            error = "O valor em amount está inválido.";
             return false;
         }
 
         if (!TryParseTransactionType(columns[3].Trim(), out var type))
         {
-            error = $"Row {rowNumber} has an invalid transaction type.";
+            error = "O tipo de transação está inválido.";
             return false;
         }
 
@@ -264,7 +264,7 @@ internal static class TransactionCsvParser
 
         if (isInsideQuotes)
         {
-            error = "CSV contains an unterminated quoted value.";
+            error = "O CSV contém aspas abertas sem fechamento.";
             return null;
         }
 

@@ -123,7 +123,7 @@ public sealed class TransactionCsvImportsEndpointsTests : IClassFixture<FarolApi
         var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
 
         Assert.NotNull(error);
-        Assert.Equal("CSV file is required.", error.Message);
+        Assert.Equal("Selecione um arquivo CSV para importar.", error.Message);
     }
 
     [Fact]
@@ -145,11 +145,11 @@ public sealed class TransactionCsvImportsEndpointsTests : IClassFixture<FarolApi
         var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
 
         Assert.NotNull(error);
-        Assert.Equal("CSV file is required.", error.Message);
+        Assert.Equal("O arquivo CSV está vazio.", error.Message);
     }
 
     [Fact]
-    public async Task PostCsv_HeaderOnly_ReturnsBadRequest()
+    public async Task PostCsv_HeaderOnly_ReturnsSuccessWithEmptySummary()
     {
         await _factory.ResetDatabaseAsync();
         using var client = _factory.CreateClient();
@@ -164,12 +164,15 @@ public sealed class TransactionCsvImportsEndpointsTests : IClassFixture<FarolApi
 
         var response = await client.PostAsync("/api/imports/transactions/csv", content);
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        response.EnsureSuccessStatusCode();
 
-        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+        var summary = await response.Content.ReadFromJsonAsync<ImportTransactionsCsvResponse>();
 
-        Assert.NotNull(error);
-        Assert.Equal("CSV file must contain at least one data row.", error.Message);
+        Assert.NotNull(summary);
+        Assert.Equal(0, summary.TotalRows);
+        Assert.Equal(0, summary.ImportedRows);
+        Assert.Equal(0, summary.SkippedRows);
+        Assert.Empty(summary.Errors);
     }
 
     [Fact]
@@ -194,7 +197,7 @@ public sealed class TransactionCsvImportsEndpointsTests : IClassFixture<FarolApi
         var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
 
         Assert.NotNull(error);
-        Assert.Equal("CSV header is invalid. Expected: occurredOn,description,amount,type,categoryName.", error.Message);
+        Assert.Equal("O cabeçalho do CSV é inválido. Use: occurredOn,description,amount,type,categoryName.", error.Message);
     }
 
     [Fact]
@@ -224,7 +227,7 @@ public sealed class TransactionCsvImportsEndpointsTests : IClassFixture<FarolApi
         Assert.Equal(1, summary.ImportedRows);
         Assert.Equal(1, summary.SkippedRows);
         Assert.Single(summary.Errors);
-        Assert.Contains("invalid amount", summary.Errors[0].Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("valor", summary.Errors[0].Message, StringComparison.OrdinalIgnoreCase);
 
         using var scope = _factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<FarolDbContext>();
@@ -258,7 +261,7 @@ public sealed class TransactionCsvImportsEndpointsTests : IClassFixture<FarolApi
         Assert.Equal(0, summary.ImportedRows);
         Assert.Equal(1, summary.SkippedRows);
         Assert.Single(summary.Errors);
-        Assert.Contains("unknown category", summary.Errors[0].Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("A categoria informada não foi encontrada.", summary.Errors[0].Message);
     }
 
     [Fact]
@@ -373,11 +376,10 @@ public sealed class TransactionCsvImportsEndpointsTests : IClassFixture<FarolApi
         var summary = await response.Content.ReadFromJsonAsync<ImportTransactionsCsvResponse>();
 
         Assert.NotNull(summary);
-        Assert.Equal(2, summary.TotalRows);
+        Assert.Equal(1, summary.TotalRows);
         Assert.Equal(1, summary.ImportedRows);
-        Assert.Equal(1, summary.SkippedRows);
-        Assert.Single(summary.Errors);
-        Assert.All(summary.Errors, error => Assert.Contains("empty", error.Message, StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(0, summary.SkippedRows);
+        Assert.Empty(summary.Errors);
     }
 
     [Fact]

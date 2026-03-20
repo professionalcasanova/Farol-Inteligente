@@ -28,7 +28,7 @@ export default function LoginPage() {
     const authNotice = consumeAuthNotice();
 
     if (authNotice === "session-expired") {
-      setNotice("Sua sessao expirou. Entre novamente para continuar.");
+      setNotice("Sua sessão expirou. Entre novamente para continuar.");
     }
 
     setIsCheckingSession(false);
@@ -48,7 +48,7 @@ export default function LoginPage() {
       setError(
         getFriendlyApiMessage(
           caughtError,
-          "Nao foi possivel entrar agora. Tente novamente em alguns instantes.",
+          "Não foi possível entrar agora. Tente novamente em alguns instantes.",
         ),
       );
     } finally {
@@ -57,7 +57,7 @@ export default function LoginPage() {
   }
 
   if (isCheckingSession) {
-    return <LoadingScreen message="Verificando sua sessao..." />;
+    return <LoadingScreen message="Verificando sua sessão..." />;
   }
 
   return (
@@ -69,19 +69,19 @@ export default function LoginPage() {
             Farol MVP
           </div>
           <h1 className="mt-8 max-w-xl text-5xl font-semibold tracking-[-0.05em] text-[var(--color-foreground)]">
-            Clareza financeira para mostrar valor ja na primeira demo.
+            Clareza financeira para mostrar valor já na primeira demo.
           </h1>
           <p className="mt-6 max-w-xl text-lg leading-8 text-[var(--color-muted)]">
-            Faca login, veja seu saldo do mes, quanto ainda esta reservado no
-            orcamento e onde o dinheiro esta escapando.
+            Faça login, veja seu saldo do mês, quanto ainda está reservado no
+            orçamento e onde o dinheiro está escapando.
           </p>
         </div>
 
         <div className="relative grid gap-4">
           {[
             "Resumo mensal e dinheiro livre no mesmo painel.",
-            "Transacoes e orcamento consumindo a API ja pronta.",
-            "Importacao CSV para reduzir atrito de demonstracao.",
+            "Transações e orçamento consumindo a API já pronta.",
+            "Importação CSV para reduzir atrito de demonstração.",
           ].map((item) => (
             <div
               className="rounded-[24px] border border-[var(--color-line)] bg-[color:rgba(255,255,255,0.76)] px-5 py-4 text-sm leading-6 text-[var(--color-foreground)]"
