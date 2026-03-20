@@ -8,6 +8,27 @@ import {
   type StoredSession,
 } from "@/lib/auth";
 
+type SessionRouter = {
+  replace: (href: string) => void;
+};
+
+export function resolveProtectedSession(router: SessionRouter) {
+  const storedSession = readStoredSession();
+
+  if (!storedSession) {
+    clearStoredSession();
+    router.replace("/login");
+    return null;
+  }
+
+  return storedSession;
+}
+
+export function logoutProtectedSession(router: SessionRouter) {
+  clearStoredSession();
+  router.replace("/login");
+}
+
 export function useProtectedSession() {
   const router = useRouter();
   const [session, setSession] = useState<StoredSession | null>(null);
@@ -15,13 +36,11 @@ export function useProtectedSession() {
 
   useEffect(() => {
     function syncSessionFromStorage() {
-      const storedSession = readStoredSession();
+      const storedSession = resolveProtectedSession(router);
 
       if (!storedSession) {
-        clearStoredSession();
         setSession(null);
         setIsLoading(false);
-        router.replace("/login");
         return;
       }
 
@@ -38,9 +57,8 @@ export function useProtectedSession() {
   }, [router]);
 
   const logout = useCallback(() => {
-    clearStoredSession();
+    logoutProtectedSession(router);
     setSession(null);
-    router.replace("/login");
   }, [router]);
 
   return {
