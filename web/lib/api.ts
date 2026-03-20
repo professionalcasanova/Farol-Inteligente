@@ -305,6 +305,17 @@ export async function login(email: string, password: string) {
   });
 }
 
+export async function register(name: string, email: string, password: string) {
+  return apiRequest<AuthResponse>("/api/auth/register", {
+    method: "POST",
+    body: {
+      name,
+      email,
+      password,
+    },
+  });
+}
+
 export async function listAccounts(token: string) {
   return apiRequest<AccountResponse[]>("/api/accounts", { token });
 }

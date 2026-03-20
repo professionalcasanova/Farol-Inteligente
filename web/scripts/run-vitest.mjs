@@ -11,6 +11,7 @@ const testFiles = [
   "lib/use-protected-session.test.ts",
   "app/page.test.tsx",
   "app/login/page.test.tsx",
+  "app/register/page.test.tsx",
   "app/dashboard/page.test.tsx",
   "app/budget/page.test.tsx",
   "app/imports/page.test.tsx",
