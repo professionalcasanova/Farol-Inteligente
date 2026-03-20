@@ -7,8 +7,9 @@ import { LoadErrorState } from "@/components/load-error-state";
 import { LoadingScreen } from "@/components/loading-screen";
 import { MonthPicker } from "@/components/month-picker";
 import {
-  ApiError,
   createBill,
+  getFriendlyApiMessage,
+  isUnauthorizedApiError,
   listBills,
   payBill,
   type BillResponse,
@@ -24,6 +25,21 @@ import {
   parseMonthInputValue,
 } from "@/lib/format";
 import { useProtectedSession } from "@/lib/use-protected-session";
+
+const billMessageMap = {
+  "Bill was not found.": "A conta a pagar não foi encontrada.",
+  "Month and year are invalid.": "O mês e o ano informados são inválidos.",
+  "Month and year must be provided together.":
+    "Informe mês e ano juntos para filtrar as contas.",
+  "Bill status is invalid. Use pending, paid or overdue.":
+    "O filtro de status das contas a pagar está inválido.",
+  "Bill amount must be greater than zero.":
+    "Informe um valor maior que zero para a conta a pagar.",
+  "Bill description is required.":
+    "Informe uma descrição para a conta a pagar.",
+  "Bill due date is required.":
+    "Informe a data de vencimento da conta a pagar.",
+} as const;
 
 type BillFormState = {
   description: string;
@@ -117,16 +133,18 @@ export default function BillsPage() {
 
         setBills(response);
       } catch (caughtError) {
-        if (caughtError instanceof ApiError && caughtError.status === 401) {
+        if (isUnauthorizedApiError(caughtError)) {
           logout("session-expired");
           return;
         }
 
         if (!isCancelled) {
           setLoadError(
-            caughtError instanceof Error
-              ? caughtError.message
-              : "Nao foi possivel carregar as bills.",
+            getFriendlyApiMessage(
+              caughtError,
+              "Não foi possível carregar as contas a pagar agora. Confira se a API local está ativa e tente novamente.",
+              { messageMap: billMessageMap },
+            ),
           );
         }
       } finally {
@@ -181,17 +199,19 @@ export default function BillsPage() {
         amount: "",
         dueOn: getDefaultDueOn(monthValue),
       });
-      setSuccess("Bill criada com sucesso.");
+      setSuccess("Conta a pagar criada com sucesso.");
     } catch (caughtError) {
-      if (caughtError instanceof ApiError && caughtError.status === 401) {
+      if (isUnauthorizedApiError(caughtError)) {
         logout("session-expired");
         return;
       }
 
       setFormError(
-        caughtError instanceof Error
-          ? caughtError.message
-          : "Nao foi possivel criar a bill.",
+        getFriendlyApiMessage(
+          caughtError,
+          "Não foi possível registrar a conta a pagar agora. Revise os dados e tente novamente.",
+          { messageMap: billMessageMap },
+        ),
       );
     } finally {
       setIsSubmitting(false);
@@ -218,15 +238,17 @@ export default function BillsPage() {
 
       await refreshBills();
     } catch (caughtError) {
-      if (caughtError instanceof ApiError && caughtError.status === 401) {
+      if (isUnauthorizedApiError(caughtError)) {
         logout("session-expired");
         return;
       }
 
       setFormError(
-        caughtError instanceof Error
-          ? caughtError.message
-          : "Nao foi possivel atualizar a bill.",
+        getFriendlyApiMessage(
+          caughtError,
+          "Não foi possível atualizar a conta a pagar agora. Tente novamente.",
+          { messageMap: billMessageMap },
+        ),
       );
     } finally {
       setActionBillId(null);
@@ -242,7 +264,7 @@ export default function BillsPage() {
       actions={
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <MonthPicker
-            label="Mes das bills"
+            label="Mês das contas"
             onChange={setMonthValue}
             value={monthValue}
           />
@@ -270,10 +292,10 @@ export default function BillsPage() {
           </Link>
         </div>
       }
-      description="Acompanhe vencimentos, destaque atrasos e marque pagamentos sem sair do MVP. O dashboard reflete tudo isso no mesmo mes."
+      description="Acompanhe vencimentos, destaque atrasos e marque pagamentos sem sair do MVP. O dashboard reflete tudo isso no mesmo mês."
       onLogout={logout}
       session={session}
-      title="Bills e vencimentos"
+      title="Contas a pagar"
     >
       {formError ? (
         <div className="mb-6 rounded-[24px] border border-[color:rgba(185,28,28,0.14)] bg-[color:rgba(254,226,226,0.8)] px-5 py-4 text-sm text-red-700">
@@ -296,18 +318,18 @@ export default function BillsPage() {
       ) : null}
 
       {isFetching ? (
-        <LoadingScreen message="Carregando bills do mes..." />
+        <LoadingScreen message="Carregando contas a pagar do mês..." />
       ) : loadError ? (
         <LoadErrorState
           message={loadError}
           onRetry={() => setReloadKey((current) => current + 1)}
-          title="Nao foi possivel carregar as bills"
+          title="Não foi possível carregar as contas a pagar"
         />
       ) : (
         <div className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
           <section className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
             <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
-              Nova bill
+              Nova conta
             </div>
             <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
               Registrar vencimento
@@ -315,7 +337,7 @@ export default function BillsPage() {
 
             <form className="mt-6 space-y-4" onSubmit={handleCreateBill}>
               <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
-                <span>Descricao</span>
+                  <span>Descrição</span>
                 <input
                   className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3 text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)]"
                   onChange={(event) =>
@@ -369,19 +391,19 @@ export default function BillsPage() {
                 disabled={isSubmitting}
                 type="submit"
               >
-                {isSubmitting ? "Salvando bill..." : "Criar bill"}
-              </button>
-            </form>
-          </section>
+                  {isSubmitting ? "Salvando conta..." : "Criar conta a pagar"}
+                </button>
+              </form>
+            </section>
 
           <section className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
             <div className="flex items-end justify-between gap-4">
               <div>
                 <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
-                  Agenda do mes
+                  Agenda do mês
                 </div>
                 <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
-                  Bills encontradas
+                  Contas encontradas
                 </h2>
               </div>
               <div className="text-sm text-[var(--color-muted)]">
@@ -392,9 +414,9 @@ export default function BillsPage() {
             <div className="mt-6 space-y-3">
               {bills.length === 0 ? (
                 <div className="rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
-                  Nenhuma bill encontrada para os filtros atuais. Use o
-                  formulario ao lado para registrar o primeiro vencimento ou
-                  ajuste os filtros para rever outro mes.
+                  Nenhuma conta a pagar encontrada para os filtros atuais. Use o
+                  formulário ao lado para registrar o primeiro vencimento ou
+                  ajuste os filtros para rever outro mês.
                 </div>
               ) : (
                 bills.map((bill) => (

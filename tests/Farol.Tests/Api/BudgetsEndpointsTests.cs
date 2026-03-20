@@ -216,6 +216,52 @@ public sealed class BudgetsEndpointsTests : IClassFixture<FarolApiFactory>
     }
 
     [Fact]
+    public async Task PostMonthlyBudget_EmptyCategories_ShouldClearExistingBudget()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var categories = await SeedCategoriesAsync("maria@email.com", ("Alimentacao", CategoryType.Expense));
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var createResponse = await client.PostAsJsonAsync("/api/budgets/monthly", new CreateMonthlyBudgetRequest
+        {
+            Month = 3,
+            Year = 2026,
+            Categories =
+            [
+                new CreateMonthlyBudgetCategoryRequest { CategoryId = categories["Alimentacao"], Planned = 500m }
+            ]
+        });
+
+        createResponse.EnsureSuccessStatusCode();
+
+        var clearResponse = await client.PostAsJsonAsync("/api/budgets/monthly", new CreateMonthlyBudgetRequest
+        {
+            Month = 3,
+            Year = 2026,
+            Categories = []
+        });
+
+        clearResponse.EnsureSuccessStatusCode();
+
+        var summary = await clearResponse.Content.ReadFromJsonAsync<MonthlyBudgetResponse>();
+
+        Assert.NotNull(summary);
+        Assert.Equal(0m, summary.TotalPlanned);
+        Assert.Equal(0m, summary.TotalSpent);
+        Assert.Equal(0m, summary.TotalRemaining);
+        Assert.Empty(summary.Categories);
+
+        using var scope = _factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<FarolDbContext>();
+
+        Assert.Single(dbContext.MonthlyBudgets);
+        Assert.Empty(dbContext.MonthlyBudgetCategories);
+    }
+
+    [Fact]
     public async Task PostMonthlyBudget_CategoryFromAnotherUser_ReturnsNotFound()
     {
         await _factory.ResetDatabaseAsync();

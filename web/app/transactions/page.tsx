@@ -6,8 +6,9 @@ import { AppShell } from "@/components/app-shell";
 import { LoadErrorState } from "@/components/load-error-state";
 import { LoadingScreen } from "@/components/loading-screen";
 import {
-  ApiError,
   createTransaction,
+  getFriendlyApiMessage,
+  isUnauthorizedApiError,
   listAccounts,
   listCategories,
   listTransactions,
@@ -24,6 +25,16 @@ import {
   getCurrentDateInputValue,
 } from "@/lib/format";
 import { useProtectedSession } from "@/lib/use-protected-session";
+
+const transactionMessageMap = {
+  "Financial account was not found.": "A conta selecionada não foi encontrada.",
+  "Category was not found.": "A categoria selecionada não foi encontrada.",
+  "Transaction amount must be greater than zero.":
+    "Informe um valor maior que zero para a transação.",
+  "Transaction description is required.":
+    "Informe uma descrição para a transação.",
+  "Transaction occurrence date is required.": "Informe a data da transação.",
+} as const;
 
 type TransactionFormState = {
   financialAccountId: string;
@@ -94,16 +105,18 @@ export default function TransactionsPage() {
             current.financialAccountId || accountsResponse[0]?.id || "",
         }));
       } catch (caughtError) {
-        if (caughtError instanceof ApiError && caughtError.status === 401) {
+        if (isUnauthorizedApiError(caughtError)) {
           logout("session-expired");
           return;
         }
 
         if (!isCancelled) {
           setLoadError(
-            caughtError instanceof Error
-              ? caughtError.message
-              : "Nao foi possivel carregar as transacoes.",
+            getFriendlyApiMessage(
+              caughtError,
+              "Não foi possível carregar as transações agora. Confira se a API local está ativa e tente novamente.",
+              { messageMap: transactionMessageMap },
+            ),
           );
         }
       } finally {
@@ -156,22 +169,24 @@ export default function TransactionsPage() {
 
       const transactionsResponse = await listTransactions(accessToken);
       setTransactions(transactionsResponse);
-      setSuccess("Transacao criada com sucesso.");
+      setSuccess("Transação criada com sucesso.");
       setForm((current) => ({
         ...defaultFormState,
         financialAccountId: current.financialAccountId,
         occurredOn: getCurrentDateInputValue(),
       }));
     } catch (caughtError) {
-      if (caughtError instanceof ApiError && caughtError.status === 401) {
+      if (isUnauthorizedApiError(caughtError)) {
         logout("session-expired");
         return;
       }
 
       setFormError(
-        caughtError instanceof Error
-          ? caughtError.message
-          : "Nao foi possivel criar a transacao.",
+        getFriendlyApiMessage(
+          caughtError,
+          "Não foi possível registrar a transação agora. Revise os dados e tente novamente.",
+          { messageMap: transactionMessageMap },
+        ),
       );
     } finally {
       setIsSubmitting(false);
@@ -192,10 +207,10 @@ export default function TransactionsPage() {
           Voltar ao dashboard
         </Link>
       }
-      description="Registre entradas e saidas sem sair do MVP. Cada lancamento ja atualiza saldo, dinheiro livre e alertas."
+      description="Registre entradas e saídas sem sair do MVP. Cada lançamento já atualiza saldo, dinheiro livre e alertas."
       onLogout={logout}
       session={session}
-      title="Transacoes"
+      title="Transações"
     >
       {formError ? (
         <div className="mb-6 rounded-[24px] border border-[color:rgba(185,28,28,0.14)] bg-[color:rgba(254,226,226,0.8)] px-5 py-4 text-sm text-red-700">
@@ -217,33 +232,33 @@ export default function TransactionsPage() {
               className="rounded-full border border-[color:rgba(29,130,93,0.18)] px-4 py-2 text-sm font-medium text-green-700 transition hover:bg-white"
               href="/budget"
             >
-              Ajustar orcamento
+              Ajustar orçamento
             </Link>
           </div>
         </div>
       ) : null}
 
       {isFetching ? (
-        <LoadingScreen message="Carregando contas, categorias e transacoes..." />
+        <LoadingScreen message="Carregando contas, categorias e transações..." />
       ) : loadError ? (
         <LoadErrorState
           message={loadError}
           onRetry={() => setReloadKey((current) => current + 1)}
-          title="Nao foi possivel carregar as transacoes"
+          title="Não foi possível carregar as transações"
         />
       ) : (
         <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
           <section className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
             <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
-              Nova transacao
+              Nova transação
             </div>
             <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
-              Lancamento rapido
+              Lançamento rápido
             </h2>
 
             {accounts.length === 0 ? (
               <div className="mt-6 rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
-                Voce precisa de ao menos uma conta financeira. Crie a primeira no
+                Você precisa de ao menos uma conta financeira. Crie a primeira no
                 <Link className="font-semibold text-[var(--color-accent)]" href="/dashboard#quick-account">
                   {" "}dashboard
                 </Link>{" "}
@@ -312,7 +327,7 @@ export default function TransactionsPage() {
                 </div>
 
                 <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
-                  <span>Descricao</span>
+                  <span>Descrição</span>
                   <input
                     className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3 text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)]"
                     onChange={(event) =>
@@ -321,7 +336,7 @@ export default function TransactionsPage() {
                         description: event.target.value,
                       }))
                     }
-                    placeholder="Mercado, salario, almoco..."
+                    placeholder="Mercado, salário, almoço..."
                     value={form.description}
                   />
                 </label>
@@ -369,7 +384,7 @@ export default function TransactionsPage() {
                   disabled={isSubmitting}
                   type="submit"
                 >
-                  {isSubmitting ? "Salvando..." : "Criar transacao"}
+                  {isSubmitting ? "Salvando..." : "Criar transação"}
                 </button>
               </form>
             )}
@@ -379,10 +394,10 @@ export default function TransactionsPage() {
             <div className="flex items-end justify-between gap-4">
               <div>
                 <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
-                  Historico
+                  Histórico
                 </div>
                 <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
-                  Transacoes registradas
+                  Transações registradas
                 </h2>
               </div>
               <div className="text-sm text-[var(--color-muted)]">
@@ -393,7 +408,7 @@ export default function TransactionsPage() {
             <div className="mt-6 space-y-3">
               {transactions.length === 0 ? (
                 <div className="rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
-                  Nenhuma transacao encontrada. O primeiro lancamento ja atualiza
+                  Nenhuma transação encontrada. O primeiro lançamento já atualiza
                   o dashboard e o insight de dinheiro livre. Se quiser conferir
                   o resultado depois, volte para{" "}
                   <Link className="font-semibold text-[var(--color-accent)]" href="/dashboard">

@@ -7,8 +7,9 @@ import { LoadErrorState } from "@/components/load-error-state";
 import { LoadingScreen } from "@/components/loading-screen";
 import { MonthPicker } from "@/components/month-picker";
 import {
-  ApiError,
+  getFriendlyApiMessage,
   getMonthlyBudget,
+  isUnauthorizedApiError,
   listCategories,
   saveMonthlyBudget,
   type CategoryResponse,
@@ -20,6 +21,18 @@ import {
   parseMonthInputValue,
 } from "@/lib/format";
 import { useProtectedSession } from "@/lib/use-protected-session";
+
+const budgetMessageMap = {
+  "One or more categories were not found.":
+    "Uma ou mais categorias do orçamento não foram encontradas.",
+  "Budget categories must be expense categories.":
+    "Use apenas categorias de despesa no orçamento.",
+  "Budget categories cannot be duplicated in the same payload.":
+    "Cada categoria pode aparecer apenas uma vez no orçamento.",
+  "Planned amount must be greater than zero.":
+    "Informe um valor planejado maior que zero.",
+  "Month and year are invalid.": "O mês e o ano informados são inválidos.",
+} as const;
 
 type BudgetRow = {
   id: number;
@@ -95,16 +108,18 @@ export default function BudgetPage() {
           ]);
         }
       } catch (caughtError) {
-        if (caughtError instanceof ApiError && caughtError.status === 401) {
+        if (isUnauthorizedApiError(caughtError)) {
           logout("session-expired");
           return;
         }
 
         if (!isCancelled) {
           setLoadError(
-            caughtError instanceof Error
-              ? caughtError.message
-              : "Nao foi possivel carregar o orcamento.",
+            getFriendlyApiMessage(
+              caughtError,
+              "Não foi possível carregar o orçamento agora. Confira se a API local está ativa e tente novamente.",
+              { messageMap: budgetMessageMap },
+            ),
           );
         }
       } finally {
@@ -167,7 +182,7 @@ export default function BudgetPage() {
       new Set(categories.map((item) => item.categoryId)).size !== categories.length;
 
     if (hasDuplicateCategories) {
-      setFormError("Cada categoria pode aparecer apenas uma vez no orcamento.");
+      setFormError("Cada categoria pode aparecer apenas uma vez no orçamento.");
       setSuccess("");
       return;
     }
@@ -199,17 +214,23 @@ export default function BudgetPage() {
               },
             ],
       );
-      setSuccess("Orcamento salvo com sucesso.");
+      setSuccess(
+        response.categories.length === 0
+          ? "Orçamento do mês limpo com sucesso. Você pode montar um novo planejamento quando quiser."
+          : "Orçamento salvo com sucesso.",
+      );
     } catch (caughtError) {
-      if (caughtError instanceof ApiError && caughtError.status === 401) {
+      if (isUnauthorizedApiError(caughtError)) {
         logout("session-expired");
         return;
       }
 
       setFormError(
-        caughtError instanceof Error
-          ? caughtError.message
-          : "Nao foi possivel salvar o orcamento.",
+        getFriendlyApiMessage(
+          caughtError,
+          "Não foi possível salvar o orçamento agora. Revise os dados e tente novamente.",
+          { messageMap: budgetMessageMap },
+        ),
       );
     } finally {
       setIsSubmitting(false);
@@ -225,7 +246,7 @@ export default function BudgetPage() {
       actions={
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <MonthPicker
-            label="Mes do orcamento"
+            label="Mês do orçamento"
             onChange={setMonthValue}
             value={monthValue}
           />
@@ -237,10 +258,10 @@ export default function BudgetPage() {
           </Link>
         </div>
       }
-      description="Monte ou substitua o orcamento mensal por categoria de despesa e acompanhe o restante em tempo real no dashboard."
+      description="Monte, substitua ou limpe o orçamento mensal por categoria de despesa e acompanhe o restante em tempo real no dashboard."
       onLogout={logout}
       session={session}
-      title="Orcamento mensal"
+      title="Orçamento mensal"
     >
       {formError ? (
         <div className="mb-6 rounded-[24px] border border-[color:rgba(185,28,28,0.14)] bg-[color:rgba(254,226,226,0.8)] px-5 py-4 text-sm text-red-700">
@@ -263,18 +284,18 @@ export default function BudgetPage() {
       ) : null}
 
       {isFetching ? (
-        <LoadingScreen message="Carregando orcamento do mes..." />
+        <LoadingScreen message="Carregando orçamento do mês..." />
       ) : loadError ? (
         <LoadErrorState
           message={loadError}
           onRetry={() => setReloadKey((current) => current + 1)}
-          title="Nao foi possivel carregar o orcamento"
+          title="Não foi possível carregar o orçamento"
         />
       ) : !budget ? (
         <LoadErrorState
-          message="O orcamento do mes nao retornou dados."
+          message="O orçamento do mês não retornou dados."
           onRetry={() => setReloadKey((current) => current + 1)}
-          title="Orcamento indisponivel"
+          title="Orçamento indisponível"
         />
       ) : (
         <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
@@ -283,7 +304,7 @@ export default function BudgetPage() {
               Consolidado
             </div>
             <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
-              Resumo do orcamento
+              Resumo do orçamento
             </h2>
 
             <div className="mt-6 grid gap-4 md:grid-cols-3">
@@ -316,9 +337,9 @@ export default function BudgetPage() {
             <div className="mt-6 space-y-3">
               {budget.categories.length === 0 ? (
                 <div className="rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
-                  Nenhuma categoria orcada neste mes ainda. Use o formulario ao
-                  lado para montar o primeiro planejamento e depois volte ao
-                  dashboard para acompanhar gasto, restante e dinheiro livre.
+                  Nenhuma categoria orçada neste mês ainda. Use o formulário ao
+                  lado para montar o primeiro planejamento. Se preferir, deixe
+                  tudo em branco e salve para manter o mês sem orçamento.
                 </div>
               ) : (
                 budget.categories.map((item) => (
@@ -348,11 +369,14 @@ export default function BudgetPage() {
             <div className="flex items-end justify-between gap-4">
               <div>
                 <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
-                  Edicao
+                  Edição
                 </div>
                 <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
-                  Criar ou substituir orcamento
+                  Criar, substituir ou limpar orçamento
                 </h2>
+                <p className="mt-3 text-sm leading-6 text-[var(--color-muted)]">
+                  Para limpar o orçamento do mês, deixe as categorias sem valor e salve.
+                </p>
               </div>
               <button
                 className="rounded-full border border-[var(--color-line)] px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-white"
@@ -365,8 +389,8 @@ export default function BudgetPage() {
 
             {expenseCategories.length === 0 ? (
               <div className="mt-6 rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
-                Nenhuma categoria de despesa disponivel. Cadastre ou mantenha as
-                categorias do sistema antes de montar o orcamento.
+                Nenhuma categoria de despesa disponível. Cadastre ou mantenha as
+                categorias do sistema antes de montar o orçamento.
               </div>
             ) : (
               <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
@@ -437,7 +461,7 @@ export default function BudgetPage() {
                   disabled={isSubmitting}
                   type="submit"
                 >
-                  {isSubmitting ? "Salvando orcamento..." : "Salvar orcamento mensal"}
+                  {isSubmitting ? "Salvando orçamento..." : "Salvar orçamento mensal"}
                 </button>
               </form>
             )}
