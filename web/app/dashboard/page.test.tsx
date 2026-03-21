@@ -1,9 +1,11 @@
 ﻿import type { ComponentProps, ReactNode } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import DashboardPage from "@/app/dashboard/page";
 import {
   ApiError,
+  createTransaction,
   getAlerts,
   getBillsSummary,
   getFreeMoney,
@@ -12,6 +14,7 @@ import {
   getMonthlySummary,
   listAccounts,
   listBills,
+  listCategories,
   listTransactions,
 } from "@/lib/api";
 import { useProtectedSession } from "@/lib/use-protected-session";
@@ -55,6 +58,7 @@ vi.mock("@/lib/api", async () => {
 
   return {
     ...actual,
+    createTransaction: vi.fn(),
     getAlerts: vi.fn(),
     getBillsSummary: vi.fn(),
     getFreeMoney: vi.fn(),
@@ -63,11 +67,13 @@ vi.mock("@/lib/api", async () => {
     getMonthlySummary: vi.fn(),
     listAccounts: vi.fn(),
     listBills: vi.fn(),
+    listCategories: vi.fn(),
     listTransactions: vi.fn(),
   };
 });
 
 const mockedUseProtectedSession = vi.mocked(useProtectedSession);
+const mockedCreateTransaction = vi.mocked(createTransaction);
 const mockedGetAlerts = vi.mocked(getAlerts);
 const mockedGetBillsSummary = vi.mocked(getBillsSummary);
 const mockedGetFreeMoney = vi.mocked(getFreeMoney);
@@ -76,6 +82,7 @@ const mockedGetMonthlyBudget = vi.mocked(getMonthlyBudget);
 const mockedGetMonthlySummary = vi.mocked(getMonthlySummary);
 const mockedListAccounts = vi.mocked(listAccounts);
 const mockedListBills = vi.mocked(listBills);
+const mockedListCategories = vi.mocked(listCategories);
 const mockedListTransactions = vi.mocked(listTransactions);
 
 const session = {
@@ -112,6 +119,12 @@ function mockDashboardApi(overrides?: {
     description: string;
     occurredOn: string;
     createdAtUtc: string;
+  }>;
+  categories?: Array<{
+    id: string;
+    name: string;
+    type: 1 | 2;
+    isSystem: boolean;
   }>;
   monthHealth?: {
     status: "healthy" | "attention" | "critical";
@@ -180,6 +193,7 @@ function mockDashboardApi(overrides?: {
     categories: [],
   });
   mockedListAccounts.mockResolvedValue(overrides?.accounts ?? []);
+  mockedListCategories.mockResolvedValue(overrides?.categories ?? []);
   mockedListTransactions.mockResolvedValue(overrides?.transactions ?? []);
   mockedListBills.mockResolvedValue(overrides?.bills ?? []);
 }
@@ -187,6 +201,7 @@ function mockDashboardApi(overrides?: {
 describe("DashboardPage", () => {
   beforeEach(() => {
     mockedUseProtectedSession.mockReset();
+    mockedCreateTransaction.mockReset();
     mockedGetAlerts.mockReset();
     mockedGetBillsSummary.mockReset();
     mockedGetFreeMoney.mockReset();
@@ -195,6 +210,7 @@ describe("DashboardPage", () => {
     mockedGetMonthlySummary.mockReset();
     mockedListAccounts.mockReset();
     mockedListBills.mockReset();
+    mockedListCategories.mockReset();
     mockedListTransactions.mockReset();
   });
 
@@ -229,7 +245,7 @@ describe("DashboardPage", () => {
     expect(screen.getByRole("link", { name: /criar primeira conta/i })).toBeInTheDocument();
     expect(await screen.findByText("Comece por aqui")).toBeInTheDocument();
     expect(screen.getByText(/Criar sua primeira conta/)).toBeInTheDocument();
-    expect(screen.getByText(/Registrar uma entrada \(salÃ¡rio\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Registrar uma entrada \(salário\)/)).toBeInTheDocument();
     expect(screen.getByText(/Adicionar uma conta a pagar/)).toBeInTheDocument();
   });
 
@@ -254,15 +270,158 @@ describe("DashboardPage", () => {
     render(<DashboardPage />);
 
     expect(
-      await screen.findByText("Seu mÃªs ainda nÃ£o tem dados suficientes."),
+      await screen.findByText("Seu mês ainda não tem dados suficientes."),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/ainda faltam transa/i),
+      screen.getByText(/ainda faltam movimenta/i),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: /registrar entrada/i }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /importar csv/i })).toBeInTheDocument();
+    expect(
+      screen.getAllByRole("link", { name: /importar (dados de )?arquivo/i }),
+    ).not.toHaveLength(0);
+  });
+
+  it("Dashboard_RegisterNow_SubmitSuccess_RefreshesDataAndClearsForm", async () => {
+    const user = userEvent.setup();
+
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+    mockedCreateTransaction.mockResolvedValue({
+      id: "transaction-2",
+      financialAccountId: "account-1",
+      categoryId: null,
+      type: 2,
+      amount: 85,
+      description: "Saída rápida",
+      occurredOn: "2026-03-21",
+      createdAtUtc: "2026-03-21T00:00:00Z",
+    });
+    mockedGetMonthHealth
+      .mockResolvedValueOnce({
+        status: "healthy",
+        summary: {
+          message: "Seu mês ainda não tem dados suficientes.",
+          cause:
+            "Você já tem conta, mas ainda faltam movimentações ou vencimentos para o Farol montar seu primeiro estado do mês.",
+          action:
+            "Registre uma entrada agora ou importe um arquivo para chegar ao primeiro insight do mês.",
+        },
+        insights: [],
+      })
+      .mockResolvedValue({
+        status: "attention",
+        summary: {
+          message: "Seu mês pede alguns ajustes agora.",
+          cause: "As contas pendentes já consomem a maior parte da sua folga.",
+          action: "Organize a ordem de pagamento e preserve caixa para o essencial.",
+        },
+        insights: [],
+      });
+    mockedGetMonthlySummary
+      .mockResolvedValueOnce({
+        month: 3,
+        year: 2026,
+        totalIncome: 0,
+        totalExpense: 0,
+        balance: 0,
+        byCategory: [],
+      })
+      .mockResolvedValue({
+        month: 3,
+        year: 2026,
+        totalIncome: 0,
+        totalExpense: 85,
+        balance: -85,
+        byCategory: [],
+      });
+    mockedGetAlerts.mockResolvedValue({ alerts: [] });
+    mockedGetBillsSummary.mockResolvedValue({
+      totalPending: 0,
+      totalOverdue: 0,
+      totalPaid: 0,
+      countPending: 0,
+      countOverdue: 0,
+      countPaid: 0,
+      upcoming: [],
+    });
+    mockedGetFreeMoney.mockResolvedValue({
+      month: 3,
+      year: 2026,
+      totalIncome: 0,
+      totalExpense: 85,
+      balance: -85,
+      totalPlannedBudget: 0,
+      totalBudgetSpent: 0,
+      totalBudgetRemaining: 0,
+      freeToSpend: -85,
+    });
+    mockedGetMonthlyBudget.mockResolvedValue({
+      month: 3,
+      year: 2026,
+      totalPlanned: 0,
+      totalSpent: 0,
+      totalRemaining: 0,
+      categories: [],
+    });
+    mockedListAccounts.mockResolvedValue([
+      {
+        id: "account-1",
+        name: "Conta principal",
+        type: 2,
+        isActive: true,
+        createdAtUtc: "2026-03-01T00:00:00Z",
+      },
+    ]);
+    mockedListCategories.mockResolvedValue([
+      {
+        id: "category-1",
+        name: "Mercado",
+        type: 2,
+        isSystem: true,
+      },
+    ]);
+    mockedListTransactions
+      .mockResolvedValueOnce([])
+      .mockResolvedValue([
+        {
+          id: "transaction-2",
+          financialAccountId: "account-1",
+          categoryId: null,
+          type: 2,
+          amount: 85,
+          description: "Saída rápida",
+          occurredOn: "2026-03-21",
+          createdAtUtc: "2026-03-21T00:00:00Z",
+        },
+      ]);
+    mockedListBills.mockResolvedValue([]);
+
+    render(<DashboardPage />);
+
+    await user.type(await screen.findByLabelText(/valor/i), "85");
+    await user.type(screen.getByLabelText(/descrição \(opcional\)/i), "Mercado");
+    await user.click(screen.getByRole("button", { name: /registrar agora/i }));
+
+    await waitFor(() => {
+      expect(mockedCreateTransaction).toHaveBeenCalledWith("token", {
+        financialAccountId: "account-1",
+        categoryId: undefined,
+        type: 2,
+        amount: 85,
+        description: "Mercado",
+        occurredOn: expect.any(String),
+      });
+    });
+
+    expect(await screen.findByText("Registrado 👍")).toBeInTheDocument();
+    expect(screen.getByLabelText(/valor/i)).toHaveValue(null);
+    expect(screen.getByLabelText(/descrição \(opcional\)/i)).toHaveValue("");
+    expect(mockedGetMonthlySummary).toHaveBeenCalledTimes(2);
   });
 
   it("Dashboard_WithMonthHealth_ShowsSummaryCauseAndAction", async () => {
@@ -319,8 +478,8 @@ describe("DashboardPage", () => {
         "Organize a ordem de pagamento e preserve caixa para o essencial.",
       ),
     ).toBeInTheDocument();
-    expect(screen.getByText("Numeros de apoio")).toBeInTheDocument();
-    expect(screen.queryByText("Alertas do mÃªs")).not.toBeInTheDocument();
+    expect(screen.getByText("Números de apoio")).toBeInTheDocument();
+    expect(screen.queryByText("Alertas do mês")).not.toBeInTheDocument();
   });
 
   it("Dashboard_WithMonthHealth_ShowsActiveInsights", async () => {
@@ -495,16 +654,17 @@ describe("DashboardPage", () => {
       categories: [],
     });
     mockedListAccounts.mockResolvedValue([]);
+    mockedListCategories.mockResolvedValue([]);
     mockedListTransactions.mockResolvedValue([]);
     mockedListBills.mockResolvedValue([]);
 
     render(<DashboardPage />);
 
     expect(await screen.findByText("Falha ao carregar")).toBeInTheDocument();
-    expect(screen.getByText("NÃ£o foi possÃ­vel abrir o dashboard")).toBeInTheDocument();
+    expect(screen.getByText("Não foi possível abrir o dashboard")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "NÃ£o foi possÃ­vel carregar o dashboard agora. Confira se a API local estÃ¡ ativa e tente novamente.",
+        "Não foi possível carregar o dashboard agora. Confira se a API local está ativa e tente novamente.",
       ),
     ).toBeInTheDocument();
   });
@@ -569,14 +729,15 @@ describe("DashboardPage", () => {
       categories: [],
     });
     mockedListAccounts.mockResolvedValue([]);
+    mockedListCategories.mockResolvedValue([]);
     mockedListTransactions.mockResolvedValue([]);
     mockedListBills.mockResolvedValue([]);
 
     render(<DashboardPage />);
 
-    expect(await screen.findByText("Como estÃ¡ seu mÃªs")).toBeInTheDocument();
-    expect(screen.queryByText("Inteligencia do mes")).not.toBeInTheDocument();
-    expect(screen.getByText("Alertas do mÃªs")).toBeInTheDocument();
+    expect(await screen.findByText("Como está seu mês")).toBeInTheDocument();
+    expect(screen.queryByText("Inteligência do mês")).not.toBeInTheDocument();
+    expect(screen.getByText("Alertas do mês")).toBeInTheDocument();
     expect(
       screen.getByText(
         "Voce tem contas vencidas que precisam de atencao imediata.",
@@ -638,6 +799,7 @@ describe("DashboardPage", () => {
       categories: [],
     });
     mockedListAccounts.mockResolvedValue([]);
+    mockedListCategories.mockResolvedValue([]);
     mockedListTransactions.mockResolvedValue([]);
     mockedListBills.mockResolvedValue([]);
 

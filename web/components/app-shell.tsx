@@ -16,10 +16,10 @@ type AppShellProps = {
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard" },
-  { href: "/transactions", label: "Transacoes" },
-  { href: "/bills", label: "Bills" },
-  { href: "/budget", label: "Orcamento" },
-  { href: "/imports", label: "Importar CSV" },
+  { href: "/transactions", label: "Movimentações" },
+  { href: "/bills", label: "Contas a pagar" },
+  { href: "/budget", label: "Planejamento" },
+  { href: "/imports", label: "Importar dados" },
 ];
 
 export function AppShell({
@@ -63,7 +63,7 @@ export function AppShell({
 
                   return (
                     <Link
-                      className={`inline-flex min-h-11 items-center rounded-full px-4 py-2 text-sm font-medium transition ${
+                      className={`inline-flex min-h-11 items-center whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition ${
                         isActive
                           ? "bg-[var(--color-foreground)] text-white"
                           : "bg-white text-[var(--color-foreground)] hover:bg-[var(--color-accent-soft)]"
@@ -86,7 +86,7 @@ export function AppShell({
                   </div>
                 </div>
                 <button
-                  className="inline-flex min-h-11 items-center rounded-full border border-[var(--color-line)] px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-white"
+                  className="inline-flex min-h-11 items-center whitespace-nowrap rounded-full border border-[var(--color-line)] px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-white"
                   onClick={onLogout}
                   type="button"
                 >
@@ -101,10 +101,10 @@ export function AppShell({
           <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div className="rounded-[24px] border border-[color:rgba(15,118,110,0.14)] bg-[var(--color-accent-soft)] px-5 py-4">
               <div className="text-xs uppercase tracking-[0.22em] text-[var(--color-accent)]">
-                visao do mes
+                visão do mês
               </div>
               <div className="mt-2 text-sm leading-6 text-[var(--color-foreground)]">
-                Receitas, despesas, orçamento e dinheiro livre no mesmo fluxo.
+                Entradas, saídas, planejamento e dinheiro livre no mesmo fluxo.
               </div>
             </div>
             {actions}
