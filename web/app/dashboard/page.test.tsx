@@ -7,6 +7,7 @@ import {
   getAlerts,
   getBillsSummary,
   getFreeMoney,
+  getMonthHealth,
   getMonthlyBudget,
   getMonthlySummary,
   listAccounts,
@@ -57,6 +58,7 @@ vi.mock("@/lib/api", async () => {
     getAlerts: vi.fn(),
     getBillsSummary: vi.fn(),
     getFreeMoney: vi.fn(),
+    getMonthHealth: vi.fn(),
     getMonthlyBudget: vi.fn(),
     getMonthlySummary: vi.fn(),
     listAccounts: vi.fn(),
@@ -69,6 +71,7 @@ const mockedUseProtectedSession = vi.mocked(useProtectedSession);
 const mockedGetAlerts = vi.mocked(getAlerts);
 const mockedGetBillsSummary = vi.mocked(getBillsSummary);
 const mockedGetFreeMoney = vi.mocked(getFreeMoney);
+const mockedGetMonthHealth = vi.mocked(getMonthHealth);
 const mockedGetMonthlyBudget = vi.mocked(getMonthlyBudget);
 const mockedGetMonthlySummary = vi.mocked(getMonthlySummary);
 const mockedListAccounts = vi.mocked(listAccounts);
@@ -110,7 +113,35 @@ function mockDashboardApi(overrides?: {
     occurredOn: string;
     createdAtUtc: string;
   }>;
+  monthHealth?: {
+    status: "healthy" | "attention" | "critical";
+    summary: {
+      message: string;
+      cause: string;
+      action: string;
+    };
+    insights: Array<{
+      type: string;
+      severity: "high" | "medium";
+      priority: number;
+      message: string;
+      cause: string;
+      action: string;
+    }>;
+  } | null;
 }) {
+  mockedGetMonthHealth.mockResolvedValue(
+    overrides?.monthHealth ?? {
+      status: "healthy",
+      summary: {
+        message: "Seu mes esta sob controle ate aqui.",
+        cause: "Voce mantem folga no mes e sem sinais fortes de pressao imediata.",
+        action:
+          "Continue acompanhando orcamento e vencimentos para manter a margem.",
+      },
+      insights: [],
+    },
+  );
   mockedGetMonthlySummary.mockResolvedValue({
     month: 3,
     year: 2026,
@@ -159,6 +190,7 @@ describe("DashboardPage", () => {
     mockedGetAlerts.mockReset();
     mockedGetBillsSummary.mockReset();
     mockedGetFreeMoney.mockReset();
+    mockedGetMonthHealth.mockReset();
     mockedGetMonthlyBudget.mockReset();
     mockedGetMonthlySummary.mockReset();
     mockedListAccounts.mockReset();
@@ -188,10 +220,96 @@ describe("DashboardPage", () => {
 
     render(<DashboardPage />);
 
+    expect(
+      await screen.findByText("Seu mes esta sob controle ate aqui."),
+    ).toBeInTheDocument();
     expect(await screen.findByText("Comece por aqui")).toBeInTheDocument();
     expect(screen.getByText(/Criar sua primeira conta/)).toBeInTheDocument();
     expect(screen.getByText(/Registrar uma entrada \(salÃ¡rio\)/)).toBeInTheDocument();
     expect(screen.getByText(/Adicionar uma conta a pagar/)).toBeInTheDocument();
+  });
+
+  it("Dashboard_WithMonthHealth_ShowsSummaryCauseAndAction", async () => {
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+    mockDashboardApi({
+      monthHealth: {
+        status: "attention",
+        summary: {
+          message: "Seu mes pede alguns ajustes agora.",
+          cause: "As contas pendentes ja consomem a maior parte da sua folga.",
+          action: "Organize a ordem de pagamento e preserve caixa para o essencial.",
+        },
+        insights: [],
+      },
+    });
+
+    render(<DashboardPage />);
+
+    expect(
+      await screen.findByText("Seu mes pede alguns ajustes agora."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "As contas pendentes ja consomem a maior parte da sua folga.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Organize a ordem de pagamento e preserve caixa para o essencial.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("Dashboard_WithMonthHealth_ShowsActiveInsights", async () => {
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+    mockDashboardApi({
+      monthHealth: {
+        status: "critical",
+        summary: {
+          message: "Voce esta no vermelho neste mes.",
+          cause: "Depois das despesas e compromissos, seu dinheiro livre ficou negativo.",
+          action: "Pause novos gastos e revise as maiores saidas do mes.",
+        },
+        insights: [
+          {
+            type: "negative_free_money",
+            severity: "high",
+            priority: 90,
+            message: "Voce esta no vermelho neste mes.",
+            cause:
+              "Depois das despesas e compromissos, seu dinheiro livre ficou negativo.",
+            action: "Pause novos gastos e revise as maiores saidas do mes.",
+          },
+          {
+            type: "budget_overspent",
+            severity: "medium",
+            priority: 70,
+            message: "Seu orcamento do mes ja saiu do plano.",
+            cause: "Voce gastou mais do que planejou nas categorias acompanhadas.",
+            action: "Reduza gastos ajustaveis e reavalie o restante do mes.",
+          },
+        ],
+      },
+    });
+
+    render(<DashboardPage />);
+
+    expect(
+      await screen.findAllByText("Voce esta no vermelho neste mes."),
+    ).toHaveLength(2);
+    expect(
+      screen.getByText("Seu orcamento do mes ja saiu do plano."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("#90")).toBeInTheDocument();
+    expect(screen.getByText("#70")).toBeInTheDocument();
   });
 
   it("Dashboard_UserWithCompletedOnboarding_HidesChecklist", async () => {
@@ -251,6 +369,16 @@ describe("DashboardPage", () => {
       isLoading: false,
       logout: vi.fn(),
     });
+    mockedGetMonthHealth.mockResolvedValue({
+      status: "healthy",
+      summary: {
+        message: "Seu mes esta sob controle ate aqui.",
+        cause: "Voce mantem folga no mes e sem sinais fortes de pressao imediata.",
+        action:
+          "Continue acompanhando orcamento e vencimentos para manter a margem.",
+      },
+      insights: [],
+    });
     mockedGetMonthlySummary.mockRejectedValue(
       new ApiError(
         "Npgsql.PostgresException: relation \"bills\" does not exist at DashboardController.cs:117",
@@ -301,6 +429,68 @@ describe("DashboardPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("Dashboard_WhenMonthHealthFails_DegradesWithoutBreakingThePage", async () => {
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+    mockedGetMonthHealth.mockRejectedValue(
+      new ApiError(
+        "Npgsql.PostgresException: relation \"month_health\" does not exist at InsightsController.cs:117",
+        500,
+      ),
+    );
+    mockedGetMonthlySummary.mockResolvedValue({
+      month: 3,
+      year: 2026,
+      totalIncome: 0,
+      totalExpense: 0,
+      balance: 0,
+      byCategory: [],
+    });
+    mockedGetAlerts.mockResolvedValue({ alerts: [] });
+    mockedGetBillsSummary.mockResolvedValue({
+      totalPending: 0,
+      totalOverdue: 0,
+      totalPaid: 0,
+      countPending: 0,
+      countOverdue: 0,
+      countPaid: 0,
+      upcoming: [],
+    });
+    mockedGetFreeMoney.mockResolvedValue({
+      month: 3,
+      year: 2026,
+      totalIncome: 0,
+      totalExpense: 0,
+      balance: 0,
+      totalPlannedBudget: 0,
+      totalBudgetSpent: 0,
+      totalBudgetRemaining: 0,
+      freeToSpend: 0,
+    });
+    mockedGetMonthlyBudget.mockResolvedValue({
+      month: 3,
+      year: 2026,
+      totalPlanned: 0,
+      totalSpent: 0,
+      totalRemaining: 0,
+      categories: [],
+    });
+    mockedListAccounts.mockResolvedValue([]);
+    mockedListTransactions.mockResolvedValue([]);
+    mockedListBills.mockResolvedValue([]);
+
+    render(<DashboardPage />);
+
+    expect(await screen.findByText("Como estÃ¡ seu mÃªs")).toBeInTheDocument();
+    expect(screen.queryByText("Inteligencia do mes")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/month_health|Npgsql|PostgresException/i),
+    ).not.toBeInTheDocument();
+  });
+
   it("Dashboard_WhenSessionExpires_TriggersConsistentLogout", async () => {
     const logout = vi.fn();
 
@@ -308,6 +498,16 @@ describe("DashboardPage", () => {
       session,
       isLoading: false,
       logout,
+    });
+    mockedGetMonthHealth.mockResolvedValue({
+      status: "healthy",
+      summary: {
+        message: "Seu mes esta sob controle ate aqui.",
+        cause: "Voce mantem folga no mes e sem sinais fortes de pressao imediata.",
+        action:
+          "Continue acompanhando orcamento e vencimentos para manter a margem.",
+      },
+      insights: [],
     });
     mockedGetMonthlySummary.mockRejectedValue(
       new ApiError("Invalid access token.", 401),

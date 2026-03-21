@@ -13,6 +13,7 @@ import {
   getBillsSummary,
   getFriendlyApiMessage,
   getFreeMoney,
+  getMonthHealth,
   getMonthlyBudget,
   getMonthlySummary,
   isUnauthorizedApiError,
@@ -23,6 +24,7 @@ import {
   type AlertsResponse,
   type BillsSummaryResponse,
   type FreeMoneyResponse,
+  type MonthHealthResponse,
   type MonthlyBudgetResponse,
   type MonthlySummaryResponse,
 } from "@/lib/api";
@@ -45,6 +47,7 @@ type DashboardData = {
   billsSummary: BillsSummaryResponse;
   budget: MonthlyBudgetResponse;
   freeMoney: FreeMoneyResponse;
+  monthHealth: MonthHealthResponse | null;
   onboarding: {
     hasAccount: boolean;
     hasBill: boolean;
@@ -67,6 +70,21 @@ const alertSeverityStyles = {
   high: "bg-[color:rgba(185,28,28,0.1)] text-red-700 border-[color:rgba(185,28,28,0.14)]",
   medium:
     "bg-[color:rgba(217,119,6,0.12)] text-[var(--color-warm)] border-[color:rgba(217,119,6,0.14)]",
+} as const;
+
+const monthHealthStatusLabels = {
+  healthy: "Saudavel",
+  attention: "Atencao",
+  critical: "Critico",
+} as const;
+
+const monthHealthStatusStyles = {
+  healthy:
+    "border-[color:rgba(29,130,93,0.18)] bg-[color:rgba(220,252,231,0.82)] text-[var(--color-success)]",
+  attention:
+    "border-[color:rgba(217,119,6,0.16)] bg-[color:rgba(255,247,237,0.9)] text-[var(--color-warm)]",
+  critical:
+    "border-[color:rgba(185,28,28,0.16)] bg-[color:rgba(254,226,226,0.82)] text-red-700",
 } as const;
 
 const checklistItemStyles = {
@@ -193,7 +211,20 @@ export default function DashboardPage() {
       setLoadError("");
 
       try {
+        const monthHealthPromise = getMonthHealth(
+          accessToken,
+          monthAndYear.month,
+          monthAndYear.year,
+        ).catch((caughtError) => {
+          if (isUnauthorizedApiError(caughtError)) {
+            throw caughtError;
+          }
+
+          return null;
+        });
+
         const [
+          monthHealth,
           summary,
           alerts,
           billsSummary,
@@ -203,6 +234,7 @@ export default function DashboardPage() {
           transactions,
           bills,
         ] = await Promise.all([
+          monthHealthPromise,
           getMonthlySummary(
             accessToken,
             monthAndYear.month,
@@ -229,6 +261,7 @@ export default function DashboardPage() {
             billsSummary,
             budget,
             freeMoney,
+            monthHealth,
             onboarding: {
               hasAccount: accounts.length > 0,
               hasBill: bills.length > 0,
@@ -389,6 +422,69 @@ export default function DashboardPage() {
         />
       ) : (
         <div className="space-y-8">
+          {data.monthHealth ? (
+            <section className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
+              <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.18fr)_minmax(320px,0.82fr)]">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
+                      Inteligencia do mes
+                    </div>
+                    <span
+                      className={`rounded-full border px-3 py-1 text-xs font-semibold ${monthHealthStatusStyles[data.monthHealth.status]}`}
+                    >
+                      {monthHealthStatusLabels[data.monthHealth.status]}
+                    </span>
+                  </div>
+
+                  <h2 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-[var(--color-foreground)]">
+                    {data.monthHealth.summary.message}
+                  </h2>
+                  <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--color-muted)]">
+                    {data.monthHealth.summary.cause}
+                  </p>
+                </div>
+
+                <div className="rounded-[24px] border border-[color:rgba(15,118,110,0.14)] bg-[var(--color-accent-soft)] px-5 py-5">
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-accent)]">
+                    O que fazer agora
+                  </div>
+                  <div className="mt-3 text-sm leading-6 text-[var(--color-foreground)]">
+                    {data.monthHealth.summary.action}
+                  </div>
+                </div>
+              </div>
+
+              {data.monthHealth.insights.length > 0 ? (
+                <div className="mt-6 grid gap-3 md:grid-cols-3">
+                  {data.monthHealth.insights.map((insight) => (
+                    <article
+                      className="rounded-[24px] border border-[var(--color-line)] bg-white px-5 py-4"
+                      key={insight.type}
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <span
+                          className={`rounded-full border px-3 py-1 text-xs font-semibold ${alertSeverityStyles[insight.severity]}`}
+                        >
+                          Prioridade {alertSeverityLabels[insight.severity]}
+                        </span>
+                        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-muted)]">
+                          #{insight.priority}
+                        </div>
+                      </div>
+                      <div className="mt-4 text-sm font-semibold leading-6 text-[var(--color-foreground)]">
+                        {insight.message}
+                      </div>
+                      <div className="mt-2 text-sm leading-6 text-[var(--color-muted)]">
+                        {insight.action}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : null}
+            </section>
+          ) : null}
+
           <section className="grid items-start gap-8 xl:grid-cols-[minmax(0,1.16fr)_minmax(320px,0.84fr)]">
             <article className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
               <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">

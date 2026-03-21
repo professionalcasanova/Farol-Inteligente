@@ -133,6 +133,29 @@ export type BillsSummaryResponse = {
   upcoming: BillsSummaryUpcomingResponse[];
 };
 
+export type MonthHealthStatus = "healthy" | "attention" | "critical";
+
+export type MonthHealthSummaryResponse = {
+  message: string;
+  cause: string;
+  action: string;
+};
+
+export type MonthHealthInsightResponse = {
+  type: string;
+  severity: AlertSeverity;
+  priority: number;
+  message: string;
+  cause: string;
+  action: string;
+};
+
+export type MonthHealthResponse = {
+  status: MonthHealthStatus;
+  summary: MonthHealthSummaryResponse;
+  insights: MonthHealthInsightResponse[];
+};
+
 export const transactionTypeOptions: Array<{
   value: TransactionType;
   label: string;
@@ -399,6 +422,17 @@ export async function getFreeMoney(token: string, month: number, year: number) {
 export async function getAlerts(token: string, month: number, year: number) {
   return apiRequest<AlertsResponse>(
     `/api/insights/alerts?month=${month}&year=${year}`,
+    { token },
+  );
+}
+
+export async function getMonthHealth(
+  token: string,
+  month: number,
+  year: number,
+) {
+  return apiRequest<MonthHealthResponse>(
+    `/api/insights/month-health?month=${month}&year=${year}`,
     { token },
   );
 }
