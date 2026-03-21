@@ -1,4 +1,4 @@
-import type { ComponentProps, ReactNode } from "react";
+﻿import type { ComponentProps, ReactNode } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import DashboardPage from "@/app/dashboard/page";
@@ -190,7 +190,7 @@ describe("DashboardPage", () => {
 
     expect(await screen.findByText("Comece por aqui")).toBeInTheDocument();
     expect(screen.getByText(/Criar sua primeira conta/)).toBeInTheDocument();
-    expect(screen.getByText(/Registrar uma entrada \(salário\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Registrar uma entrada \(salÃ¡rio\)/)).toBeInTheDocument();
     expect(screen.getByText(/Adicionar uma conta a pagar/)).toBeInTheDocument();
   });
 
@@ -238,7 +238,7 @@ describe("DashboardPage", () => {
 
     render(<DashboardPage />);
 
-    expect(await screen.findByText("Ações rápidas")).toBeInTheDocument();
+    expect(await screen.findByText("O que fazer em seguida")).toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.queryByText("Comece por aqui")).not.toBeInTheDocument();
@@ -293,10 +293,10 @@ describe("DashboardPage", () => {
     render(<DashboardPage />);
 
     expect(await screen.findByText("Falha ao carregar")).toBeInTheDocument();
-    expect(screen.getByText("Não foi possível abrir o dashboard")).toBeInTheDocument();
+    expect(screen.getByText("NÃ£o foi possÃ­vel abrir o dashboard")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Não foi possível carregar o dashboard agora. Confira se a API local está ativa e tente novamente.",
+        "NÃ£o foi possÃ­vel carregar o dashboard agora. Confira se a API local estÃ¡ ativa e tente novamente.",
       ),
     ).toBeInTheDocument();
   });

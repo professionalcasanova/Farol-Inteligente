@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
@@ -60,7 +60,7 @@ const defaultAccountForm: AccountFormState = {
 
 const alertSeverityLabels = {
   high: "Alto",
-  medium: "Médio",
+  medium: "MÃ©dio",
 } as const;
 
 const alertSeverityStyles = {
@@ -74,6 +74,44 @@ const checklistItemStyles = {
     "border-[color:rgba(29,130,93,0.14)] bg-[color:rgba(220,252,231,0.76)]",
   pending: "border-[var(--color-line)] bg-white",
 } as const;
+
+function getDashboardHeadline(data: DashboardData) {
+  if (data.billsSummary.countOverdue > 0) {
+    return "Seu mÃªs pede atenÃ§Ã£o imediata.";
+  }
+
+  if (data.alerts.alerts.length > 0) {
+    return "Seu mÃªs estÃ¡ sob controle, mas com pontos de atenÃ§Ã£o.";
+  }
+
+  if (
+    data.summary.totalIncome === 0 &&
+    data.summary.totalExpense === 0 &&
+    data.billsSummary.countPending === 0 &&
+    data.budget.totalPlanned === 0
+  ) {
+    return "Seu mÃªs ainda estÃ¡ comeÃ§ando.";
+  }
+
+  return "Seu mÃªs estÃ¡ organizado atÃ© aqui.";
+}
+
+function getDashboardSupportText(data: DashboardData) {
+  if (data.billsSummary.countOverdue > 0) {
+    return `VocÃª tem ${data.billsSummary.countOverdue} conta${data.billsSummary.countOverdue === 1 ? "" : "s"} vencida${data.billsSummary.countOverdue === 1 ? "" : "s"} somando ${formatCurrency(data.billsSummary.totalOverdue)}. Vale resolver isso antes de olhar o restante.`;
+  }
+
+  if (
+    data.summary.totalIncome === 0 &&
+    data.summary.totalExpense === 0 &&
+    data.billsSummary.countPending === 0 &&
+    data.budget.totalPlanned === 0
+  ) {
+    return "Registre uma transaÃ§Ã£o, monte um orÃ§amento ou adicione uma conta a pagar para comeÃ§ar a leitura do mÃªs.";
+  }
+
+  return `Seu saldo estÃ¡ em ${formatCurrency(data.summary.balance)} e o dinheiro livre em ${formatCurrency(data.freeMoney.freeToSpend)}. A partir daqui, os alertas e vencimentos mostram onde agir primeiro.`;
+}
 
 export default function DashboardPage() {
   const { session, isLoading, logout } = useProtectedSession();
@@ -96,7 +134,7 @@ export default function DashboardPage() {
     ? [
         {
           completed: data.onboarding.hasAccount,
-          description: "Crie a base para organizar entradas, saídas e importações.",
+          description: "Crie a base para organizar entradas, saÃ­das e importaÃ§Ãµes.",
           href: "/dashboard#quick-account",
           label: "Criar sua primeira conta",
         },
@@ -104,7 +142,7 @@ export default function DashboardPage() {
           completed: data.onboarding.hasTransaction,
           description: "Registre uma entrada para liberar saldo, resumo mensal e dinheiro livre.",
           href: "/transactions",
-          label: "Registrar uma entrada (salário)",
+          label: "Registrar uma entrada (salÃ¡rio)",
         },
         {
           completed: data.onboarding.hasBill,
@@ -119,6 +157,28 @@ export default function DashboardPage() {
     (item) => item.completed,
   ).length;
   const shouldShowOnboarding = checklistItems.some((item) => !item.completed);
+  const quickActionItems = [
+    {
+      href: "/transactions",
+      label: "Registrar transaÃ§Ã£o",
+      description: "Atualize saldo, categorias e dinheiro livre na hora.",
+    },
+    {
+      href: "/bills",
+      label: "Criar conta a pagar",
+      description: "Cadastre vencimentos e acompanhe alertas do mÃªs.",
+    },
+    {
+      href: "/budget",
+      label: "Montar orÃ§amento",
+      description: "Defina limites por categoria e acompanhe o restante.",
+    },
+    {
+      href: "/imports",
+      label: "Importar CSV",
+      description: "Traga vÃ¡rias transaÃ§Ãµes de uma vez para acelerar o uso.",
+    },
+  ];
 
   useEffect(() => {
     if (!session) {
@@ -187,7 +247,7 @@ export default function DashboardPage() {
           setLoadError(
             getFriendlyApiMessage(
               caughtError,
-              "Não foi possível carregar o dashboard agora. Confira se a API local está ativa e tente novamente.",
+              "NÃ£o foi possÃ­vel carregar o dashboard agora. Confira se a API local estÃ¡ ativa e tente novamente.",
             ),
           );
         }
@@ -239,7 +299,7 @@ export default function DashboardPage() {
       );
       setAccountForm(defaultAccountForm);
       setAccountSuccess(
-        "Conta criada com sucesso. Agora você já pode registrar transações, bills ou importar um CSV.",
+        "Conta criada com sucesso. Agora vocÃª jÃ¡ pode registrar transaÃ§Ãµes, bills ou importar um CSV.",
       );
     } catch (caughtError) {
       if (isUnauthorizedApiError(caughtError)) {
@@ -250,7 +310,7 @@ export default function DashboardPage() {
       setAccountError(
         getFriendlyApiMessage(
           caughtError,
-          "Não foi possível criar a conta agora. Revise os dados e tente novamente.",
+          "NÃ£o foi possÃ­vel criar a conta agora. Revise os dados e tente novamente.",
           {
             messageMap: {
               "Name is required.": "Informe o nome da conta para continuar.",
@@ -259,7 +319,7 @@ export default function DashboardPage() {
               "Financial account name cannot exceed 120 characters.":
                 "O nome da conta ficou longo demais. Tente um nome menor.",
               "Financial account type is invalid.":
-                "Selecione um tipo de conta válido.",
+                "Selecione um tipo de conta vÃ¡lido.",
             },
           },
         ),
@@ -277,12 +337,12 @@ export default function DashboardPage() {
     <AppShell
       actions={
         <MonthPicker
-          label="Mês de referência"
+          label="MÃªs de referÃªncia"
           onChange={setMonthValue}
           value={monthValue}
         />
       }
-      description="Acompanhe o mês com uma leitura rápida de receitas, despesas, orçamento e dinheiro livre."
+      description="Acompanhe o mÃªs com uma leitura rÃ¡pida de receitas, despesas, orÃ§amento e dinheiro livre."
       onLogout={logout}
       session={session}
       title="Dashboard financeiro"
@@ -295,7 +355,7 @@ export default function DashboardPage() {
               className="rounded-full border border-[color:rgba(29,130,93,0.18)] px-4 py-2 text-sm font-medium text-green-700 transition hover:bg-white"
               href="/transactions"
             >
-              Registrar transação
+              Registrar transaÃ§Ã£o
             </Link>
             <Link
               className="rounded-full border border-[color:rgba(29,130,93,0.18)] px-4 py-2 text-sm font-medium text-green-700 transition hover:bg-white"
@@ -314,21 +374,142 @@ export default function DashboardPage() {
       ) : null}
 
       {isFetching ? (
-        <LoadingScreen message="Atualizando o resumo do mês..." />
+        <LoadingScreen message="Atualizando o resumo do mÃªs..." />
       ) : loadError ? (
         <LoadErrorState
           message={loadError}
           onRetry={() => setReloadKey((current) => current + 1)}
-          title="Não foi possível abrir o dashboard"
+          title="NÃ£o foi possÃ­vel abrir o dashboard"
         />
       ) : !data ? (
         <LoadErrorState
-          message="O dashboard não retornou dados para este mês."
+          message="O dashboard nÃ£o retornou dados para este mÃªs."
           onRetry={() => setReloadKey((current) => current + 1)}
-          title="Dashboard indisponível"
+          title="Dashboard indisponÃ­vel"
         />
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-8">
+          <section className="grid items-start gap-8 xl:grid-cols-[minmax(0,1.16fr)_minmax(320px,0.84fr)]">
+            <article className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
+              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
+                Como estÃ¡ seu mÃªs
+              </div>
+              <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <h2 className="text-3xl font-semibold tracking-[-0.04em] text-[var(--color-foreground)]">
+                    {getDashboardHeadline(data)}
+                  </h2>
+                  <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--color-muted)]">
+                    {getDashboardSupportText(data)}
+                  </p>
+                </div>
+                <div className="rounded-[24px] border border-[color:rgba(15,118,110,0.14)] bg-[var(--color-accent-soft)] px-5 py-4 text-sm text-[var(--color-foreground)]">
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-accent)]">
+                    MÃªs em foco
+                  </div>
+                  <div className="mt-2 font-semibold">
+                    {monthAndYear.month.toString().padStart(2, "0")}/{monthAndYear.year}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                {[
+                  {
+                    label: "Receitas",
+                    value: formatCurrency(data.freeMoney.totalIncome),
+                    detail: "Entradas registradas no mÃªs.",
+                    tone: "bg-[color:rgba(15,118,110,0.08)] text-[var(--color-accent)]",
+                  },
+                  {
+                    label: "Despesas",
+                    value: formatCurrency(data.freeMoney.totalExpense),
+                    detail: "SaÃ­das que jÃ¡ impactaram o mÃªs.",
+                    tone: "bg-[color:rgba(209,123,15,0.12)] text-[var(--color-warm)]",
+                  },
+                  {
+                    label: "Saldo",
+                    value: formatCurrency(data.freeMoney.balance),
+                    detail: "Resultado entre receitas e despesas.",
+                    tone: "bg-[color:rgba(17,37,51,0.08)] text-[var(--color-foreground)]",
+                  },
+                  {
+                    label: "Dinheiro livre",
+                    value: formatCurrency(data.freeMoney.freeToSpend),
+                    detail: "O quanto ainda sobra depois do planejado.",
+                    tone: "bg-[color:rgba(41,128,90,0.12)] text-[var(--color-success)]",
+                  },
+                ].map((item) => (
+                  <article
+                    className="rounded-[24px] border border-[var(--color-line)] bg-white p-5"
+                    key={item.label}
+                  >
+                    <div
+                      className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${item.tone}`}
+                    >
+                      {item.label}
+                    </div>
+                    <div className="mt-5 text-3xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
+                      {item.value}
+                    </div>
+                    <div className="mt-2 text-xs leading-5 text-[var(--color-muted)]">
+                      {item.detail}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </article>
+
+            <article className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
+              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
+                Mais crÃ­tico agora
+              </div>
+              <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
+                Alertas do mÃªs
+              </h2>
+
+              <div className="mt-6 grid gap-3">
+                {data.alerts.alerts.length === 0 ? (
+                  <div className="rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
+                    Nenhum alerta importante para este mÃªs no momento. Se quiser avanÃ§ar o uso agora, registre uma transaÃ§Ã£o, monte um orÃ§amento ou adicione uma conta a pagar.
+                  </div>
+                ) : (
+                  data.alerts.alerts.map((alert, index) => (
+                    <article
+                      className="rounded-[24px] border border-[var(--color-line)] bg-white px-5 py-4"
+                      key={`${alert.type}-${index}`}
+                    >
+                      <div className="flex flex-col gap-3">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <span
+                            className={`rounded-full border px-3 py-1 text-xs font-semibold ${alertSeverityStyles[alert.severity]}`}
+                          >
+                            Prioridade {alertSeverityLabels[alert.severity]}
+                          </span>
+                          <div className="text-sm font-semibold text-[var(--color-foreground)]">
+                            {formatCurrency(alert.amount)}
+                          </div>
+                        </div>
+                        <div className="text-sm font-semibold leading-6 text-[var(--color-foreground)]">
+                          {alert.message}
+                        </div>
+                        {alert.actionUrl ? (
+                          <div>
+                            <Link
+                              className="rounded-full border border-[var(--color-line)] px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-[var(--color-accent-soft)]"
+                              href={alert.actionUrl}
+                            >
+                              Resolver agora
+                            </Link>
+                          </div>
+                        ) : null}
+                      </div>
+                    </article>
+                  ))
+                )}
+              </div>
+            </article>
+          </section>
           {shouldShowOnboarding ? (
             <section className="rounded-[28px] border border-[color:rgba(15,118,110,0.14)] bg-[var(--color-accent-soft)] p-6">
               <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -340,11 +521,11 @@ export default function DashboardPage() {
                     Primeiro valor em poucos passos
                   </h2>
                   <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--color-muted)]">
-                    O checklist some automaticamente quando você conclui os três passos principais.
+                    O checklist some automaticamente quando vocÃª conclui os trÃªs passos principais.
                   </p>
                 </div>
                 <div className="text-sm font-medium text-[var(--color-foreground)]">
-                  {completedChecklistItemsCount} de 3 concluídos
+                  {completedChecklistItemsCount} de 3 concluÃ­dos
                 </div>
               </div>
 
@@ -365,7 +546,7 @@ export default function DashboardPage() {
                         </div>
                       </div>
                       <div className="shrink-0 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-accent)]">
-                        {item.completed ? "Concluído" : "Abrir"}
+                        {item.completed ? "ConcluÃ­do" : "Abrir"}
                       </div>
                     </div>
                   </Link>
@@ -374,159 +555,46 @@ export default function DashboardPage() {
             </section>
           ) : null}
 
-          <section className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
-            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
-                  Ações rápidas
-                </div>
-                <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
-                  Próximo passo da demonstração
-                </h2>
-              </div>
-              <div className="text-sm text-[var(--color-muted)]">
-                Escolha um fluxo e volte para acompanhar o impacto no dashboard.
-              </div>
-            </div>
-
-            <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              {[
-                {
-                  href: "/transactions",
-                  label: "Nova transação",
-                  description: "Registre receita ou despesa e atualize o saldo na hora.",
-                },
-                {
-                  href: "/bills",
-                  label: "Nova bill",
-                  description: "Cadastre vencimentos e veja alertas aparecerem no mes.",
-                },
-                {
-                  href: "/budget",
-                  label: "Montar orçamento",
-                  description: "Defina limites por categoria e acompanhe o restante.",
-                },
-                {
-                  href: "/imports",
-                  label: "Importar CSV",
-                  description: "Puxe várias transações de uma vez para acelerar a demo.",
-                },
-              ].map((item) => (
-                <Link
-                  className="rounded-[24px] border border-[var(--color-line)] bg-white px-5 py-4 transition hover:border-[var(--color-accent)]"
-                  href={item.href}
-                  key={item.href}
-                >
-                  <div className="text-sm font-semibold text-[var(--color-foreground)]">
-                    {item.label}
+          {!shouldShowOnboarding ? (
+            <section className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
+              <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
+                    O que fazer em seguida
                   </div>
-                  <div className="mt-2 text-sm leading-6 text-[var(--color-muted)]">
-                    {item.description}
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </section>
-
-          <section className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
-            <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
-              Alertas do mês
-            </div>
-            <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
-              O que merece atencao agora
-            </h2>
-
-            <div className="mt-6 grid gap-3">
-              {data.alerts.alerts.length === 0 ? (
-                <div className="rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
-                  Nenhum alerta importante para este mes no momento. Se quiser
-                  avançar a demo agora, registre uma transação, monte um
-                  orçamento ou adicione uma bill.
+                  <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
+                    Escolha o próximo ajuste do mês
+                  </h2>
                 </div>
-              ) : (
-                data.alerts.alerts.map((alert, index) => (
-                  <article
-                    className="rounded-[24px] border border-[var(--color-line)] bg-white px-5 py-4"
-                    key={`${alert.type}-${index}`}
+                <div className="text-sm text-[var(--color-muted)]">
+                  Use estes atalhos quando quiser agir rápido sem perder o contexto do dashboard.
+                </div>
+              </div>
+
+              <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                {quickActionItems.map((item) => (
+                  <Link
+                    className="rounded-[24px] border border-[var(--color-line)] bg-white px-5 py-4 transition hover:border-[var(--color-accent)]"
+                    href={item.href}
+                    key={item.href}
                   >
-                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-3">
-                          <span
-                            className={`rounded-full border px-3 py-1 text-xs font-semibold ${alertSeverityStyles[alert.severity]}`}
-                          >
-                            Prioridade {alertSeverityLabels[alert.severity]}
-                          </span>
-                        </div>
-                        <div className="mt-3 text-sm font-semibold text-[var(--color-foreground)]">
-                          {alert.message}
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-start gap-3 md:items-end">
-                        <div className="text-sm font-semibold text-[var(--color-foreground)]">
-                          {formatCurrency(alert.amount)}
-                        </div>
-                        {alert.actionUrl ? (
-                          <Link
-                            className="rounded-full border border-[var(--color-line)] px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-[var(--color-accent-soft)]"
-                            href={alert.actionUrl}
-                          >
-                            Resolver agora
-                          </Link>
-                        ) : null}
-                      </div>
+                    <div className="text-sm font-semibold text-[var(--color-foreground)]">
+                      {item.label}
                     </div>
-                  </article>
-                ))
-              )}
-            </div>
-          </section>
-
-          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {[
-              {
-                label: "Receitas",
-                value: formatCurrency(data.freeMoney.totalIncome),
-                tone: "bg-[color:rgba(15,118,110,0.08)] text-[var(--color-accent)]",
-              },
-              {
-                label: "Despesas",
-                value: formatCurrency(data.freeMoney.totalExpense),
-                tone: "bg-[color:rgba(209,123,15,0.12)] text-[var(--color-warm)]",
-              },
-              {
-                label: "Saldo",
-                value: formatCurrency(data.freeMoney.balance),
-                tone: "bg-[color:rgba(17,37,51,0.08)] text-[var(--color-foreground)]",
-              },
-              {
-                label: "Dinheiro livre",
-                value: formatCurrency(data.freeMoney.freeToSpend),
-                tone: "bg-[color:rgba(41,128,90,0.12)] text-[var(--color-success)]",
-              },
-            ].map((item) => (
-              <article
-                className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-5"
-                key={item.label}
-              >
-                <div
-                  className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${item.tone}`}
-                >
-                  {item.label}
-                </div>
-                <div className="mt-6 text-3xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
-                  {item.value}
-                </div>
-              </article>
-            ))}
-          </section>
-
+                    <div className="mt-2 text-sm leading-6 text-[var(--color-muted)]">
+                      {item.description}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          ) : null}
           <section className="grid items-start gap-8 xl:grid-cols-[minmax(0,1.28fr)_minmax(320px,0.72fr)]">
             <article className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
               <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                 <div>
                   <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
-                    Orçamento do mês
+                    OrÃ§amento do mÃªs
                   </div>
                   <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
                     Reserva e execucao
@@ -563,10 +631,10 @@ export default function DashboardPage() {
               <div className="mt-6 grid gap-3">
                 {data.budget.categories.length === 0 ? (
                   <div className="rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
-                    Ainda não existe orçamento cadastrado para este mês. Monte
+                    Ainda nÃ£o existe orÃ§amento cadastrado para este mÃªs. Monte
                     seu primeiro planejamento em{" "}
                     <Link className="font-semibold text-[var(--color-accent)]" href="/budget">
-                      Orçamento
+                      OrÃ§amento
                     </Link>{" "}
                     e depois volte aqui para acompanhar o restante.
                   </div>
@@ -581,7 +649,7 @@ export default function DashboardPage() {
                           {item.categoryName}
                         </div>
                         <div className="mt-1 text-xs text-[var(--color-muted)]">
-                          Categoria acompanhada no orçamento.
+                          Categoria acompanhada no orÃ§amento.
                         </div>
                       </div>
                       <div>
@@ -619,17 +687,17 @@ export default function DashboardPage() {
               id="quick-account"
             >
               <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
-                Contas e preparação
+                Contas e preparaÃ§Ã£o
               </div>
               <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
-                Base para transações e importação
+                Base para transaÃ§Ãµes e importaÃ§Ã£o
               </h2>
 
               <div className="mt-6 space-y-3">
                 {data.accounts.length === 0 ? (
                   <div className="rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-5 text-sm text-[var(--color-muted)]">
                     Nenhuma conta encontrada. Crie a primeira conta abaixo para
-                    liberar transações, bills, orçamento e importação CSV.
+                    liberar transaÃ§Ãµes, bills, orÃ§amento e importaÃ§Ã£o CSV.
                   </div>
                 ) : (
                   data.accounts.map((account) => (
@@ -690,7 +758,7 @@ export default function DashboardPage() {
                   disabled={isCreatingAccount}
                   type="submit"
                 >
-                  {isCreatingAccount ? "Criando conta..." : "Criar conta rápida"}
+                  {isCreatingAccount ? "Criando conta..." : "Criar conta rÃ¡pida"}
                 </button>
               </form>
             </article>
@@ -699,7 +767,7 @@ export default function DashboardPage() {
           <section className="grid items-start gap-8 xl:grid-cols-[minmax(0,0.94fr)_minmax(0,1.06fr)]">
             <article className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
               <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
-                Bills do mês
+                Bills do mÃªs
               </div>
               <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
                 Vencimentos em destaque
@@ -746,16 +814,16 @@ export default function DashboardPage() {
 
             <article className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
               <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
-                Próximas contas
+                PrÃ³ximas contas
               </div>
               <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
-                Até 5 vencimentos pendentes
+                AtÃ© 5 vencimentos pendentes
               </h2>
 
               <div className="mt-6 space-y-3">
                 {data.billsSummary.upcoming.length === 0 ? (
                   <div className="rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
-                    Nenhuma conta pendente para este mês. Se quiser demonstrar
+                    Nenhuma conta pendente para este mÃªs. Se quiser demonstrar
                     vencimentos e alertas, crie uma nova bill em{" "}
                     <Link className="font-semibold text-[var(--color-accent)]" href="/bills">
                       Bills
@@ -796,16 +864,16 @@ export default function DashboardPage() {
               Leitura por categoria
             </div>
             <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
-              Onde o mês está concentrado
+              Onde o mÃªs estÃ¡ concentrado
             </h2>
 
             <div className="mt-6 grid gap-3 md:grid-cols-2">
               {data.summary.byCategory.length === 0 ? (
                 <div className="rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
-                  Ainda não há transações registradas neste mês. Crie uma
+                  Ainda nÃ£o hÃ¡ transaÃ§Ãµes registradas neste mÃªs. Crie uma
                   receita ou despesa em{" "}
                   <Link className="font-semibold text-[var(--color-accent)]" href="/transactions">
-                    Transações
+                    TransaÃ§Ãµes
                   </Link>{" "}
                   para alimentar o dashboard.
                 </div>
