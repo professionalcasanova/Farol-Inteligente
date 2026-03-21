@@ -91,6 +91,46 @@ public sealed class FinancialAlertsInsightsEndpointsTests : IClassFixture<FarolA
     }
 
     [Fact]
+    public async Task GetAlerts_ShouldUsePlannedBudgetRemainingToCalculateLowBalance()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var seed = await SeedAccountAndCategoriesAsync(
+            "maria@email.com",
+            ("Salario", CategoryType.Income),
+            ("Alimentacao", CategoryType.Expense),
+            ("Transporte", CategoryType.Expense));
+
+        await SeedBudgetAsync(
+            "maria@email.com",
+            today.Month,
+            today.Year,
+            (seed.CategoryIds["Alimentacao"], 500m),
+            (seed.CategoryIds["Transporte"], 500m));
+
+        await SeedTransactionsAsync(
+            "maria@email.com",
+            seed.AccountId,
+            [
+                (today, "Salario", 16000m, TransactionType.Income, seed.CategoryIds["Salario"]),
+                (today, "Mercado", 500m, TransactionType.Expense, seed.CategoryIds["Alimentacao"]),
+                (today, "Combustivel", 14500m, TransactionType.Expense, seed.CategoryIds["Transporte"])
+            ]);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await client.GetFromJsonAsync<AlertsResponse>(
+            $"/api/insights/alerts?month={today.Month}&year={today.Year}");
+
+        Assert.NotNull(response);
+        var alert = Assert.Single(response.Alerts);
+        Assert.Equal("low_balance", alert.Type);
+        Assert.Equal(500m, alert.Amount);
+    }
+
+    [Fact]
     public async Task GetAlerts_ShouldReturnBudgetOverspentAlert()
     {
         await _factory.ResetDatabaseAsync();

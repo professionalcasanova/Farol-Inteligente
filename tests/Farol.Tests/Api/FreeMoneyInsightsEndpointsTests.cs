@@ -98,6 +98,85 @@ public sealed class FreeMoneyInsightsEndpointsTests : IClassFixture<FarolApiFact
     }
 
     [Fact]
+    public async Task GetFreeMoney_ShouldDiscountOnlyThePlannedBudgetRemaining()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var seed = await SeedAccountAndCategoriesAsync(
+            "maria@email.com",
+            ("Salario", CategoryType.Income),
+            ("Alimentacao", CategoryType.Expense),
+            ("Transporte", CategoryType.Expense));
+
+        await SeedBudgetAsync(
+            "maria@email.com",
+            3,
+            2026,
+            (seed.CategoryIds["Alimentacao"], 500m),
+            (seed.CategoryIds["Transporte"], 500m));
+
+        await SeedTransactionsAsync(
+            "maria@email.com",
+            seed.AccountId,
+            [
+                (new DateOnly(2026, 3, 5), "Salario", 16000m, TransactionType.Income, seed.CategoryIds["Salario"]),
+                (new DateOnly(2026, 3, 6), "Mercado", 500m, TransactionType.Expense, seed.CategoryIds["Alimentacao"]),
+                (new DateOnly(2026, 3, 7), "Combustivel", 14500m, TransactionType.Expense, seed.CategoryIds["Transporte"])
+            ]);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await client.GetFromJsonAsync<FreeMoneyResponse>("/api/insights/free-money?month=3&year=2026");
+
+        Assert.NotNull(response);
+        Assert.Equal(16000m, response.TotalIncome);
+        Assert.Equal(15000m, response.TotalExpense);
+        Assert.Equal(1000m, response.Balance);
+        Assert.Equal(1000m, response.TotalPlannedBudget);
+        Assert.Equal(500m, response.TotalBudgetSpent);
+        Assert.Equal(500m, response.TotalBudgetRemaining);
+        Assert.Equal(500m, response.FreeToSpend);
+    }
+
+    [Fact]
+    public async Task GetFreeMoney_ShouldNotDiscountBudgetTwiceWhenSpentIsAbovePlanned()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var seed = await SeedAccountAndCategoriesAsync(
+            "maria@email.com",
+            ("Salario", CategoryType.Income),
+            ("Alimentacao", CategoryType.Expense));
+
+        await SeedBudgetAsync(
+            "maria@email.com",
+            3,
+            2026,
+            (seed.CategoryIds["Alimentacao"], 500m));
+
+        await SeedTransactionsAsync(
+            "maria@email.com",
+            seed.AccountId,
+            [
+                (new DateOnly(2026, 3, 5), "Salario", 3000m, TransactionType.Income, seed.CategoryIds["Salario"]),
+                (new DateOnly(2026, 3, 6), "Mercado", 700m, TransactionType.Expense, seed.CategoryIds["Alimentacao"])
+            ]);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await client.GetFromJsonAsync<FreeMoneyResponse>("/api/insights/free-money?month=3&year=2026");
+
+        Assert.NotNull(response);
+        Assert.Equal(2300m, response.Balance);
+        Assert.Equal(500m, response.TotalPlannedBudget);
+        Assert.Equal(700m, response.TotalBudgetSpent);
+        Assert.Equal(-200m, response.TotalBudgetRemaining);
+        Assert.Equal(2300m, response.FreeToSpend);
+    }
+
+    [Fact]
     public async Task GetFreeMoney_ShouldReturnBalanceWhenBudgetIsEmpty()
     {
         await _factory.ResetDatabaseAsync();

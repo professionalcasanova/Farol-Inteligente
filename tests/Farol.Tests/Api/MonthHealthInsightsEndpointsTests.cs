@@ -86,6 +86,44 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
     }
 
     [Fact]
+    public async Task GetMonthHealth_ShouldUsePlannedBudgetRemainingWhenFreeMoneyBecomesNegative()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var seed = await SeedAccountAndCategoriesAsync(
+            "maria@email.com",
+            ("Salario", CategoryType.Income),
+            ("Alimentacao", CategoryType.Expense),
+            ("Transporte", CategoryType.Expense));
+
+        await SeedBudgetAsync(
+            "maria@email.com",
+            today.Month,
+            today.Year,
+            (seed.CategoryIds["Alimentacao"], 500m),
+            (seed.CategoryIds["Transporte"], 1500m));
+
+        await SeedTransactionsAsync(
+            "maria@email.com",
+            seed.AccountId,
+            [
+                (today, "Salario", 16000m, TransactionType.Income, seed.CategoryIds["Salario"]),
+                (today, "Mercado", 15000m, TransactionType.Expense, seed.CategoryIds["Alimentacao"])
+            ]);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await client.GetFromJsonAsync<MonthHealthResponse>(
+            $"/api/insights/month-health?month={today.Month}&year={today.Year}");
+
+        Assert.NotNull(response);
+        Assert.Equal("critical", response.Status);
+        Assert.Equal("negative_free_money", Assert.Single(response.Insights).Type);
+    }
+
+    [Fact]
     public async Task GetMonthHealth_WithBudgetOverrunAboveTolerance_ShouldReturnAttention()
     {
         await _factory.ResetDatabaseAsync();

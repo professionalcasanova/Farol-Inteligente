@@ -99,7 +99,8 @@ public sealed class MonthlyInsightsService(FarolDbContext dbContext)
         }
 
         var totalBudgetRemaining = totalPlannedBudget - totalBudgetSpent;
-        var reservedBudget = totalBudgetRemaining > 0 ? totalBudgetRemaining : 0;
+        var plannedRemaining = Math.Max(totalBudgetRemaining, 0m);
+        var freeToSpend = balance - plannedRemaining;
 
         var bills = await dbContext.Bills
             .AsNoTracking()
@@ -130,7 +131,7 @@ public sealed class MonthlyInsightsService(FarolDbContext dbContext)
             totalPlannedBudget,
             totalBudgetSpent,
             totalBudgetRemaining,
-            balance - reservedBudget,
+            freeToSpend,
             pendingBills.Sum(bill => bill.Amount),
             overdueBills.Sum(bill => bill.Amount),
             pendingBills.Count,
