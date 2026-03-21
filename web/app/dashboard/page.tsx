@@ -131,6 +131,19 @@ function getDashboardSupportText(data: DashboardData) {
   return `Seu saldo estÃ¡ em ${formatCurrency(data.summary.balance)} e o dinheiro livre em ${formatCurrency(data.freeMoney.freeToSpend)}. A partir daqui, os alertas e vencimentos mostram onde agir primeiro.`;
 }
 
+function getFinancialSupportText(data: DashboardData) {
+  if (
+    data.summary.totalIncome === 0 &&
+    data.summary.totalExpense === 0 &&
+    data.billsSummary.countPending === 0 &&
+    data.budget.totalPlanned === 0
+  ) {
+    return "Este painel mostra a base do mÃªs. Conforme vocÃª registrar transaÃ§Ãµes, vencimentos e orÃ§amento, a leitura fica mais precisa.";
+  }
+
+  return `Receitas, despesas, saldo e dinheiro livre ajudam a confirmar o contexto do mÃªs antes de agir sobre orÃ§amento e vencimentos.`;
+}
+
 export default function DashboardPage() {
   const { session, isLoading, logout } = useProtectedSession();
   const [monthValue, setMonthValue] = useState(getCurrentMonthInputValue());
@@ -485,18 +498,28 @@ export default function DashboardPage() {
             </section>
           ) : null}
 
-          <section className="grid items-start gap-8 xl:grid-cols-[minmax(0,1.16fr)_minmax(320px,0.84fr)]">
+          <section
+            className={
+              data.monthHealth
+                ? "space-y-8"
+                : "grid items-start gap-8 xl:grid-cols-[minmax(0,1.16fr)_minmax(320px,0.84fr)]"
+            }
+          >
             <article className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
               <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
-                Como estÃ¡ seu mÃªs
+                {data.monthHealth ? "Numeros de apoio" : "Como estÃ¡ seu mÃªs"}
               </div>
               <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                 <div>
                   <h2 className="text-3xl font-semibold tracking-[-0.04em] text-[var(--color-foreground)]">
-                    {getDashboardHeadline(data)}
+                    {data.monthHealth
+                      ? "Base financeira do mÃªs"
+                      : getDashboardHeadline(data)}
                   </h2>
                   <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--color-muted)]">
-                    {getDashboardSupportText(data)}
+                    {data.monthHealth
+                      ? getFinancialSupportText(data)
+                      : getDashboardSupportText(data)}
                   </p>
                 </div>
                 <div className="rounded-[24px] border border-[color:rgba(15,118,110,0.14)] bg-[var(--color-accent-soft)] px-5 py-4 text-sm text-[var(--color-foreground)]">
@@ -556,55 +579,57 @@ export default function DashboardPage() {
               </div>
             </article>
 
-            <article className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
-              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
-                Mais crÃ­tico agora
-              </div>
-              <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
-                Alertas do mÃªs
-              </h2>
+            {!data.monthHealth ? (
+              <article className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
+                <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
+                  Mais crÃ­tico agora
+                </div>
+                <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
+                  Alertas do mÃªs
+                </h2>
 
-              <div className="mt-6 grid gap-3">
-                {data.alerts.alerts.length === 0 ? (
-                  <div className="rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
-                    Nenhum alerta importante para este mÃªs no momento. Se quiser avanÃ§ar o uso agora, registre uma transaÃ§Ã£o, monte um orÃ§amento ou adicione uma conta a pagar.
-                  </div>
-                ) : (
-                  data.alerts.alerts.map((alert, index) => (
-                    <article
-                      className="rounded-[24px] border border-[var(--color-line)] bg-white px-5 py-4"
-                      key={`${alert.type}-${index}`}
-                    >
-                      <div className="flex flex-col gap-3">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <span
-                            className={`rounded-full border px-3 py-1 text-xs font-semibold ${alertSeverityStyles[alert.severity]}`}
-                          >
-                            Prioridade {alertSeverityLabels[alert.severity]}
-                          </span>
-                          <div className="text-sm font-semibold text-[var(--color-foreground)]">
-                            {formatCurrency(alert.amount)}
-                          </div>
-                        </div>
-                        <div className="text-sm font-semibold leading-6 text-[var(--color-foreground)]">
-                          {alert.message}
-                        </div>
-                        {alert.actionUrl ? (
-                          <div>
-                            <Link
-                              className="rounded-full border border-[var(--color-line)] px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-[var(--color-accent-soft)]"
-                              href={alert.actionUrl}
+                <div className="mt-6 grid gap-3">
+                  {data.alerts.alerts.length === 0 ? (
+                    <div className="rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
+                      Nenhum alerta importante para este mÃªs no momento. Se quiser avanÃ§ar o uso agora, registre uma transaÃ§Ã£o, monte um orÃ§amento ou adicione uma conta a pagar.
+                    </div>
+                  ) : (
+                    data.alerts.alerts.map((alert, index) => (
+                      <article
+                        className="rounded-[24px] border border-[var(--color-line)] bg-white px-5 py-4"
+                        key={`${alert.type}-${index}`}
+                      >
+                        <div className="flex flex-col gap-3">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <span
+                              className={`rounded-full border px-3 py-1 text-xs font-semibold ${alertSeverityStyles[alert.severity]}`}
                             >
-                              Resolver agora
-                            </Link>
+                              Prioridade {alertSeverityLabels[alert.severity]}
+                            </span>
+                            <div className="text-sm font-semibold text-[var(--color-foreground)]">
+                              {formatCurrency(alert.amount)}
+                            </div>
                           </div>
-                        ) : null}
-                      </div>
-                    </article>
-                  ))
-                )}
-              </div>
-            </article>
+                          <div className="text-sm font-semibold leading-6 text-[var(--color-foreground)]">
+                            {alert.message}
+                          </div>
+                          {alert.actionUrl ? (
+                            <div>
+                              <Link
+                                className="rounded-full border border-[var(--color-line)] px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-[var(--color-accent-soft)]"
+                                href={alert.actionUrl}
+                              >
+                                Resolver agora
+                              </Link>
+                            </div>
+                          ) : null}
+                        </div>
+                      </article>
+                    ))
+                  )}
+                </div>
+              </article>
+            ) : null}
           </section>
           {shouldShowOnboarding ? (
             <section className="rounded-[28px] border border-[color:rgba(15,118,110,0.14)] bg-[var(--color-accent-soft)] p-6">

@@ -262,6 +262,8 @@ describe("DashboardPage", () => {
         "Organize a ordem de pagamento e preserve caixa para o essencial.",
       ),
     ).toBeInTheDocument();
+    expect(screen.getByText("Numeros de apoio")).toBeInTheDocument();
+    expect(screen.queryByText("Alertas do mÃªs")).not.toBeInTheDocument();
   });
 
   it("Dashboard_WithMonthHealth_ShowsActiveInsights", async () => {
@@ -449,7 +451,17 @@ describe("DashboardPage", () => {
       balance: 0,
       byCategory: [],
     });
-    mockedGetAlerts.mockResolvedValue({ alerts: [] });
+    mockedGetAlerts.mockResolvedValue({
+      alerts: [
+        {
+          type: "overdue_bills",
+          severity: "high",
+          message: "Voce tem contas vencidas que precisam de atencao imediata.",
+          amount: 300,
+          actionUrl: "/bills?status=overdue",
+        },
+      ],
+    });
     mockedGetBillsSummary.mockResolvedValue({
       totalPending: 0,
       totalOverdue: 0,
@@ -486,6 +498,12 @@ describe("DashboardPage", () => {
 
     expect(await screen.findByText("Como estÃ¡ seu mÃªs")).toBeInTheDocument();
     expect(screen.queryByText("Inteligencia do mes")).not.toBeInTheDocument();
+    expect(screen.getByText("Alertas do mÃªs")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Voce tem contas vencidas que precisam de atencao imediata.",
+      ),
+    ).toBeInTheDocument();
     expect(
       screen.queryByText(/month_health|Npgsql|PostgresException/i),
     ).not.toBeInTheDocument();
