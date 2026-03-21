@@ -1,5 +1,6 @@
 using System.Text;
 using Farol.Api.Common;
+using Farol.Api.Modules.Insights;
 using Farol.Infrastructure.Auth;
 using Farol.Infrastructure.Persistence;
 using Farol.Infrastructure.Seeding;
@@ -98,6 +99,7 @@ builder.Services.AddDbContext<FarolDbContext>(options =>
     options.UseNpgsql(connectionString));
 builder.Services.AddScoped<PasswordService>();
 builder.Services.AddScoped<JwtTokenService>();
+builder.Services.AddScoped<MonthlyInsightsService>();
 
 var app = builder.Build();
 
