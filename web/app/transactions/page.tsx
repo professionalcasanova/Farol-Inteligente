@@ -247,8 +247,8 @@ export default function TransactionsPage() {
           title="Não foi possível carregar as transações"
         />
       ) : (
-        <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-          <section className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
+        <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,0.94fr)_minmax(0,1.06fr)]">
+          <section className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
             <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
               Nova transação
             </div>
@@ -390,7 +390,7 @@ export default function TransactionsPage() {
             )}
           </section>
 
-          <section className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
+          <section className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
             <div className="flex items-end justify-between gap-4">
               <div>
                 <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">

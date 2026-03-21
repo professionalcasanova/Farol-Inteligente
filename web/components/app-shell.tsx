@@ -33,9 +33,9 @@ export function AppShell({
   const pathname = usePathname();
 
   return (
-    <div className="min-h-screen px-4 py-4 sm:px-6 lg:px-8">
-      <div className="mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-7xl flex-col rounded-[32px] border border-[var(--color-line)] bg-[color:rgba(255,250,242,0.9)] shadow-[0_40px_120px_rgba(20,37,51,0.12)] backdrop-blur">
-        <header className="border-b border-[var(--color-line)] px-6 py-5 sm:px-8">
+    <div className="min-h-screen px-6 py-5 sm:px-8 xl:px-10">
+      <div className="mx-auto flex min-h-[calc(100vh-2.5rem)] w-full max-w-[1360px] flex-col rounded-[32px] border border-[var(--color-line)] bg-[color:rgba(255,250,242,0.9)] shadow-[0_40px_120px_rgba(20,37,51,0.12)] backdrop-blur">
+        <header className="border-b border-[var(--color-line)] px-7 py-6 sm:px-8 lg:px-10">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
             <div className="space-y-3">
               <div className="flex items-center gap-3">
@@ -57,13 +57,13 @@ export function AppShell({
             </div>
 
             <div className="flex flex-col gap-3 lg:items-end">
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                 {navItems.map((item) => {
                   const isActive = pathname === item.href;
 
                   return (
                     <Link
-                      className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                      className={`inline-flex min-h-11 items-center rounded-full px-4 py-2 text-sm font-medium transition ${
                         isActive
                           ? "bg-[var(--color-foreground)] text-white"
                           : "bg-white text-[var(--color-foreground)] hover:bg-[var(--color-accent-soft)]"
@@ -76,7 +76,7 @@ export function AppShell({
                   );
                 })}
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3 lg:justify-end">
                 <div className="text-right">
                   <div className="text-sm font-medium text-[var(--color-foreground)]">
                     {session.name}
@@ -86,7 +86,7 @@ export function AppShell({
                   </div>
                 </div>
                 <button
-                  className="rounded-full border border-[var(--color-line)] px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-white"
+                  className="inline-flex min-h-11 items-center rounded-full border border-[var(--color-line)] px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-white"
                   onClick={onLogout}
                   type="button"
                 >
@@ -97,7 +97,7 @@ export function AppShell({
           </div>
         </header>
 
-        <main className="flex-1 px-6 py-6 sm:px-8">
+        <main className="flex-1 px-7 py-7 sm:px-8 lg:px-10">
           <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div className="rounded-[24px] border border-[color:rgba(15,118,110,0.14)] bg-[var(--color-accent-soft)] px-5 py-4">
               <div className="text-xs uppercase tracking-[0.22em] text-[var(--color-accent)]">

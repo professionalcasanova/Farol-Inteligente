@@ -521,8 +521,8 @@ export default function DashboardPage() {
             ))}
           </section>
 
-          <section className="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
-            <article className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
+          <section className="grid items-start gap-8 xl:grid-cols-[minmax(0,1.28fr)_minmax(320px,0.72fr)]">
+            <article className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
               <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                 <div>
                   <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
@@ -615,7 +615,7 @@ export default function DashboardPage() {
             </article>
 
             <article
-              className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6"
+              className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6"
               id="quick-account"
             >
               <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
@@ -696,8 +696,8 @@ export default function DashboardPage() {
             </article>
           </section>
 
-          <section className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
-            <article className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
+          <section className="grid items-start gap-8 xl:grid-cols-[minmax(0,0.94fr)_minmax(0,1.06fr)]">
+            <article className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
               <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
                 Bills do mês
               </div>
@@ -744,7 +744,7 @@ export default function DashboardPage() {
               </div>
             </article>
 
-            <article className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
+            <article className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
               <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
                 Próximas contas
               </div>
