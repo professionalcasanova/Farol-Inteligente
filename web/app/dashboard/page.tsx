@@ -144,6 +144,39 @@ function getFinancialSupportText(data: DashboardData) {
   return `Receitas, despesas, saldo e dinheiro livre ajudam a confirmar o contexto do mÃªs antes de agir sobre orÃ§amento e vencimentos.`;
 }
 
+function isFirstUseState(data: DashboardData) {
+  return (
+    data.summary.totalIncome === 0 &&
+    data.summary.totalExpense === 0 &&
+    data.billsSummary.countPending === 0 &&
+    data.billsSummary.countOverdue === 0 &&
+    data.budget.totalPlanned === 0 &&
+    data.accounts.length <= 1 &&
+    !data.onboarding.hasTransaction &&
+    !data.onboarding.hasBill
+  );
+}
+
+function getActivationMessage(data: DashboardData) {
+  if (!data.onboarding.hasAccount) {
+    return {
+      message: "Comece criando sua primeira conta no Farol.",
+      cause:
+        "Sem uma conta financeira, ainda nÃ£o dÃ¡ para registrar transaÃ§Ãµes, importar CSV ou acompanhar seu mÃªs.",
+      action:
+        "Crie uma conta abaixo e depois registre uma entrada ou importe seus primeiros dados para liberar a leitura do mÃªs.",
+    };
+  }
+
+  return {
+    message: "Seu mÃªs ainda nÃ£o tem dados suficientes.",
+    cause:
+      "VocÃª jÃ¡ tem conta, mas ainda faltam transaÃ§Ãµes ou vencimentos para o Farol montar seu primeiro estado do mÃªs.",
+    action:
+      "Registre uma entrada agora ou importe um CSV para chegar ao primeiro insight do mÃªs.",
+  };
+}
+
 export default function DashboardPage() {
   const { session, isLoading, logout } = useProtectedSession();
   const [monthValue, setMonthValue] = useState(getCurrentMonthInputValue());
@@ -188,6 +221,8 @@ export default function DashboardPage() {
     (item) => item.completed,
   ).length;
   const shouldShowOnboarding = checklistItems.some((item) => !item.completed);
+  const firstUseState = data ? isFirstUseState(data) : false;
+  const activationMessage = data ? getActivationMessage(data) : null;
   const quickActionItems = [
     {
       href: "/transactions",
@@ -441,7 +476,7 @@ export default function DashboardPage() {
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-3">
                     <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
-                      Inteligencia do mes
+                      {firstUseState ? "Primeiro uso" : "Inteligencia do mes"}
                     </div>
                     <span
                       className={`rounded-full border px-3 py-1 text-xs font-semibold ${monthHealthStatusStyles[data.monthHealth.status]}`}
@@ -451,10 +486,14 @@ export default function DashboardPage() {
                   </div>
 
                   <h2 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-[var(--color-foreground)]">
-                    {data.monthHealth.summary.message}
+                    {firstUseState && activationMessage
+                      ? activationMessage.message
+                      : data.monthHealth.summary.message}
                   </h2>
                   <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--color-muted)]">
-                    {data.monthHealth.summary.cause}
+                    {firstUseState && activationMessage
+                      ? activationMessage.cause
+                      : data.monthHealth.summary.cause}
                   </p>
                 </div>
 
@@ -463,12 +502,41 @@ export default function DashboardPage() {
                     O que fazer agora
                   </div>
                   <div className="mt-3 text-sm leading-6 text-[var(--color-foreground)]">
-                    {data.monthHealth.summary.action}
+                    {firstUseState && activationMessage
+                      ? activationMessage.action
+                      : data.monthHealth.summary.action}
                   </div>
+                  {firstUseState ? (
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      {!data.onboarding.hasAccount ? (
+                        <Link
+                          className="rounded-full border border-[var(--color-line)] bg-white px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-[var(--color-panel)]"
+                          href="/dashboard#quick-account"
+                        >
+                          Criar primeira conta
+                        </Link>
+                      ) : (
+                        <>
+                          <Link
+                            className="rounded-full border border-[var(--color-line)] bg-white px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-[var(--color-panel)]"
+                            href="/transactions"
+                          >
+                            Registrar entrada
+                          </Link>
+                          <Link
+                            className="rounded-full border border-[var(--color-line)] bg-white px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-[var(--color-panel)]"
+                            href="/imports"
+                          >
+                            Importar CSV
+                          </Link>
+                        </>
+                      )}
+                    </div>
+                  ) : null}
                 </div>
               </div>
 
-              {data.monthHealth.insights.length > 0 ? (
+              {data.monthHealth.insights.length > 0 && !firstUseState ? (
                 <div className="mt-6 grid gap-3 md:grid-cols-3">
                   {data.monthHealth.insights.map((insight) => (
                     <article

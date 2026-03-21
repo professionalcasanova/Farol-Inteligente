@@ -221,12 +221,48 @@ describe("DashboardPage", () => {
     render(<DashboardPage />);
 
     expect(
-      await screen.findByText("Seu mes esta sob controle ate aqui."),
+      await screen.findByText("Comece criando sua primeira conta no Farol."),
     ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Sem uma conta financeira/i),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /criar primeira conta/i })).toBeInTheDocument();
     expect(await screen.findByText("Comece por aqui")).toBeInTheDocument();
     expect(screen.getByText(/Criar sua primeira conta/)).toBeInTheDocument();
     expect(screen.getByText(/Registrar uma entrada \(salÃ¡rio\)/)).toBeInTheDocument();
     expect(screen.getByText(/Adicionar uma conta a pagar/)).toBeInTheDocument();
+  });
+
+  it("Dashboard_FirstUseWithAccount_ShowsPathToAddOrImportData", async () => {
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+    mockDashboardApi({
+      accounts: [
+        {
+          id: "account-1",
+          name: "Conta principal",
+          type: 2,
+          isActive: true,
+          createdAtUtc: "2026-03-01T00:00:00Z",
+        },
+      ],
+    });
+
+    render(<DashboardPage />);
+
+    expect(
+      await screen.findByText("Seu mÃªs ainda nÃ£o tem dados suficientes."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/ainda faltam transa/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /registrar entrada/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /importar csv/i })).toBeInTheDocument();
   });
 
   it("Dashboard_WithMonthHealth_ShowsSummaryCauseAndAction", async () => {
@@ -236,6 +272,27 @@ describe("DashboardPage", () => {
       logout: vi.fn(),
     });
     mockDashboardApi({
+      accounts: [
+        {
+          id: "account-1",
+          name: "Conta principal",
+          type: 2,
+          isActive: true,
+          createdAtUtc: "2026-03-01T00:00:00Z",
+        },
+      ],
+      transactions: [
+        {
+          id: "transaction-1",
+          financialAccountId: "account-1",
+          categoryId: null,
+          type: 1,
+          amount: 3000,
+          description: "Salario",
+          occurredOn: "2026-03-01",
+          createdAtUtc: "2026-03-01T00:00:00Z",
+        },
+      ],
       monthHealth: {
         status: "attention",
         summary: {
@@ -273,6 +330,27 @@ describe("DashboardPage", () => {
       logout: vi.fn(),
     });
     mockDashboardApi({
+      accounts: [
+        {
+          id: "account-1",
+          name: "Conta principal",
+          type: 2,
+          isActive: true,
+          createdAtUtc: "2026-03-01T00:00:00Z",
+        },
+      ],
+      transactions: [
+        {
+          id: "transaction-1",
+          financialAccountId: "account-1",
+          categoryId: null,
+          type: 1,
+          amount: 3000,
+          description: "Salario",
+          occurredOn: "2026-03-01",
+          createdAtUtc: "2026-03-01T00:00:00Z",
+        },
+      ],
       monthHealth: {
         status: "critical",
         summary: {
