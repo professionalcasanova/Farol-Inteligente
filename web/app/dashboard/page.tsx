@@ -165,7 +165,7 @@ function getDashboardSupportText(data: DashboardData) {
     return "Registre uma movimentação, monte um planejamento ou adicione uma conta a pagar para começar a leitura do mês.";
   }
 
-  return `Seu saldo está em ${formatCurrency(data.summary.balance)} e o dinheiro livre em ${formatCurrency(data.freeMoney.freeToSpend)}. A partir daqui, os alertas e vencimentos mostram onde agir primeiro.`;
+  return `Seu saldo está em ${formatCurrency(data.summary.balance)} e o dinheiro livre em ${formatCurrency(data.freeMoney.freeToSpend)}. Esse valor já considera o que ainda ficou reservado no planejamento do mês. A partir daqui, os alertas e vencimentos mostram onde agir primeiro.`;
 }
 
 function getFinancialSupportText(data: DashboardData) {
@@ -178,7 +178,7 @@ function getFinancialSupportText(data: DashboardData) {
     return "Este painel mostra a base do mês. Conforme você registrar movimentações, vencimentos e planejamento, a leitura fica mais precisa.";
   }
 
-  return "Entradas, saídas, saldo e dinheiro livre ajudam a confirmar o contexto do mês antes de agir sobre planejamento e vencimentos.";
+  return "Entradas, saídas, saldo e dinheiro livre ajudam a confirmar o contexto do mês antes de agir sobre planejamento e vencimentos. Aqui, o dinheiro livre já considera o que ainda ficou reservado no planejamento.";
 }
 
 function isFirstUseState(data: DashboardData) {
