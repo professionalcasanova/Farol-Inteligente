@@ -404,8 +404,9 @@ describe("DashboardPage", () => {
     render(<DashboardPage />);
 
     await user.type(await screen.findByLabelText(/quanto foi/i), "85");
+    await user.click(screen.getByRole("button", { name: /adicionar descrição ou categoria/i }));
     await user.type(screen.getByLabelText(/descrição \(se quiser\)/i), "Mercado");
-    await user.click(screen.getByRole("button", { name: /registrar agora/i }));
+    await user.click(screen.getByRole("button", { name: /registrar saída/i }));
 
     await waitFor(() => {
       expect(mockedCreateTransaction).toHaveBeenCalledWith("token", {
@@ -420,7 +421,9 @@ describe("DashboardPage", () => {
 
     expect(await screen.findByText("Registrado 👍")).toBeInTheDocument();
     expect(screen.getByLabelText(/quanto foi/i)).toHaveValue(null);
-    expect(screen.getByLabelText(/descrição \(se quiser\)/i)).toHaveValue("");
+    expect(
+      screen.queryByLabelText(/descrição \(se quiser\)/i),
+    ).not.toBeInTheDocument();
     expect(mockedGetMonthlySummary).toHaveBeenCalledTimes(2);
   });
 
@@ -472,7 +475,7 @@ describe("DashboardPage", () => {
 
     await user.click(await screen.findByRole("button", { name: /entrou dinheiro/i }));
     await user.type(screen.getByLabelText(/quanto foi/i), "1200");
-    await user.click(screen.getByRole("button", { name: /registrar agora/i }));
+    await user.click(screen.getByRole("button", { name: /registrar entrada/i }));
 
     await waitFor(() => {
       expect(mockedCreateTransaction).toHaveBeenCalledWith("token", {
@@ -484,6 +487,44 @@ describe("DashboardPage", () => {
         occurredOn: expect.any(String),
       });
     });
+  });
+
+  it("Dashboard_RegisterNow_HidesOptionalDetailsUntilUserAsksForThem", async () => {
+    const user = userEvent.setup();
+
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+    mockDashboardApi({
+      accounts: [
+        {
+          id: "account-1",
+          name: "Conta principal",
+          type: 2,
+          isActive: true,
+          createdAtUtc: "2026-03-01T00:00:00Z",
+        },
+      ],
+    });
+
+    render(<DashboardPage />);
+
+    expect(await screen.findByLabelText(/quanto foi/i)).toHaveFocus();
+    expect(
+      screen.getByRole("button", { name: /registrar saída/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText(/descrição \(se quiser\)/i),
+    ).not.toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", { name: /adicionar descrição ou categoria/i }),
+    );
+
+    expect(screen.getByLabelText(/descrição \(se quiser\)/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/categoria \(se quiser\)/i)).toBeInTheDocument();
   });
 
   it("Dashboard_WithMonthHealth_ShowsSummaryCauseAndAction", async () => {
