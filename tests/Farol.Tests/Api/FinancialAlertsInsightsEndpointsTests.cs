@@ -100,14 +100,13 @@ public sealed class FinancialAlertsInsightsEndpointsTests : IClassFixture<FarolA
         var seed = await SeedAccountAndCategoriesAsync(
             "maria@email.com",
             ("Salario", CategoryType.Income),
-            ("Alimentacao", CategoryType.Expense),
-            ("Transporte", CategoryType.Expense));
+            ("Transporte", CategoryType.Expense),
+            ("Lazer", CategoryType.Expense));
 
         await SeedBudgetAsync(
             "maria@email.com",
             today.Month,
             today.Year,
-            (seed.CategoryIds["Alimentacao"], 500m),
             (seed.CategoryIds["Transporte"], 500m));
 
         await SeedTransactionsAsync(
@@ -115,8 +114,7 @@ public sealed class FinancialAlertsInsightsEndpointsTests : IClassFixture<FarolA
             seed.AccountId,
             [
                 (today, "Salario", 16000m, TransactionType.Income, seed.CategoryIds["Salario"]),
-                (today, "Mercado", 500m, TransactionType.Expense, seed.CategoryIds["Alimentacao"]),
-                (today, "Combustivel", 14500m, TransactionType.Expense, seed.CategoryIds["Transporte"])
+                (today, "Lazer", 15000m, TransactionType.Expense, seed.CategoryIds["Lazer"])
             ]);
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);

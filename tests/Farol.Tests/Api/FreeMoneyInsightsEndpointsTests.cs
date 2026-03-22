@@ -106,14 +106,13 @@ public sealed class FreeMoneyInsightsEndpointsTests : IClassFixture<FarolApiFact
         var seed = await SeedAccountAndCategoriesAsync(
             "maria@email.com",
             ("Salario", CategoryType.Income),
-            ("Alimentacao", CategoryType.Expense),
-            ("Transporte", CategoryType.Expense));
+            ("Transporte", CategoryType.Expense),
+            ("Lazer", CategoryType.Expense));
 
         await SeedBudgetAsync(
             "maria@email.com",
             3,
             2026,
-            (seed.CategoryIds["Alimentacao"], 500m),
             (seed.CategoryIds["Transporte"], 500m));
 
         await SeedTransactionsAsync(
@@ -121,8 +120,7 @@ public sealed class FreeMoneyInsightsEndpointsTests : IClassFixture<FarolApiFact
             seed.AccountId,
             [
                 (new DateOnly(2026, 3, 5), "Salario", 16000m, TransactionType.Income, seed.CategoryIds["Salario"]),
-                (new DateOnly(2026, 3, 6), "Mercado", 500m, TransactionType.Expense, seed.CategoryIds["Alimentacao"]),
-                (new DateOnly(2026, 3, 7), "Combustivel", 14500m, TransactionType.Expense, seed.CategoryIds["Transporte"])
+                (new DateOnly(2026, 3, 7), "Lazer", 15000m, TransactionType.Expense, seed.CategoryIds["Lazer"])
             ]);
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
@@ -133,8 +131,8 @@ public sealed class FreeMoneyInsightsEndpointsTests : IClassFixture<FarolApiFact
         Assert.Equal(16000m, response.TotalIncome);
         Assert.Equal(15000m, response.TotalExpense);
         Assert.Equal(1000m, response.Balance);
-        Assert.Equal(1000m, response.TotalPlannedBudget);
-        Assert.Equal(500m, response.TotalBudgetSpent);
+        Assert.Equal(500m, response.TotalPlannedBudget);
+        Assert.Equal(0m, response.TotalBudgetSpent);
         Assert.Equal(500m, response.TotalBudgetRemaining);
         Assert.Equal(500m, response.FreeToSpend);
     }

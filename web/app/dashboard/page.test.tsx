@@ -403,8 +403,8 @@ describe("DashboardPage", () => {
 
     render(<DashboardPage />);
 
-    await user.type(await screen.findByLabelText(/valor/i), "85");
-    await user.type(screen.getByLabelText(/descrição \(opcional\)/i), "Mercado");
+    await user.type(await screen.findByLabelText(/quanto foi/i), "85");
+    await user.type(screen.getByLabelText(/descrição \(se quiser\)/i), "Mercado");
     await user.click(screen.getByRole("button", { name: /registrar agora/i }));
 
     await waitFor(() => {
@@ -419,9 +419,71 @@ describe("DashboardPage", () => {
     });
 
     expect(await screen.findByText("Registrado 👍")).toBeInTheDocument();
-    expect(screen.getByLabelText(/valor/i)).toHaveValue(null);
-    expect(screen.getByLabelText(/descrição \(opcional\)/i)).toHaveValue("");
+    expect(screen.getByLabelText(/quanto foi/i)).toHaveValue(null);
+    expect(screen.getByLabelText(/descrição \(se quiser\)/i)).toHaveValue("");
     expect(mockedGetMonthlySummary).toHaveBeenCalledTimes(2);
+  });
+
+  it("Dashboard_RegisterNow_WithEntryShortcut_UsesSelectedTypeAndDefaultDescription", async () => {
+    const user = userEvent.setup();
+
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+    mockedCreateTransaction.mockResolvedValue({
+      id: "transaction-3",
+      financialAccountId: "account-1",
+      categoryId: null,
+      type: 1,
+      amount: 1200,
+      description: "Entrada rápida",
+      occurredOn: "2026-03-21",
+      createdAtUtc: "2026-03-21T00:00:00Z",
+    });
+    mockDashboardApi({
+      accounts: [
+        {
+          id: "account-1",
+          name: "Conta principal",
+          type: 2,
+          isActive: true,
+          createdAtUtc: "2026-03-01T00:00:00Z",
+        },
+      ],
+      categories: [
+        {
+          id: "category-1",
+          name: "Salário",
+          type: 1,
+          isSystem: true,
+        },
+        {
+          id: "category-2",
+          name: "Mercado",
+          type: 2,
+          isSystem: true,
+        },
+      ],
+    });
+
+    render(<DashboardPage />);
+
+    await user.click(await screen.findByRole("button", { name: /entrou dinheiro/i }));
+    await user.type(screen.getByLabelText(/quanto foi/i), "1200");
+    await user.click(screen.getByRole("button", { name: /registrar agora/i }));
+
+    await waitFor(() => {
+      expect(mockedCreateTransaction).toHaveBeenCalledWith("token", {
+        financialAccountId: "account-1",
+        categoryId: undefined,
+        type: 1,
+        amount: 1200,
+        description: "Entrada rápida",
+        occurredOn: expect.any(String),
+      });
+    });
   });
 
   it("Dashboard_WithMonthHealth_ShowsSummaryCauseAndAction", async () => {

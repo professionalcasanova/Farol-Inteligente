@@ -95,14 +95,13 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
         var seed = await SeedAccountAndCategoriesAsync(
             "maria@email.com",
             ("Salario", CategoryType.Income),
-            ("Alimentacao", CategoryType.Expense),
-            ("Transporte", CategoryType.Expense));
+            ("Transporte", CategoryType.Expense),
+            ("Lazer", CategoryType.Expense));
 
         await SeedBudgetAsync(
             "maria@email.com",
             today.Month,
             today.Year,
-            (seed.CategoryIds["Alimentacao"], 500m),
             (seed.CategoryIds["Transporte"], 1500m));
 
         await SeedTransactionsAsync(
@@ -110,7 +109,7 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
             seed.AccountId,
             [
                 (today, "Salario", 16000m, TransactionType.Income, seed.CategoryIds["Salario"]),
-                (today, "Mercado", 15000m, TransactionType.Expense, seed.CategoryIds["Alimentacao"])
+                (today, "Lazer", 15000m, TransactionType.Expense, seed.CategoryIds["Lazer"])
             ]);
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);

@@ -694,90 +694,109 @@ export default function DashboardPage() {
                 para começar a registrar suas movimentações.
               </div>
             ) : (
-              <form className="mt-6 grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(220px,0.8fr)_minmax(0,1fr)_minmax(220px,0.8fr)_auto]" onSubmit={handleQuickEntrySubmit}>
-                <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
-                  <span>Valor</span>
-                  <input
-                    className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3 text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)]"
-                    inputMode="decimal"
-                    min="0.01"
-                    onChange={(event) =>
-                      setQuickEntryForm((current) => ({
-                        ...current,
-                        amount: event.target.value,
-                      }))
-                    }
-                    placeholder="120,00"
-                    step="0.01"
-                    type="number"
-                    value={quickEntryForm.amount}
-                  />
-                </label>
+              <form className="mt-6 space-y-4" onSubmit={handleQuickEntrySubmit}>
+                <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_auto] xl:items-end">
+                  <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
+                    <span>Quanto foi?</span>
+                    <input
+                      className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-4 text-2xl font-semibold text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)]"
+                      inputMode="decimal"
+                      min="0.01"
+                      onChange={(event) =>
+                        setQuickEntryForm((current) => ({
+                          ...current,
+                          amount: event.target.value,
+                        }))
+                      }
+                      placeholder="120"
+                      step="0.01"
+                      type="number"
+                      value={quickEntryForm.amount}
+                    />
+                  </label>
 
-                <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
-                  <span>Tipo</span>
-                  <select
-                    className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3 text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)]"
-                    onChange={(event) =>
-                      setQuickEntryForm((current) => ({
-                        ...current,
-                        type: Number(event.target.value) as TransactionType,
-                      }))
-                    }
-                    value={quickEntryForm.type}
-                  >
-                    {quickEntryTypeOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                  <div className="grid gap-3 sm:grid-cols-[auto_auto] xl:self-end">
+                    <div
+                      aria-label="Tipo da movimentação"
+                      className="inline-flex rounded-2xl border border-[var(--color-line)] bg-white p-1"
+                      role="group"
+                    >
+                      {quickEntryTypeOptions.map((option) => {
+                        const isSelected = quickEntryForm.type === option.value;
 
-                <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
-                  <span>Descrição (opcional)</span>
-                  <input
-                    className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3 text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)]"
-                    onChange={(event) =>
-                      setQuickEntryForm((current) => ({
-                        ...current,
-                        description: event.target.value,
-                      }))
-                    }
-                    placeholder="Mercado, salário, almoço..."
-                    value={quickEntryForm.description}
-                  />
-                </label>
+                        return (
+                          <button
+                            aria-pressed={isSelected}
+                            className={`rounded-[18px] px-4 py-3 text-sm font-semibold transition ${isSelected ? "bg-[var(--color-foreground)] text-white" : "text-[var(--color-muted)] hover:text-[var(--color-foreground)]"}`}
+                            key={option.value}
+                            onClick={() =>
+                              setQuickEntryForm((current) => ({
+                                ...current,
+                                type: option.value,
+                              }))
+                            }
+                            type="button"
+                          >
+                            {option.label}
+                          </button>
+                        );
+                      })}
+                    </div>
 
-                <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
-                  <span>Categoria (opcional)</span>
-                  <select
-                    className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3 text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)]"
-                    onChange={(event) =>
-                      setQuickEntryForm((current) => ({
-                        ...current,
-                        categoryId: event.target.value,
-                      }))
-                    }
-                    value={quickEntryForm.categoryId}
-                  >
-                    <option value="">Sem categoria</option>
-                    {visibleQuickEntryCategories.map((category) => (
-                      <option key={category.id} value={category.id}>
-                        {category.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                    <button
+                      className="w-full rounded-2xl bg-[var(--color-foreground)] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-70"
+                      disabled={isRegisteringNow}
+                      type="submit"
+                    >
+                      {isRegisteringNow ? "Registrando..." : "Registrar agora"}
+                    </button>
+                  </div>
+                </div>
 
-                <div className="flex items-end">
-                  <button
-                    className="w-full rounded-2xl bg-[var(--color-foreground)] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-70"
-                    disabled={isRegisteringNow}
-                    type="submit"
-                  >
-                    {isRegisteringNow ? "Registrando..." : "Registrar agora"}
-                  </button>
+                <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(220px,0.8fr)]">
+                  <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
+                    <span>Descrição (se quiser)</span>
+                    <input
+                      className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3 text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)]"
+                      onChange={(event) =>
+                        setQuickEntryForm((current) => ({
+                          ...current,
+                          description: event.target.value,
+                        }))
+                      }
+                      placeholder="Mercado, salário, almoço..."
+                      value={quickEntryForm.description}
+                    />
+                  </label>
+
+                  <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
+                    <span>Categoria (se quiser)</span>
+                    <select
+                      className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3 text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)]"
+                      onChange={(event) =>
+                        setQuickEntryForm((current) => ({
+                          ...current,
+                          categoryId: event.target.value,
+                        }))
+                      }
+                      value={quickEntryForm.categoryId}
+                    >
+                      <option value="">Deixar sem categoria</option>
+                      {visibleQuickEntryCategories.map((category) => (
+                        <option key={category.id} value={category.id}>
+                          {category.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                <div className="text-sm text-[var(--color-muted)]">
+                  Se quiser, registre só o valor e toque em{" "}
+                  <span className="font-semibold text-[var(--color-foreground)]">
+                    Registrar agora
+                  </span>
+                  .
                 </div>
               </form>
             )}
