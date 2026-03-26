@@ -1,0 +1,44 @@
+# Farol Intelligence Service
+
+Serviço Python da V1 de inteligência financeira do Farol.
+
+## O que faz
+
+- recebe um snapshot financeiro mensal já consolidado pela API C#
+- classifica o mês em `healthy`, `attention` ou `critical`
+- calcula um score de `0` a `100`
+- gera insights priorizados e ações recomendadas
+
+## Estrutura
+
+```txt
+services/farol_intelligence/
+  app/
+    analysis.py
+    main.py
+    models.py
+  tests/
+    test_analysis.py
+  pyproject.toml
+```
+
+## Rodando localmente
+
+No diretório `services/farol_intelligence`:
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -e .
+uvicorn app.main:app --reload
+```
+
+O endpoint principal ficará em:
+
+- `POST http://127.0.0.1:8000/analyze/v1`
+
+## Rodando testes
+
+```powershell
+python -m unittest discover tests -v
+```

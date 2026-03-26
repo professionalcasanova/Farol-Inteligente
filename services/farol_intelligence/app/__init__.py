@@ -1,0 +1,1 @@
+"""Farol intelligence service package."""
