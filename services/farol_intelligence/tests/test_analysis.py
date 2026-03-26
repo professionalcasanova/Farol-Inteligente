@@ -62,6 +62,7 @@ class FinancialAnalysisTests(unittest.TestCase):
         self.assertEqual("healthy", result["status"])
         self.assertEqual(100, result["score"])
         self.assertEqual("healthy_month", result["insights"][0]["type"])
+        self.assertEqual("keep_tracking", result["recommendedActions"][0]["id"])
 
     def test_analyze_should_return_critical_when_bill_is_overdue(self) -> None:
         payload = make_payload()
@@ -73,6 +74,32 @@ class FinancialAnalysisTests(unittest.TestCase):
         self.assertEqual("critical", result["status"])
         self.assertEqual("overdue_bills", result["insights"][0]["type"])
         self.assertLess(result["score"], 100)
+        self.assertEqual("review_overdue_bills", result["recommendedActions"][0]["id"])
+
+    def test_analyze_should_return_critical_when_free_money_is_negative(self) -> None:
+        payload = make_payload()
+        payload["totals"]["freeToSpend"] = -250.0
+        payload["bills"]["upcoming7DaysCount"] = 0
+        payload["bills"]["upcoming7DaysAmount"] = 0.0
+
+        result = analyze_financial_snapshot(payload)
+
+        self.assertEqual("critical", result["status"])
+        self.assertEqual(70, result["score"])
+        self.assertEqual("negative_free_money", result["insights"][0]["type"])
+        self.assertEqual("review_expenses", result["recommendedActions"][0]["id"])
+
+    def test_analyze_should_return_critical_when_short_term_bills_exceed_free_money(self) -> None:
+        payload = make_payload()
+        payload["totals"]["freeToSpend"] = 400.0
+        payload["bills"]["upcoming7DaysCount"] = 2
+        payload["bills"]["upcoming7DaysAmount"] = 900.0
+
+        result = analyze_financial_snapshot(payload)
+
+        self.assertEqual("critical", result["status"])
+        self.assertEqual("short_term_bills_pressure", result["insights"][0]["type"])
+        self.assertEqual(80, result["score"])
 
     def test_analyze_should_return_attention_when_budget_is_overspent(self) -> None:
         payload = make_payload()
@@ -84,6 +111,7 @@ class FinancialAnalysisTests(unittest.TestCase):
 
         self.assertEqual("attention", result["status"])
         self.assertEqual("budget_overspent", result["insights"][0]["type"])
+        self.assertEqual(85, result["score"])
 
     def test_analyze_should_detect_high_non_essential_spending(self) -> None:
         payload = make_payload()
@@ -109,6 +137,21 @@ class FinancialAnalysisTests(unittest.TestCase):
         self.assertTrue(
             any(item["type"] == "high_non_essential_spending" for item in result["insights"])
         )
+        self.assertEqual(90, result["score"])
+
+    def test_analyze_should_return_attention_when_period_pending_bills_exceed_free_money(self) -> None:
+        payload = make_payload()
+        payload["totals"]["freeToSpend"] = 500.0
+        payload["bills"]["pendingCount"] = 3
+        payload["bills"]["pendingAmount"] = 900.0
+        payload["bills"]["upcoming7DaysCount"] = 0
+        payload["bills"]["upcoming7DaysAmount"] = 0.0
+
+        result = analyze_financial_snapshot(payload)
+
+        self.assertEqual("attention", result["status"])
+        self.assertEqual("period_financial_pressure", result["insights"][0]["type"])
+        self.assertEqual(85, result["score"])
 
     def test_analyze_should_limit_insights_to_top_three(self) -> None:
         payload = make_payload()
@@ -136,6 +179,26 @@ class FinancialAnalysisTests(unittest.TestCase):
         self.assertEqual("overdue_bills", result["insights"][0]["type"])
         self.assertEqual("negative_free_money", result["insights"][1]["type"])
         self.assertEqual("short_term_bills_pressure", result["insights"][2]["type"])
+
+    def test_analyze_should_deduplicate_recommended_actions_when_multiple_insights_share_target(self) -> None:
+        payload = make_payload()
+        payload["totals"]["freeToSpend"] = -100.0
+        payload["totals"]["budgetSpent"] = 1300.0
+        payload["totals"]["budgetRemaining"] = -300.0
+        payload["bills"]["upcoming7DaysCount"] = 0
+        payload["bills"]["upcoming7DaysAmount"] = 0.0
+
+        result = analyze_financial_snapshot(payload)
+
+        self.assertEqual("critical", result["status"])
+        self.assertEqual(
+            len({item["id"] for item in result["recommendedActions"]}),
+            len(result["recommendedActions"]),
+        )
+        self.assertEqual(
+            ["review_expenses", "review_budget"],
+            [item["id"] for item in result["recommendedActions"]],
+        )
 
 
 if __name__ == "__main__":
