@@ -1,3 +1,4 @@
+using Farol.Api.Modules.Insights;
 using Farol.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -11,6 +12,9 @@ namespace Farol.Tests.Api;
 public sealed class FarolApiFactory : WebApplicationFactory<Program>
 {
     private readonly string _databaseName = $"FarolTests-{Guid.NewGuid()}";
+    private readonly FakeFinancialIntelligenceClient _financialIntelligenceClient = new();
+
+    public FakeFinancialIntelligenceClient FinancialIntelligenceClient => _financialIntelligenceClient;
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -22,9 +26,11 @@ public sealed class FarolApiFactory : WebApplicationFactory<Program>
             services.RemoveAll<DbContextOptions>();
             services.RemoveAll<FarolDbContext>();
             services.RemoveAll<IDbContextOptionsConfiguration<FarolDbContext>>();
+            services.RemoveAll<IFinancialIntelligenceClient>();
 
             services.AddDbContext<FarolDbContext>(options =>
                 options.UseInMemoryDatabase(_databaseName));
+            services.AddSingleton<IFinancialIntelligenceClient>(_financialIntelligenceClient);
         });
     }
 
@@ -35,5 +41,6 @@ public sealed class FarolApiFactory : WebApplicationFactory<Program>
 
         await dbContext.Database.EnsureDeletedAsync();
         await dbContext.Database.EnsureCreatedAsync();
+        _financialIntelligenceClient.Reset();
     }
 }

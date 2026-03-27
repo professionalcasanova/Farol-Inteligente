@@ -100,6 +100,18 @@ builder.Services.AddDbContext<FarolDbContext>(options =>
 builder.Services.AddScoped<PasswordService>();
 builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddScoped<MonthlyInsightsService>();
+builder.Services.AddScoped<FinancialIntelligenceService>();
+builder.Services.Configure<FinancialIntelligenceOptions>(
+    builder.Configuration.GetSection(FinancialIntelligenceOptions.SectionName));
+builder.Services.AddHttpClient<IFinancialIntelligenceClient, HttpFinancialIntelligenceClient>((serviceProvider, client) =>
+{
+    var options = serviceProvider
+        .GetRequiredService<Microsoft.Extensions.Options.IOptions<FinancialIntelligenceOptions>>()
+        .Value;
+
+    client.BaseAddress = new Uri(options.BaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+});
 
 var app = builder.Build();
 

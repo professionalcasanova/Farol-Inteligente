@@ -39,10 +39,10 @@ public sealed class BillsSummaryEndpointsTests : IClassFixture<FarolApiFactory>
         var month = today.Month;
         var year = today.Year;
 
-        await SeedBillAsync("maria@email.com", "Internet", 100m, today.AddDays(2));
-        await SeedBillAsync("maria@email.com", "Celular", 80m, today.AddDays(5));
-        await SeedBillAsync("maria@email.com", "Energia", 50m, today.AddDays(-3));
-        await SeedBillAsync("maria@email.com", "Aluguel", 900m, today.AddDays(-6), isPaid: true);
+        await SeedBillAsync("maria@email.com", "Internet", 100m, today);
+        await SeedBillAsync("maria@email.com", "Celular", 80m, today);
+        await SeedBillAsync("maria@email.com", "Energia", 50m, today.AddDays(-1));
+        await SeedBillAsync("maria@email.com", "Aluguel", 900m, today.AddDays(-2), isPaid: true);
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
@@ -65,17 +65,17 @@ public sealed class BillsSummaryEndpointsTests : IClassFixture<FarolApiFactory>
         using var client = _factory.CreateClient();
         var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var month = today.Month;
-        var year = today.Year;
+        var nextMonthStart = new DateOnly(today.Year, today.Month, 1).AddMonths(1);
+        var month = nextMonthStart.Month;
+        var year = nextMonthStart.Year;
 
-        await SeedBillAsync("maria@email.com", "Bill 3", 30m, today.AddDays(5));
-        await SeedBillAsync("maria@email.com", "Bill 1", 10m, today.AddDays(1));
-        await SeedBillAsync("maria@email.com", "Bill 2", 20m, today.AddDays(3));
-        await SeedBillAsync("maria@email.com", "Bill 4", 40m, today.AddDays(7));
-        await SeedBillAsync("maria@email.com", "Bill 5", 50m, today.AddDays(9));
-        await SeedBillAsync("maria@email.com", "Bill 6", 60m, today.AddDays(11));
-        await SeedBillAsync("maria@email.com", "Bill paid", 70m, today.AddDays(2), isPaid: true);
-        await SeedBillAsync("maria@email.com", "Bill overdue", 80m, today.AddDays(-2));
+        await SeedBillAsync("maria@email.com", "Bill 3", 30m, nextMonthStart.AddDays(5));
+        await SeedBillAsync("maria@email.com", "Bill 1", 10m, nextMonthStart.AddDays(1));
+        await SeedBillAsync("maria@email.com", "Bill 2", 20m, nextMonthStart.AddDays(3));
+        await SeedBillAsync("maria@email.com", "Bill 4", 40m, nextMonthStart.AddDays(7));
+        await SeedBillAsync("maria@email.com", "Bill 5", 50m, nextMonthStart.AddDays(9));
+        await SeedBillAsync("maria@email.com", "Bill 6", 60m, nextMonthStart.AddDays(11));
+        await SeedBillAsync("maria@email.com", "Bill paid", 70m, nextMonthStart.AddDays(2), isPaid: true);
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 

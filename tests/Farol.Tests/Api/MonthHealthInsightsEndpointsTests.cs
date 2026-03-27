@@ -34,7 +34,79 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
     }
 
     [Fact]
-    public async Task GetMonthHealth_WithOverdueBills_ShouldReturnCritical()
+    public async Task GetMonthHealth_WithInvalidMonth_ShouldReturnBadRequest()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await client.GetAsync("/api/insights/month-health?month=13&year=2026");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+        Assert.NotNull(payload);
+        Assert.Equal("The field Month must be between 1 and 12.", payload.Message);
+    }
+
+    [Fact]
+    public async Task GetMonthHealth_ShouldProxyFinancialIntelligenceResponse()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        _factory.FinancialIntelligenceClient.Handler = (_, _) =>
+            Task.FromResult(new FinancialAnalysisResponse
+            {
+                ContractVersion = "v1",
+                Status = "critical",
+                Score = 32,
+                Summary = new FinancialAnalysisSummaryResponse
+                {
+                    Message = "Há contas vencidas no seu mês.",
+                    Cause = "Você tem contas que já passaram do vencimento e isso aumenta a pressão financeira agora.",
+                    Action = "Priorize quitar ou renegociar as contas vencidas hoje."
+                },
+                Insights =
+                [
+                    new FinancialAnalysisInsightResponse
+                    {
+                        Type = "overdue_bills",
+                        Severity = "high",
+                        Priority = 100,
+                        Message = "Há contas vencidas no seu mês.",
+                        Cause = "Você tem contas que já passaram do vencimento e isso aumenta a pressão financeira agora.",
+                        Action = "Priorize quitar ou renegociar as contas vencidas hoje."
+                    }
+                ],
+                RecommendedActions =
+                [
+                    new FinancialAnalysisRecommendedActionResponse
+                    {
+                        Id = "review_overdue_bills",
+                        Label = "Resolver contas vencidas",
+                        Target = "/bills?status=overdue"
+                    }
+                ]
+            });
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await client.GetFromJsonAsync<MonthHealthResponse>(
+            $"/api/insights/month-health?month={today.Month}&year={today.Year}");
+
+        Assert.NotNull(response);
+        Assert.Equal("critical", response.Status);
+        Assert.Equal(32, response.Score);
+        Assert.Equal("Há contas vencidas no seu mês.", response.Summary.Message);
+        Assert.Equal("overdue_bills", Assert.Single(response.Insights).Type);
+        Assert.Equal("review_overdue_bills", Assert.Single(response.RecommendedActions).Id);
+    }
+
+    [Fact]
+    public async Task GetMonthHealth_ShouldSendBillsSnapshotToFinancialIntelligenceService()
     {
         await _factory.ResetDatabaseAsync();
         using var client = _factory.CreateClient();
@@ -42,20 +114,28 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
         await SeedBillAsync("maria@email.com", "Energia", 300m, today.AddDays(-3));
+        await SeedBillAsync("maria@email.com", "Aluguel", 180m, today);
+        await SeedBillAsync("maria@email.com", "Internet", 120m, today);
+        await SeedBillAsync("maria@email.com", "Seguro", 90m, today);
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-        var response = await client.GetFromJsonAsync<MonthHealthResponse>(
-            $"/api/insights/month-health?month={today.Month}&year={today.Year}");
+        var response = await client.GetAsync($"/api/insights/month-health?month={today.Month}&year={today.Year}");
 
-        Assert.NotNull(response);
-        Assert.Equal("critical", response.Status);
-        Assert.Equal("overdue_bills", Assert.Single(response.Insights).Type);
-        Assert.Equal("Voce tem contas vencidas que precisam de atencao imediata.", response.Summary.Message);
+        response.EnsureSuccessStatusCode();
+        var request = _factory.FinancialIntelligenceClient.LastRequest;
+
+        Assert.NotNull(request);
+        Assert.Equal(1, request.Bills.OverdueCount);
+        Assert.Equal(300m, request.Bills.OverdueAmount);
+        Assert.Equal(3, request.Bills.PendingCount);
+        Assert.Equal(390m, request.Bills.PendingAmount);
+        Assert.Equal(3, request.Bills.Upcoming7DaysCount);
+        Assert.Equal(390m, request.Bills.Upcoming7DaysAmount);
     }
 
     [Fact]
-    public async Task GetMonthHealth_WithNegativeFreeMoney_ShouldReturnCritical()
+    public async Task GetMonthHealth_ShouldUsePlannedBudgetRemainingWhenBuildingSnapshot()
     {
         await _factory.ResetDatabaseAsync();
         using var client = _factory.CreateClient();
@@ -63,38 +143,7 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var seed = await SeedAccountAndCategoriesAsync(
             "maria@email.com",
-            ("Salario", CategoryType.Income),
-            ("Mercado", CategoryType.Expense));
-
-        await SeedTransactionsAsync(
-            "maria@email.com",
-            seed.AccountId,
-            [
-                (today, "Salario", 1000m, TransactionType.Income, seed.CategoryIds["Salario"]),
-                (today, "Mercado", 1300m, TransactionType.Expense, seed.CategoryIds["Mercado"])
-            ]);
-
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-
-        var response = await client.GetFromJsonAsync<MonthHealthResponse>(
-            $"/api/insights/month-health?month={today.Month}&year={today.Year}");
-
-        Assert.NotNull(response);
-        Assert.Equal("critical", response.Status);
-        Assert.Equal("negative_free_money", Assert.Single(response.Insights).Type);
-        Assert.Equal("Voce esta no vermelho neste mes.", response.Summary.Message);
-    }
-
-    [Fact]
-    public async Task GetMonthHealth_ShouldUsePlannedBudgetRemainingWhenFreeMoneyBecomesNegative()
-    {
-        await _factory.ResetDatabaseAsync();
-        using var client = _factory.CreateClient();
-        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var seed = await SeedAccountAndCategoriesAsync(
-            "maria@email.com",
-            ("Salario", CategoryType.Income),
+            ("Salário", CategoryType.Income),
             ("Transporte", CategoryType.Expense),
             ("Lazer", CategoryType.Expense));
 
@@ -102,28 +151,31 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
             "maria@email.com",
             today.Month,
             today.Year,
-            (seed.CategoryIds["Transporte"], 1500m));
+            (seed.CategoryIds["Transporte"], 500m));
 
         await SeedTransactionsAsync(
             "maria@email.com",
             seed.AccountId,
             [
-                (today, "Salario", 16000m, TransactionType.Income, seed.CategoryIds["Salario"]),
+                (today, "Salário", 16000m, TransactionType.Income, seed.CategoryIds["Salário"]),
                 (today, "Lazer", 15000m, TransactionType.Expense, seed.CategoryIds["Lazer"])
             ]);
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-        var response = await client.GetFromJsonAsync<MonthHealthResponse>(
-            $"/api/insights/month-health?month={today.Month}&year={today.Year}");
+        var response = await client.GetAsync($"/api/insights/month-health?month={today.Month}&year={today.Year}");
 
-        Assert.NotNull(response);
-        Assert.Equal("critical", response.Status);
-        Assert.Equal("negative_free_money", Assert.Single(response.Insights).Type);
+        response.EnsureSuccessStatusCode();
+        var request = _factory.FinancialIntelligenceClient.LastRequest;
+
+        Assert.NotNull(request);
+        Assert.Equal(1000m, request.Totals.Balance);
+        Assert.Equal(500m, request.Totals.BudgetRemaining);
+        Assert.Equal(500m, request.Totals.FreeToSpend);
     }
 
     [Fact]
-    public async Task GetMonthHealth_WithBudgetOverrunAboveTolerance_ShouldReturnAttention()
+    public async Task GetMonthHealth_ShouldSendAggregatedCategoriesToFinancialIntelligenceService()
     {
         await _factory.ResetDatabaseAsync();
         using var client = _factory.CreateClient();
@@ -131,150 +183,36 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var seed = await SeedAccountAndCategoriesAsync(
             "maria@email.com",
-            ("Salario", CategoryType.Income),
-            ("Alimentacao", CategoryType.Expense));
-
-        await SeedBudgetAsync(
-            "maria@email.com",
-            today.Month,
-            today.Year,
-            (seed.CategoryIds["Alimentacao"], 100m));
-
-        await SeedTransactionsAsync(
-            "maria@email.com",
-            seed.AccountId,
-            [
-                (today, "Salario", 2000m, TransactionType.Income, seed.CategoryIds["Salario"]),
-                (today, "Mercado", 150m, TransactionType.Expense, seed.CategoryIds["Alimentacao"])
-            ]);
-
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-
-        var response = await client.GetFromJsonAsync<MonthHealthResponse>(
-            $"/api/insights/month-health?month={today.Month}&year={today.Year}");
-
-        Assert.NotNull(response);
-        Assert.Equal("attention", response.Status);
-        var insight = Assert.Single(response.Insights);
-        Assert.Equal("budget_overspent", insight.Type);
-        Assert.Equal(70, insight.Priority);
-    }
-
-    [Fact]
-    public async Task GetMonthHealth_WithSmallBudgetOverrun_ShouldRemainHealthy()
-    {
-        await _factory.ResetDatabaseAsync();
-        using var client = _factory.CreateClient();
-        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var seed = await SeedAccountAndCategoriesAsync(
-            "maria@email.com",
-            ("Salario", CategoryType.Income),
-            ("Alimentacao", CategoryType.Expense));
-
-        await SeedBudgetAsync(
-            "maria@email.com",
-            today.Month,
-            today.Year,
-            (seed.CategoryIds["Alimentacao"], 100m));
-
-        await SeedTransactionsAsync(
-            "maria@email.com",
-            seed.AccountId,
-            [
-                (today, "Salario", 2000m, TransactionType.Income, seed.CategoryIds["Salario"]),
-                (today, "Mercado", 120m, TransactionType.Expense, seed.CategoryIds["Alimentacao"])
-            ]);
-
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-
-        var response = await client.GetFromJsonAsync<MonthHealthResponse>(
-            $"/api/insights/month-health?month={today.Month}&year={today.Year}");
-
-        Assert.NotNull(response);
-        Assert.Equal("healthy", response.Status);
-        Assert.Empty(response.Insights);
-        Assert.Equal("Seu mes esta sob controle ate aqui.", response.Summary.Message);
-    }
-
-    [Fact]
-    public async Task GetMonthHealth_WithPendingBillsPressure_ShouldReturnAttention()
-    {
-        await _factory.ResetDatabaseAsync();
-        using var client = _factory.CreateClient();
-        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var seed = await SeedAccountAndCategoriesAsync(
-            "maria@email.com",
-            ("Salario", CategoryType.Income),
+            ("Salário", CategoryType.Income),
+            ("Delivery", CategoryType.Expense),
             ("Mercado", CategoryType.Expense));
 
         await SeedTransactionsAsync(
             "maria@email.com",
             seed.AccountId,
             [
-                (today, "Salario", 1200m, TransactionType.Income, seed.CategoryIds["Salario"]),
-                (today, "Mercado", 1100m, TransactionType.Expense, seed.CategoryIds["Mercado"])
+                (today, "Salário", 5000m, TransactionType.Income, seed.CategoryIds["Salário"]),
+                (today, "Almoço", 100m, TransactionType.Expense, seed.CategoryIds["Delivery"]),
+                (today, "Jantar", 80m, TransactionType.Expense, seed.CategoryIds["Delivery"]),
+                (today, "Compras", 250m, TransactionType.Expense, seed.CategoryIds["Mercado"])
             ]);
-
-        await SeedBillAsync("maria@email.com", "Aluguel", 80m, today.AddDays(2));
-        await SeedBillAsync("maria@email.com", "Internet", 40m, today.AddDays(4));
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-        var response = await client.GetFromJsonAsync<MonthHealthResponse>(
-            $"/api/insights/month-health?month={today.Month}&year={today.Year}");
+        var response = await client.GetAsync($"/api/insights/month-health?month={today.Month}&year={today.Year}");
 
-        Assert.NotNull(response);
-        Assert.Equal("attention", response.Status);
-        var insight = Assert.Single(response.Insights);
-        Assert.Equal("pending_bills_pressure", insight.Type);
-        Assert.Equal(60, insight.Priority);
-    }
+        response.EnsureSuccessStatusCode();
+        var request = _factory.FinancialIntelligenceClient.LastRequest;
 
-    [Fact]
-    public async Task GetMonthHealth_ShouldOrderInsightsByPriorityAndLimitToThree()
-    {
-        await _factory.ResetDatabaseAsync();
-        using var client = _factory.CreateClient();
-        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var seed = await SeedAccountAndCategoriesAsync(
-            "maria@email.com",
-            ("Salario", CategoryType.Income),
-            ("Alimentacao", CategoryType.Expense));
-
-        await SeedBudgetAsync(
-            "maria@email.com",
-            today.Month,
-            today.Year,
-            (seed.CategoryIds["Alimentacao"], 100m));
-
-        await SeedTransactionsAsync(
-            "maria@email.com",
-            seed.AccountId,
-            [
-                (today, "Salario", 1000m, TransactionType.Income, seed.CategoryIds["Salario"]),
-                (today, "Mercado", 1600m, TransactionType.Expense, seed.CategoryIds["Alimentacao"])
-            ]);
-
-        await SeedBillAsync("maria@email.com", "Energia", 300m, today.AddDays(-2));
-        await SeedBillAsync("maria@email.com", "Aluguel", 200m, today.AddDays(2));
-        await SeedBillAsync("maria@email.com", "Internet", 150m, today.AddDays(5));
-
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-
-        var response = await client.GetFromJsonAsync<MonthHealthResponse>(
-            $"/api/insights/month-health?month={today.Month}&year={today.Year}");
-
-        Assert.NotNull(response);
-        Assert.Equal("critical", response.Status);
-        Assert.Equal(3, response.Insights.Count);
-        Assert.Collection(
-            response.Insights,
-            first => Assert.Equal("overdue_bills", first.Type),
-            second => Assert.Equal("negative_free_money", second.Type),
-            third => Assert.Equal("budget_overspent", third.Type));
+        Assert.NotNull(request);
+        Assert.Contains(request.Categories, item =>
+            item.Name == "Delivery" &&
+            item.Type == "expense" &&
+            item.Amount == 180m);
+        Assert.Contains(request.Categories, item =>
+            item.Name == "Salário" &&
+            item.Type == "income" &&
+            item.Amount == 5000m);
     }
 
     [Fact]
@@ -290,28 +228,35 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", joaoToken);
 
-        var response = await client.GetFromJsonAsync<MonthHealthResponse>(
-            $"/api/insights/month-health?month={today.Month}&year={today.Year}");
+        var response = await client.GetAsync($"/api/insights/month-health?month={today.Month}&year={today.Year}");
 
-        Assert.NotNull(response);
-        Assert.Equal("healthy", response.Status);
-        Assert.Empty(response.Insights);
+        response.EnsureSuccessStatusCode();
+        var request = _factory.FinancialIntelligenceClient.LastRequest;
+
+        Assert.NotNull(request);
+        Assert.Equal(0, request.Bills.OverdueCount);
+        Assert.Equal(0m, request.Bills.OverdueAmount);
     }
 
     [Fact]
-    public async Task GetMonthHealth_WithInvalidMonth_ShouldReturnBadRequest()
+    public async Task GetMonthHealth_WhenFinancialIntelligenceIsUnavailable_ShouldReturnServiceUnavailable()
     {
         await _factory.ResetDatabaseAsync();
         using var client = _factory.CreateClient();
         var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        _factory.FinancialIntelligenceClient.Handler = (_, _) =>
+            throw new FinancialIntelligenceUnavailableException("Service unavailable.");
+
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-        var response = await client.GetAsync("/api/insights/month-health?month=13&year=2026");
+        var response = await client.GetAsync($"/api/insights/month-health?month={today.Month}&year={today.Year}");
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<ErrorResponse>();
         Assert.NotNull(payload);
-        Assert.Equal("The field Month must be between 1 and 12.", payload.Message);
+        Assert.Equal("A inteligência financeira está indisponível no momento.", payload.Message);
     }
 
     private async Task<(Guid AccountId, Dictionary<string, Guid> CategoryIds)> SeedAccountAndCategoriesAsync(

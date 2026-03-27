@@ -6,17 +6,8 @@ namespace Farol.Api.Modules.Insights;
 
 public sealed class MonthlyInsightsService(FarolDbContext dbContext)
 {
-    private const string HealthyStatus = "healthy";
-    private const string AttentionStatus = "attention";
-    private const string CriticalStatus = "critical";
-
     private const string HighSeverity = "high";
     private const string MediumSeverity = "medium";
-
-    private const string OverdueBillsType = "overdue_bills";
-    private const string NegativeFreeMoneyType = "negative_free_money";
-    private const string BudgetOverspentType = "budget_overspent";
-    private const string PendingBillsPressureType = "pending_bills_pressure";
 
     public async Task<MonthlyInsightSnapshot> GetMonthlySnapshotAsync(
         Guid userId,
@@ -120,8 +111,40 @@ public sealed class MonthlyInsightsService(FarolDbContext dbContext)
             .Where(bill => !bill.IsPaid && bill.DueOn >= today)
             .ToList();
 
+        var upcoming7DaysBills = bills
+            .Where(bill =>
+                !bill.IsPaid &&
+                bill.DueOn >= today &&
+                bill.DueOn <= today.AddDays(7))
+            .ToList();
+
         var overdueBills = bills
             .Where(bill => !bill.IsPaid && bill.DueOn < today)
+            .ToList();
+
+        var categoryIdsForSummary = transactions
+            .Where(transaction => transaction.CategoryId.HasValue)
+            .Select(transaction => transaction.CategoryId!.Value)
+            .Distinct()
+            .ToArray();
+
+        var categoryNames = categoryIdsForSummary.Length == 0
+            ? new Dictionary<Guid, string>()
+            : await dbContext.Categories
+                .AsNoTracking()
+                .Where(category => categoryIdsForSummary.Contains(category.Id))
+                .ToDictionaryAsync(category => category.Id, category => category.Name, cancellationToken);
+
+        var categories = transactions
+            .Where(transaction =>
+                transaction.CategoryId.HasValue &&
+                categoryNames.ContainsKey(transaction.CategoryId.Value))
+            .GroupBy(transaction => new { CategoryId = transaction.CategoryId!.Value, transaction.Type })
+            .Select(group => new MonthlyInsightCategorySnapshot(
+                group.Key.CategoryId,
+                categoryNames[group.Key.CategoryId],
+                group.Key.Type,
+                group.Sum(item => item.Amount)))
             .ToList();
 
         return new MonthlyInsightSnapshot(
@@ -135,7 +158,10 @@ public sealed class MonthlyInsightsService(FarolDbContext dbContext)
             pendingBills.Sum(bill => bill.Amount),
             overdueBills.Sum(bill => bill.Amount),
             pendingBills.Count,
-            overdueBills.Count);
+            overdueBills.Count,
+            upcoming7DaysBills.Sum(bill => bill.Amount),
+            upcoming7DaysBills.Count,
+            categories);
     }
 
     public FreeMoneyResponse BuildFreeMoneyResponse(
@@ -214,120 +240,6 @@ public sealed class MonthlyInsightsService(FarolDbContext dbContext)
             Alerts = alerts
         };
     }
-
-    public MonthHealthResponse BuildMonthHealthResponse(MonthlyInsightSnapshot snapshot)
-    {
-        var insights = GetActiveInsights(snapshot)
-            .OrderByDescending(item => item.Priority)
-            .Take(3)
-            .ToList();
-
-        var status = ResolveStatus(snapshot);
-        var summary = insights.Count > 0
-            ? new MonthHealthSummaryResponse
-            {
-                Message = insights[0].Message,
-                Cause = insights[0].Cause,
-                Action = insights[0].Action
-            }
-            : new MonthHealthSummaryResponse
-            {
-                Message = "Seu mes esta sob controle ate aqui.",
-                Cause = "Voce mantem folga no mes e sem sinais fortes de pressao imediata.",
-                Action = "Continue acompanhando orcamento e vencimentos para manter a margem."
-            };
-
-        return new MonthHealthResponse
-        {
-            Status = status,
-            Summary = summary,
-            Insights = insights
-        };
-    }
-
-    private static string ResolveStatus(MonthlyInsightSnapshot snapshot)
-    {
-        if (snapshot.CountOverdueBills > 0)
-        {
-            return CriticalStatus;
-        }
-
-        if (snapshot.FreeToSpend < 0)
-        {
-            return CriticalStatus;
-        }
-
-        if (snapshot.TotalPlannedBudget > 0 && snapshot.BudgetOverrun >= 50m)
-        {
-            return AttentionStatus;
-        }
-
-        if (snapshot.FreeToSpend >= 0 && snapshot.CountPendingBills >= 2 && snapshot.TotalPendingBills > snapshot.FreeToSpend)
-        {
-            return AttentionStatus;
-        }
-
-        return HealthyStatus;
-    }
-
-    private static List<MonthHealthInsightResponse> GetActiveInsights(MonthlyInsightSnapshot snapshot)
-    {
-        var insights = new List<MonthHealthInsightResponse>();
-
-        if (snapshot.CountOverdueBills > 0)
-        {
-            insights.Add(new MonthHealthInsightResponse
-            {
-                Type = OverdueBillsType,
-                Severity = HighSeverity,
-                Priority = 100,
-                Message = "Voce tem contas vencidas que precisam de atencao imediata.",
-                Cause = "Ha vencimentos atrasados pressionando seu mes.",
-                Action = "Priorize quitar ou renegociar as contas vencidas hoje."
-            });
-        }
-
-        if (snapshot.FreeToSpend < 0)
-        {
-            insights.Add(new MonthHealthInsightResponse
-            {
-                Type = NegativeFreeMoneyType,
-                Severity = HighSeverity,
-                Priority = 90,
-                Message = "Voce esta no vermelho neste mes.",
-                Cause = "Depois das despesas e compromissos, seu dinheiro livre ficou negativo.",
-                Action = "Pause novos gastos e revise as maiores saidas do mes."
-            });
-        }
-
-        if (snapshot.TotalPlannedBudget > 0 && snapshot.BudgetOverrun >= 50m)
-        {
-            insights.Add(new MonthHealthInsightResponse
-            {
-                Type = BudgetOverspentType,
-                Severity = MediumSeverity,
-                Priority = 70,
-                Message = "Seu orcamento do mes ja saiu do plano.",
-                Cause = "Voce gastou mais do que planejou nas categorias acompanhadas.",
-                Action = "Reduza gastos ajustaveis e reavalie o restante do mes."
-            });
-        }
-
-        if (snapshot.FreeToSpend >= 0 && snapshot.CountPendingBills >= 2 && snapshot.TotalPendingBills > snapshot.FreeToSpend)
-        {
-            insights.Add(new MonthHealthInsightResponse
-            {
-                Type = PendingBillsPressureType,
-                Severity = MediumSeverity,
-                Priority = 60,
-                Message = "As contas ainda pendentes ja consomem sua folga do mes.",
-                Cause = "Os proximos vencimentos estao ocupando todo o dinheiro livre disponivel.",
-                Action = "Organize a ordem de pagamento e preserve caixa para o essencial."
-            });
-        }
-
-        return insights;
-    }
 }
 
 public sealed record MonthlyInsightSnapshot(
@@ -341,7 +253,16 @@ public sealed record MonthlyInsightSnapshot(
     decimal TotalPendingBills,
     decimal TotalOverdueBills,
     int CountPendingBills,
-    int CountOverdueBills)
+    int CountOverdueBills,
+    decimal TotalUpcoming7DaysBills,
+    int CountUpcoming7DaysBills,
+    IReadOnlyList<MonthlyInsightCategorySnapshot> Categories)
 {
     public decimal BudgetOverrun => TotalBudgetSpent - TotalPlannedBudget;
 }
+
+public sealed record MonthlyInsightCategorySnapshot(
+    Guid CategoryId,
+    string Name,
+    TransactionType Type,
+    decimal Amount);

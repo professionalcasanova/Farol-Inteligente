@@ -7,7 +7,9 @@ namespace Farol.Api.Modules.Insights;
 [ApiController]
 [Authorize]
 [Route("api/insights")]
-public sealed class InsightsController(MonthlyInsightsService monthlyInsightsService) : ControllerBase
+public sealed class InsightsController(
+    MonthlyInsightsService monthlyInsightsService,
+    FinancialIntelligenceService financialIntelligenceService) : ControllerBase
 {
     [HttpGet("free-money")]
     public async Task<ActionResult<FreeMoneyResponse>> GetFreeMoney(
@@ -64,12 +66,21 @@ public sealed class InsightsController(MonthlyInsightsService monthlyInsightsSer
             return validationResult;
         }
 
-        var snapshot = await monthlyInsightsService.GetMonthlySnapshotAsync(
-            userId,
-            periodStart,
-            cancellationToken);
+        try
+        {
+            var response = await financialIntelligenceService.GetMonthHealthAsync(
+                userId,
+                periodStart,
+                cancellationToken);
 
-        return Ok(monthlyInsightsService.BuildMonthHealthResponse(snapshot));
+            return Ok(response);
+        }
+        catch (FinancialIntelligenceUnavailableException)
+        {
+            return StatusCode(
+                StatusCodes.Status503ServiceUnavailable,
+                new ErrorResponse("A inteligência financeira está indisponível no momento."));
+        }
     }
 
     private ActionResult? TryGetUserIdAndPeriodStart(
