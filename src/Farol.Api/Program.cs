@@ -118,6 +118,12 @@ var app = builder.Build();
 if (!app.Environment.IsEnvironment("Testing"))
 {
     await DatabaseSeeder.SeedSystemCategoriesAsync(app.Services, app.Lifetime.ApplicationStopping);
+
+    if (app.Environment.IsDevelopment() &&
+        builder.Configuration.GetValue<bool>("DemoScenarios:Enabled"))
+    {
+        await DemoScenarioSeeder.SeedDemoScenariosAsync(app.Services, app.Lifetime.ApplicationStopping);
+    }
 }
 
 if (app.Environment.IsDevelopment())
