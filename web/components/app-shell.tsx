@@ -76,7 +76,9 @@ export function AppShell({
                   );
                 })}
               </div>
+
               <div className="flex flex-wrap items-center gap-3 lg:justify-end">
+                {actions}
                 <div className="text-right">
                   <div className="text-sm font-medium text-[var(--color-foreground)]">
                     {session.name}
@@ -97,20 +99,7 @@ export function AppShell({
           </div>
         </header>
 
-        <main className="flex-1 px-7 py-7 sm:px-8 lg:px-10">
-          <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div className="rounded-[24px] border border-[color:rgba(15,118,110,0.14)] bg-[var(--color-accent-soft)] px-5 py-4">
-              <div className="text-xs uppercase tracking-[0.22em] text-[var(--color-accent)]">
-                visão do mês
-              </div>
-              <div className="mt-2 text-sm leading-6 text-[var(--color-foreground)]">
-                Entradas, saídas, planejamento e dinheiro livre no mesmo fluxo.
-              </div>
-            </div>
-            {actions}
-          </div>
-          {children}
-        </main>
+        <main className="flex-1 px-7 py-7 sm:px-8 lg:px-10">{children}</main>
       </div>
     </div>
   );

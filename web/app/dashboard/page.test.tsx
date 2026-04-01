@@ -226,7 +226,7 @@ describe("DashboardPage", () => {
     expect(screen.getByText("Preparando seu painel...")).toBeInTheDocument();
   });
 
-  it("Dashboard_NewUser_ShowsOnboardingChecklist", async () => {
+  it("Dashboard_NewUser_ShowsFirstAccountPathInsideQuickEntry", async () => {
     mockedUseProtectedSession.mockReturnValue({
       session,
       isLoading: false,
@@ -243,10 +243,9 @@ describe("DashboardPage", () => {
       screen.getByText(/Sem uma conta financeira/i),
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /criar primeira conta/i })).toBeInTheDocument();
-    expect(await screen.findByText("Comece por aqui")).toBeInTheDocument();
-    expect(screen.getByText(/Criar sua primeira conta/)).toBeInTheDocument();
-    expect(screen.getByText(/Registrar uma entrada \(salário\)/)).toBeInTheDocument();
-    expect(screen.getByText(/Adicionar uma conta a pagar/)).toBeInTheDocument();
+    expect(await screen.findAllByText("Criar primeira conta")).toHaveLength(2);
+    expect(screen.getByLabelText(/nome da conta/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^tipo$/i)).toBeInTheDocument();
   });
 
   it("Dashboard_FirstUseWithAccount_ShowsPathToAddOrImportData", async () => {
@@ -276,7 +275,7 @@ describe("DashboardPage", () => {
       screen.getByText(/ainda faltam movimenta/i),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: /registrar entrada/i }),
+      screen.getByRole("link", { name: /registrar agora/i }),
     ).toBeInTheDocument();
     expect(
       screen.getAllByRole("link", { name: /importar (dados de )?arquivo/i }),
@@ -404,7 +403,7 @@ describe("DashboardPage", () => {
     render(<DashboardPage />);
 
     await user.type(await screen.findByLabelText(/quanto foi/i), "85");
-    await user.click(screen.getByRole("button", { name: /adicionar descrição ou categoria/i }));
+    await user.click(screen.getByRole("button", { name: /adicionar descrição/i }));
     await user.type(screen.getByLabelText(/descrição \(se quiser\)/i), "Mercado");
     await user.click(screen.getByRole("button", { name: /registrar saída/i }));
 
@@ -489,7 +488,52 @@ describe("DashboardPage", () => {
     });
   });
 
-  it("Dashboard_RegisterNow_HidesOptionalDetailsUntilUserAsksForThem", async () => {
+  it("Dashboard_RegisterNow_SwitchingTypeUpdatesVisibleCategories", async () => {
+    const user = userEvent.setup();
+
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+    mockDashboardApi({
+      accounts: [
+        {
+          id: "account-1",
+          name: "Conta principal",
+          type: 2,
+          isActive: true,
+          createdAtUtc: "2026-03-01T00:00:00Z",
+        },
+      ],
+      categories: [
+        {
+          id: "category-1",
+          name: "Salário",
+          type: 1,
+          isSystem: true,
+        },
+        {
+          id: "category-2",
+          name: "Mercado",
+          type: 2,
+          isSystem: true,
+        },
+      ],
+    });
+
+    render(<DashboardPage />);
+
+    expect(await screen.findByRole("button", { name: "Mercado" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Salário" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /entrou dinheiro/i }));
+
+    expect(await screen.findByRole("button", { name: "Salário" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Mercado" })).not.toBeInTheDocument();
+  });
+
+  it("Dashboard_RegisterNow_ShowsCategoryChoicesAndKeepsDescriptionCollapsed", async () => {
     const user = userEvent.setup();
 
     mockedUseProtectedSession.mockReturnValue({
@@ -515,16 +559,16 @@ describe("DashboardPage", () => {
     expect(
       screen.getByRole("button", { name: /registrar saída/i }),
     ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /sem categoria/i })).toBeInTheDocument();
     expect(
       screen.queryByLabelText(/descrição \(se quiser\)/i),
     ).not.toBeInTheDocument();
 
     await user.click(
-      screen.getByRole("button", { name: /adicionar descrição ou categoria/i }),
+      screen.getByRole("button", { name: /adicionar descrição/i }),
     );
 
     expect(screen.getByLabelText(/descrição \(se quiser\)/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/categoria \(se quiser\)/i)).toBeInTheDocument();
   });
 
   it("Dashboard_WithMonthHealth_ShowsSummaryCauseAndAction", async () => {
@@ -581,7 +625,9 @@ describe("DashboardPage", () => {
         "Organize a ordem de pagamento e preserve caixa para o essencial.",
       ),
     ).toBeInTheDocument();
-    expect(screen.getByText("Números de apoio")).toBeInTheDocument();
+    expect(screen.getByText("Resumo financeiro")).toBeInTheDocument();
+    expect(screen.getByText("Entradas x saídas")).toBeInTheDocument();
+    expect(screen.getByText("Planejado x gasto")).toBeInTheDocument();
     expect(screen.queryByText("Alertas do mês")).not.toBeInTheDocument();
   });
 
@@ -654,7 +700,7 @@ describe("DashboardPage", () => {
     expect(screen.getByText("#70")).toBeInTheDocument();
   });
 
-  it("Dashboard_UserWithCompletedOnboarding_HidesChecklist", async () => {
+  it("Dashboard_UserWithCompletedOnboarding_RemovesOldGuidanceBlocks", async () => {
     mockedUseProtectedSession.mockReturnValue({
       session,
       isLoading: false,
@@ -698,11 +744,11 @@ describe("DashboardPage", () => {
 
     render(<DashboardPage />);
 
-    expect(await screen.findByText("O que fazer em seguida")).toBeInTheDocument();
-
-    await waitFor(() => {
-      expect(screen.queryByText("Comece por aqui")).not.toBeInTheDocument();
-    });
+    expect(await screen.findByText("O que você fez hoje com seu dinheiro?")).toBeInTheDocument();
+    expect(screen.queryByText("Comece por aqui")).not.toBeInTheDocument();
+    expect(screen.queryByText("O que fazer em seguida")).not.toBeInTheDocument();
+    expect(screen.queryByText("Reserva e execução")).not.toBeInTheDocument();
+    expect(screen.queryByText("Base para movimentações e importação")).not.toBeInTheDocument();
   });
 
   it("Dashboard_LoadError_ShowsReadableErrorState", async () => {
@@ -838,14 +884,10 @@ describe("DashboardPage", () => {
 
     render(<DashboardPage />);
 
-    expect(await screen.findByText("Como está seu mês")).toBeInTheDocument();
-    expect(screen.queryByText("Inteligência do mês")).not.toBeInTheDocument();
-    expect(screen.getByText("Alertas do mês")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "Voce tem contas vencidas que precisam de atencao imediata.",
-      ),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("Resumo financeiro")).toBeInTheDocument();
+    expect(screen.queryByText("Visão do mês")).not.toBeInTheDocument();
+    expect(screen.queryByText("Alertas do mês")).not.toBeInTheDocument();
+    expect(screen.getByText("Base do mês")).toBeInTheDocument();
     expect(
       screen.queryByText(/month_health|Npgsql|PostgresException/i),
     ).not.toBeInTheDocument();
