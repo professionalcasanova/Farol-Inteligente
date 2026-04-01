@@ -11,7 +11,7 @@ namespace Farol.Api.Modules.Dashboard;
 [ApiController]
 [Authorize]
 [Route("api/dashboard")]
-public sealed class DashboardController(FarolDbContext dbContext) : ControllerBase
+public sealed class DashboardController(FarolDbContext dbContext, TimeProvider timeProvider) : ControllerBase
 {
     private const string PendingStatus = "pending";
     private const string PaidStatus = "paid";
@@ -118,7 +118,7 @@ public sealed class DashboardController(FarolDbContext dbContext) : ControllerBa
         }
 
         var periodEnd = periodStart.AddMonths(1);
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
 
         var bills = await dbContext.Bills
             .AsNoTracking()

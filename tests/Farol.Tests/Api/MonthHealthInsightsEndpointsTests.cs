@@ -111,16 +111,17 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
         await _factory.ResetDatabaseAsync();
         using var client = _factory.CreateClient();
         var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = _factory.Today;
+        var referenceDate = new DateOnly(today.Year, today.Month, Math.Min(10, DateTime.DaysInMonth(today.Year, today.Month)));
 
-        await SeedBillAsync("maria@email.com", "Energia", 300m, today.AddDays(-3));
-        await SeedBillAsync("maria@email.com", "Aluguel", 180m, today);
-        await SeedBillAsync("maria@email.com", "Internet", 120m, today);
-        await SeedBillAsync("maria@email.com", "Seguro", 90m, today);
+        await SeedBillAsync("maria@email.com", "Energia", 300m, referenceDate.AddDays(-3));
+        await SeedBillAsync("maria@email.com", "Aluguel", 180m, referenceDate);
+        await SeedBillAsync("maria@email.com", "Internet", 120m, referenceDate);
+        await SeedBillAsync("maria@email.com", "Seguro", 90m, referenceDate);
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-        var response = await client.GetAsync($"/api/insights/month-health?month={today.Month}&year={today.Year}");
+        var response = await client.GetAsync($"/api/insights/month-health?month={referenceDate.Month}&year={referenceDate.Year}");
 
         response.EnsureSuccessStatusCode();
         var request = _factory.FinancialIntelligenceClient.LastRequest;

@@ -10,7 +10,7 @@ namespace Farol.Api.Modules.Bills;
 [ApiController]
 [Authorize]
 [Route("api/bills")]
-public sealed class BillsController(FarolDbContext dbContext) : ControllerBase
+public sealed class BillsController(FarolDbContext dbContext, TimeProvider timeProvider) : ControllerBase
 {
     private const string PendingStatus = "pending";
     private const string PaidStatus = "paid";
@@ -186,8 +186,8 @@ public sealed class BillsController(FarolDbContext dbContext) : ControllerBase
         return normalizedStatus is PendingStatus or PaidStatus or OverdueStatus;
     }
 
-    private static DateOnly GetToday()
+    private DateOnly GetToday()
     {
-        return DateOnly.FromDateTime(DateTime.UtcNow);
+        return DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
     }
 }

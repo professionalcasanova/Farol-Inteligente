@@ -38,14 +38,15 @@ public sealed class FinancialAlertsInsightsEndpointsTests : IClassFixture<FarolA
         await _factory.ResetDatabaseAsync();
         using var client = _factory.CreateClient();
         var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = _factory.Today;
+        var referenceDate = new DateOnly(today.Year, today.Month, Math.Min(10, DateTime.DaysInMonth(today.Year, today.Month)));
 
-        await SeedBillAsync("maria@email.com", "Energia", 300m, today.AddDays(-2));
+        await SeedBillAsync("maria@email.com", "Energia", 300m, referenceDate.AddDays(-2));
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
         var response = await client.GetFromJsonAsync<AlertsResponse>(
-            $"/api/insights/alerts?month={today.Month}&year={today.Year}");
+            $"/api/insights/alerts?month={referenceDate.Month}&year={referenceDate.Year}");
 
         Assert.NotNull(response);
         var alert = Assert.Single(response.Alerts);

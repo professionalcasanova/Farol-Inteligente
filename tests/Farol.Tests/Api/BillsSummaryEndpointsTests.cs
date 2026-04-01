@@ -35,14 +35,15 @@ public sealed class BillsSummaryEndpointsTests : IClassFixture<FarolApiFactory>
         await _factory.ResetDatabaseAsync();
         using var client = _factory.CreateClient();
         var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var month = today.Month;
-        var year = today.Year;
+        var today = _factory.Today;
+        var referenceDate = new DateOnly(today.Year, today.Month, Math.Min(10, DateTime.DaysInMonth(today.Year, today.Month)));
+        var month = referenceDate.Month;
+        var year = referenceDate.Year;
 
-        await SeedBillAsync("maria@email.com", "Internet", 100m, today);
-        await SeedBillAsync("maria@email.com", "Celular", 80m, today);
-        await SeedBillAsync("maria@email.com", "Energia", 50m, today.AddDays(-1));
-        await SeedBillAsync("maria@email.com", "Aluguel", 900m, today.AddDays(-2), isPaid: true);
+        await SeedBillAsync("maria@email.com", "Internet", 100m, referenceDate);
+        await SeedBillAsync("maria@email.com", "Celular", 80m, referenceDate);
+        await SeedBillAsync("maria@email.com", "Energia", 50m, referenceDate.AddDays(-1));
+        await SeedBillAsync("maria@email.com", "Aluguel", 900m, referenceDate.AddDays(-2), isPaid: true);
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 

@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Farol.Api.Modules.Insights;
 
-public sealed class MonthlyInsightsService(FarolDbContext dbContext)
+public sealed class MonthlyInsightsService(FarolDbContext dbContext, TimeProvider timeProvider)
 {
     private const string HighSeverity = "high";
     private const string MediumSeverity = "medium";
@@ -15,7 +15,7 @@ public sealed class MonthlyInsightsService(FarolDbContext dbContext)
         CancellationToken cancellationToken)
     {
         var periodEnd = periodStart.AddMonths(1);
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
 
         var transactions = await dbContext.Transactions
             .AsNoTracking()

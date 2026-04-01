@@ -235,7 +235,7 @@ public sealed class BillsEndpointsTests : IClassFixture<FarolApiFactory>
         await _factory.ResetDatabaseAsync();
         using var client = _factory.CreateClient();
         var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = _factory.Today;
 
         await SeedBillAsync("maria@email.com", "Internet", 99.90m, today.AddDays(-1));
         await SeedBillAsync("maria@email.com", "Streaming", 39.90m, today.AddDays(2));

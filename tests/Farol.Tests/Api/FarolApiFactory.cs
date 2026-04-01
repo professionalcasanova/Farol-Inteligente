@@ -13,8 +13,11 @@ public sealed class FarolApiFactory : WebApplicationFactory<Program>
 {
     private readonly string _databaseName = $"FarolTests-{Guid.NewGuid()}";
     private readonly FakeFinancialIntelligenceClient _financialIntelligenceClient = new();
+    private readonly TimeProvider _timeProvider = new FixedTimeProvider(
+        new DateTimeOffset(2026, 3, 10, 12, 0, 0, TimeSpan.Zero));
 
     public FakeFinancialIntelligenceClient FinancialIntelligenceClient => _financialIntelligenceClient;
+    public DateOnly Today => DateOnly.FromDateTime(_timeProvider.GetUtcNow().UtcDateTime);
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -27,10 +30,12 @@ public sealed class FarolApiFactory : WebApplicationFactory<Program>
             services.RemoveAll<FarolDbContext>();
             services.RemoveAll<IDbContextOptionsConfiguration<FarolDbContext>>();
             services.RemoveAll<IFinancialIntelligenceClient>();
+            services.RemoveAll<TimeProvider>();
 
             services.AddDbContext<FarolDbContext>(options =>
                 options.UseInMemoryDatabase(_databaseName));
             services.AddSingleton<IFinancialIntelligenceClient>(_financialIntelligenceClient);
+            services.AddSingleton(_timeProvider);
         });
     }
 

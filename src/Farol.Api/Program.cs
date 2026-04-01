@@ -101,6 +101,7 @@ builder.Services.AddScoped<PasswordService>();
 builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddScoped<MonthlyInsightsService>();
 builder.Services.AddScoped<FinancialIntelligenceService>();
+builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.Configure<FinancialIntelligenceOptions>(
     builder.Configuration.GetSection(FinancialIntelligenceOptions.SectionName));
 builder.Services.AddHttpClient<IFinancialIntelligenceClient, HttpFinancialIntelligenceClient>((serviceProvider, client) =>
