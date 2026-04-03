@@ -279,6 +279,46 @@ Retorno atual de `alerts`:
 - `amount`
 - `actionUrl`
 
+## Analise critica de saude financeira
+
+Endpoint disponivel:
+
+- `GET /api/insights/month-health?month={m}&year={y}`
+
+Contrarato e decisoes de criticidade:
+
+- Motor determinístico em Python (`services/farol_intelligence/app/analysis.py`)
+- Status: `healthy`, `attention`, `critical`
+- Critical é acionado quando:
+  - `maxOverdueDays >= 7` (dias em atraso >= 7)
+  - OU `free_to_spend < 0` E `variable_expense_ratio > 0.8` (saldo negativo + despesas variáveis > 80% da renda)
+- Retorno incluindo:
+  - `status`: saúde do mês
+  - `score`: 0-100, penalidades acumuladas
+  - `message`: resumo principal (fonte de verdade para exibição no dashboard)
+  - `reasons`: array de razões explícitas (ex: "Conta de energia vencida há 8 dias")
+  - `actions`: array de ações recomendadas (ex: "Priorize o pagamento das contas fixas vencidas")
+  - `priority`: nível de urgência (ex: 110 para crítico)
+  - `summary`: causa e ação adicionais
+  - `insights`: detalhes completos por tipo de pressão
+  - `recommendedActions`: navegação web para próximo passo do usuário
+
+Dashboard:
+
+- Bloco crítico proeminente exibe quando `status === "critical"`
+- Título: "Risco financeiro crítico"
+- Mostra mensagem + até 2 razões + até 2 ações
+- CTA padrão: "Ver contas a pagar"
+- Fallback: se `reasons/actions` ausentes, usa `cause`/`action` de insights
+- Comportamento não-crítico preservado
+
+Testes:
+
+- Cenários críticos cobertos (overdue, negative+variável)
+- Fallback validado
+- Backend mapeia resposta sem duplicar lógica
+- Frontend renderiza sem reimplementar regras
+
 ## Banco local
 
 `docker-compose.yml` sobe um PostgreSQL local com:
