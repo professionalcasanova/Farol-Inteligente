@@ -217,6 +217,17 @@ export default function DashboardPage() {
   const monthlyFlowMax = data
     ? Math.max(1, data.freeMoney.totalIncome, data.freeMoney.totalExpense)
     : 1;
+
+  const isCriticalHealth = data?.monthHealth?.status === "critical";
+  const criticalReasons = data?.monthHealth
+    ? data.monthHealth.reasons?.slice(0, 2) ??
+      data.monthHealth.insights?.slice(0, 2).map((insight) => insight.cause) ??
+      []
+    : [];
+  const criticalActions = data?.monthHealth
+    ? data.monthHealth.actions?.slice(0, 2) ??
+      [data.monthHealth.summary?.action].filter(Boolean)
+    : [];
   const budgetFlowMax = data
     ? Math.max(1, data.budget.totalPlanned, data.budget.totalSpent)
     : 1;
@@ -837,9 +848,45 @@ export default function DashboardPage() {
           </section>
 
           {data.monthHealth ? (
-            <section className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
-              <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.18fr)_minmax(320px,0.82fr)]">
-                <div className="min-w-0">
+            <>
+              {isCriticalHealth ? (
+                <section className="rounded-[28px] border border-[color:rgba(185,28,28,0.3)] bg-[color:rgba(254,226,226,0.8)] p-6">
+                  <div className="text-sm font-semibold uppercase tracking-[0.18em] text-red-700">
+                    Risco financeiro crítico
+                  </div>
+                  <div className="mt-3 text-xl font-bold text-red-800">
+                    {data.monthHealth.message ?? data.monthHealth.summary.message}
+                  </div>
+                  {criticalReasons.length > 0 ? (
+                    <ul className="mt-3 list-disc pl-5 text-sm text-[var(--color-foreground)]">
+                      {criticalReasons.map((reason, index) => (
+                        <li key={`reason-${index}`}>{reason}</li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  {criticalActions.length > 0 ? (
+                    <div className="mt-3 text-sm text-[var(--color-muted)]">
+                      {criticalActions.slice(0, 2).map((action, index) => (
+                        <p key={`action-${index}`} className="mt-1">
+                          • {action}
+                        </p>
+                      ))}
+                    </div>
+                  ) : null}
+                  <div className="mt-4">
+                    <Link
+                      href="/bills"
+                      className="rounded-xl bg-red-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-800"
+                    >
+                      Ver contas a pagar
+                    </Link>
+                  </div>
+                </section>
+              ) : null}
+
+              <section className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
+                <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.18fr)_minmax(320px,0.82fr)]">
+                  <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-3">
                     <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
                       {firstUseState ? "Primeiro uso" : "Visão do mês"}
@@ -930,6 +977,7 @@ export default function DashboardPage() {
                 </div>
               ) : null}
             </section>
+          </>
           ) : null}
 
           <section className="space-y-8">

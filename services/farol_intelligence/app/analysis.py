@@ -57,6 +57,7 @@ def analyze_financial_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
     bills = snapshot["bills"]
     categories = snapshot.get("categories", [])
 
+    income = _to_decimal(totals.get("income", 0.0))
     free_to_spend = _to_decimal(totals["freeToSpend"])
     planned_budget = _to_decimal(totals["plannedBudget"])
     budget_spent = _to_decimal(totals["budgetSpent"])
@@ -68,16 +69,24 @@ def analyze_financial_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
         non_essential_expense_amount / total_expense if total_expense > 0 else 0.0
     )
 
+    variable_expense_ratio = (
+        total_expense / income if income > 0 else 0.0
+    )
+    max_overdue_days = int(bills.get("maxOverdueDays", 0))
+
     facts = {
+        "income": income,
         "free_to_spend": free_to_spend,
         "budget_overrun": budget_overrun,
         "overdue_count": int(bills["overdueCount"]),
+        "max_overdue_days": max_overdue_days,
         "pending_count": int(bills["pendingCount"]),
         "pending_amount": _to_decimal(bills["pendingAmount"]),
         "upcoming_7_days_count": int(bills["upcoming7DaysCount"]),
         "upcoming_7_days_amount": _to_decimal(bills["upcoming7DaysAmount"]),
         "non_essential_expense_amount": non_essential_expense_amount,
         "non_essential_expense_ratio": non_essential_expense_ratio,
+        "variable_expense_ratio": variable_expense_ratio,
     }
 
     status = _resolve_status(facts)
@@ -95,12 +104,24 @@ def analyze_financial_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
         "status": status,
         "score": score,
         "summary": summary,
+        "message": summary["message"],
+        "reasons": [item.cause for item in top_insights],
+        "actions": [item.action for item in top_insights],
         "insights": [_serialize_insight(item) for item in top_insights],
         "recommendedActions": recommended_actions,
     }
 
 
 def _resolve_status(facts: dict[str, Any]) -> str:
+    if facts.get("max_overdue_days", 0) >= 7:
+        return STATUS_CRITICAL
+
+    if (
+        facts["free_to_spend"] < 0
+        and facts.get("variable_expense_ratio", 0.0) > 0.8
+    ):
+        return STATUS_CRITICAL
+
     if facts["overdue_count"] > 0:
         return STATUS_CRITICAL
 
@@ -131,7 +152,13 @@ def _resolve_status(facts: dict[str, Any]) -> str:
 def _calculate_score(facts: dict[str, Any]) -> int:
     score = 100
 
+    if facts.get("max_overdue_days", 0) >= 7:
+        score -= 40
+
     if facts["overdue_count"] > 0:
+        score -= 35
+
+    if facts["free_to_spend"] < 0 and facts.get("variable_expense_ratio", 0.0) > 0.8:
         score -= 35
 
     if facts["free_to_spend"] < 0:
@@ -160,6 +187,33 @@ def _calculate_score(facts: dict[str, Any]) -> int:
 
 def _resolve_insights(facts: dict[str, Any]) -> list[InsightDefinition]:
     insights: list[InsightDefinition] = []
+
+    if facts.get("max_overdue_days", 0) >= 7:
+        insights.append(
+            InsightDefinition(
+                type="overdue_bills_long",
+                severity=SEVERITY_HIGH,
+                priority=110,
+                message="Você tem uma conta com mais de 7 dias de atraso.",
+                cause=f"Conta está atrasada há {facts['max_overdue_days']} dias, aumentando risco de juros.",
+                action="Priorize o pagamento das contas fixas vencidas.",
+            )
+        )
+
+    if facts["free_to_spend"] < 0 and facts.get("variable_expense_ratio", 0.0) > 0.8:
+        insights.append(
+            InsightDefinition(
+                type="negative_balance_high_variable_expense",
+                severity=SEVERITY_HIGH,
+                priority=105,
+                message="Saldo negativo e despesas variáveis muito altas em relação à renda.",
+                cause=(
+                    f"Saldo do mês está em {facts['free_to_spend']:.2f} e "
+                    f"despesas variáveis representam {facts['variable_expense_ratio'] * 100:.1f}% da renda."
+                ),
+                action="Suspenda despesas não essenciais até estabilizar o saldo.",
+            )
+        )
 
     if facts["overdue_count"] > 0:
         insights.append(

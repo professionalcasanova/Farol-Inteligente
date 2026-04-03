@@ -8,6 +8,14 @@ public sealed class FinancialAnalysisResponse
 
     public required int Score { get; init; }
 
+    public string? Message { get; init; }
+
+    public IReadOnlyList<string>? Reasons { get; init; }
+
+    public IReadOnlyList<string>? Actions { get; init; }
+
+    public int? Priority { get; init; }
+
     public required FinancialAnalysisSummaryResponse Summary { get; init; }
 
     public required IReadOnlyList<FinancialAnalysisInsightResponse> Insights { get; init; }

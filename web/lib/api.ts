@@ -152,8 +152,18 @@ export type MonthHealthInsightResponse = {
 
 export type MonthHealthResponse = {
   status: MonthHealthStatus;
+  score?: number;
+  message?: string;
+  reasons?: string[];
+  actions?: string[];
+  priority?: number;
   summary: MonthHealthSummaryResponse;
   insights: MonthHealthInsightResponse[];
+  recommendedActions?: Array<{
+    id: string;
+    label: string;
+    target: string;
+  }>;
 };
 
 export const transactionTypeOptions: Array<{

@@ -22,27 +22,37 @@ public sealed class FinancialIntelligenceService(
             BuildRequest(userId, periodStart, snapshot, options.Value),
             cancellationToken);
 
+        var mappedInsightList = response.Insights
+            .Select(item => new MonthHealthInsightResponse
+            {
+                Type = item.Type,
+                Severity = item.Severity,
+                Priority = item.Priority,
+                Message = item.Message,
+                Cause = item.Cause,
+                Action = item.Action
+            })
+            .ToList();
+
+        var mappedReasons = response.Reasons ?? mappedInsightList.Select(i => i.Cause).ToList();
+        var mappedActions = response.Actions ?? mappedInsightList.Select(i => i.Action).ToList();
+        var mappedPriority = response.Priority ?? mappedInsightList.Max(i => i.Priority);
+
         return new MonthHealthResponse
         {
             Status = response.Status,
             Score = response.Score,
+            Message = response.Message ?? response.Summary.Message,
+            Reasons = mappedReasons,
+            Actions = mappedActions,
+            Priority = mappedPriority,
             Summary = new MonthHealthSummaryResponse
             {
                 Message = response.Summary.Message,
                 Cause = response.Summary.Cause,
                 Action = response.Summary.Action
             },
-            Insights = response.Insights
-                .Select(item => new MonthHealthInsightResponse
-                {
-                    Type = item.Type,
-                    Severity = item.Severity,
-                    Priority = item.Priority,
-                    Message = item.Message,
-                    Cause = item.Cause,
-                    Action = item.Action
-                })
-                .ToList(),
+            Insights = mappedInsightList,
             RecommendedActions = response.RecommendedActions
                 .Select(item => new RecommendedActionResponse
                 {

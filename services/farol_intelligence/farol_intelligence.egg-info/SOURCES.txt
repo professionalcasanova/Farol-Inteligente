@@ -1,0 +1,12 @@
+README.md
+pyproject.toml
+app/__init__.py
+app/analysis.py
+app/main.py
+app/models.py
+farol_intelligence.egg-info/PKG-INFO
+farol_intelligence.egg-info/SOURCES.txt
+farol_intelligence.egg-info/dependency_links.txt
+farol_intelligence.egg-info/requires.txt
+farol_intelligence.egg-info/top_level.txt
+tests/test_analysis.py

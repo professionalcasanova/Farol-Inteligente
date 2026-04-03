@@ -63,14 +63,18 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
                 ContractVersion = "v1",
                 Status = "critical",
                 Score = 32,
+                Message = "Crítico: saldo negativo e dívidas atrasadas.",
+                Reasons = new[] { "Conta de energia vencida há 10 dias", "Saldo do mês está em -R$ 1.200,00" },
+                Actions = new[] { "Priorize o pagamento das contas fixas vencidas", "Suspenda despesas não essenciais até estabilizar o saldo" },
+                Priority = 110,
                 Summary = new FinancialAnalysisSummaryResponse
                 {
                     Message = "Há contas vencidas no seu mês.",
                     Cause = "Você tem contas que já passaram do vencimento e isso aumenta a pressão financeira agora.",
                     Action = "Priorize quitar ou renegociar as contas vencidas hoje."
                 },
-                Insights =
-                [
+                Insights = new List<FinancialAnalysisInsightResponse>
+                {
                     new FinancialAnalysisInsightResponse
                     {
                         Type = "overdue_bills",
@@ -80,16 +84,16 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
                         Cause = "Você tem contas que já passaram do vencimento e isso aumenta a pressão financeira agora.",
                         Action = "Priorize quitar ou renegociar as contas vencidas hoje."
                     }
-                ],
-                RecommendedActions =
-                [
+                },
+                RecommendedActions = new List<FinancialAnalysisRecommendedActionResponse>
+                {
                     new FinancialAnalysisRecommendedActionResponse
                     {
                         Id = "review_overdue_bills",
                         Label = "Resolver contas vencidas",
                         Target = "/bills?status=overdue"
                     }
-                ]
+                }
             });
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
@@ -100,9 +104,78 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
         Assert.NotNull(response);
         Assert.Equal("critical", response.Status);
         Assert.Equal(32, response.Score);
+        Assert.Equal("Crítico: saldo negativo e dívidas atrasadas.", response.Message);
+        Assert.Equal(2, response.Reasons.Count);
+        Assert.Contains("Conta de energia vencida", response.Reasons);
+        Assert.Equal(2, response.Actions.Count);
+        Assert.Contains("Priorize o pagamento das contas fixas vencidas", response.Actions);
+        Assert.Equal(110, response.Priority);
         Assert.Equal("Há contas vencidas no seu mês.", response.Summary.Message);
         Assert.Equal("overdue_bills", Assert.Single(response.Insights).Type);
         Assert.Equal("review_overdue_bills", Assert.Single(response.RecommendedActions).Id);
+    }
+
+    [Fact]
+    public async Task GetMonthHealth_ShouldProxyFinancialIntelligenceResponse_ForNegativeBalanceAndHighVariableExpenses()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        _factory.FinancialIntelligenceClient.Handler = (_, _) =>
+            Task.FromResult(new FinancialAnalysisResponse
+            {
+                ContractVersion = "v1",
+                Status = "critical",
+                Score = 18,
+                Message = "Criticidade de fluxo de caixa detectada.",
+                Reasons = new[] { "Saldo do mês está em -R$ 1.200,00", "Despesas variáveis > 80%" },
+                Actions = new[] { "Suspenda despesas não essenciais até estabilizar o saldo" },
+                Priority = 105,
+                Summary = new FinancialAnalysisSummaryResponse
+                {
+                    Message = "Você está no vermelho e tem pressão de gastos variáveis.",
+                    Cause = "Gastos elevados versus renda e cashflow negativo.",
+                    Action = "Ajuste imediatamente o orçamento." 
+                },
+                Insights = new List<FinancialAnalysisInsightResponse>
+                {
+                    new FinancialAnalysisInsightResponse
+                    {
+                        Type = "negative_balance_high_variable_expense",
+                        Severity = "high",
+                        Priority = 105,
+                        Message = "Saldo negativo e mais de 80% das despesas são variáveis.",
+                        Cause = "Saldo do mês está em -R$ 1.200,00 e despesas variáveis são muito altas.",
+                        Action = "Suspender despesas não essenciais e renegociar contrato."
+                    }
+                },
+                RecommendedActions = new List<FinancialAnalysisRecommendedActionResponse>
+                {
+                    new FinancialAnalysisRecommendedActionResponse
+                    {
+                        Id = "suspend_non_essential",
+                        Label = "Suspender não essenciais",
+                        Target = "/transactions"
+                    }
+                }
+            });
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await client.GetFromJsonAsync<MonthHealthResponse>(
+            $"/api/insights/month-health?month={today.Month}&year={today.Year}");
+
+        Assert.NotNull(response);
+        Assert.Equal("critical", response.Status);
+        Assert.Equal(18, response.Score);
+        Assert.Equal("Criticidade de fluxo de caixa detectada.", response.Message);
+        Assert.Contains("Saldo do mês está em -R$ 1.200,00", response.Reasons);
+        Assert.Contains("Suspenda despesas não essenciais até estabilizar o saldo", response.Actions);
+        Assert.Equal(105, response.Priority);
+        Assert.Equal("negative_balance_high_variable_expense", Assert.Single(response.Insights).Type);
+        Assert.Equal("suspend_non_essential", Assert.Single(response.RecommendedActions).Id);
     }
 
     [Fact]
