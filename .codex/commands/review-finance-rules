@@ -1,0 +1,21 @@
+Revise esta lógica/regra financeira do projeto Farol.
+
+Analise com foco em:
+- se a regra representa bem a realidade financeira do usuário
+- se a mensagem gerada está coerente com a gravidade da situação
+- se existe risco de suavizar um problema sério
+- se a regra ajuda o usuário a agir
+- se há edge cases ignorados
+
+Quero a resposta em 6 partes:
+1. Regra atual resumida
+2. O que ela acerta
+3. O que ela erra ou suaviza demais
+4. Casos críticos que podem ficar mal classificados
+5. Ajuste de lógica sugerido
+6. Ajuste de mensagem sugerido para o usuário final
+
+Importante:
+- não use linguagem financeira técnica demais
+- pense como produto de recuperação e clareza
+- se o dinheiro acabou ou ficou negativo, diga isso com clareza
