@@ -128,6 +128,11 @@ function mockDashboardApi(overrides?: {
   }>;
   monthHealth?: {
     status: "healthy" | "attention" | "critical";
+    recommendedActions?: Array<{
+      id: string;
+      label: string;
+      target: string;
+    }>;
     summary: {
       message: string;
       cause: string;
@@ -751,6 +756,89 @@ describe("DashboardPage", () => {
     expect(screen.getByText("Entradas x saídas")).toBeInTheDocument();
     expect(screen.getByText("Planejado x gasto")).toBeInTheDocument();
     expect(screen.queryByText("Alertas do mês")).not.toBeInTheDocument();
+  });
+
+  it("Dashboard_WithRecommendedActions_ShowsPrioritizedLinks", async () => {
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+    mockDashboardApi({
+      accounts: [
+        {
+          id: "account-1",
+          name: "Conta principal",
+          type: 2,
+          isActive: true,
+          createdAtUtc: "2026-03-01T00:00:00Z",
+        },
+      ],
+      transactions: [
+        {
+          id: "transaction-1",
+          financialAccountId: "account-1",
+          categoryId: null,
+          type: 1,
+          amount: 3000,
+          description: "Salario",
+          occurredOn: "2026-03-01",
+          createdAtUtc: "2026-03-01T00:00:00Z",
+        },
+      ],
+      monthHealth: {
+        status: "attention",
+        summary: {
+          message: "Seu mes pede alguns ajustes agora.",
+          cause: "As contas pendentes ja consomem a maior parte da sua folga.",
+          action: "Organize a ordem de pagamento e preserve caixa para o essencial.",
+        },
+        recommendedActions: [
+          {
+            id: "review_overdue_bills",
+            label: "Ver contas vencidas",
+            target: "/bills?status=overdue",
+          },
+          {
+            id: "review_expenses",
+            label: "Revisar gastos do mes",
+            target: "/transactions",
+          },
+          {
+            id: "adjust_budget",
+            label: "Ajustar orcamento",
+            target: "/budget",
+          },
+          {
+            id: "keep_tracking",
+            label: "Continuar acompanhando",
+            target: "/dashboard",
+          },
+        ],
+        insights: [],
+      },
+    });
+
+    render(<DashboardPage />);
+
+    expect(await screen.findByText("Prioridades do momento")).toBeInTheDocument();
+
+    const actionLinks = screen.getAllByRole("link", { name: /abrir/i });
+
+    expect(actionLinks).toHaveLength(3);
+    expect(screen.getByRole("link", { name: /1\. ver contas vencidas/i })).toHaveAttribute(
+      "href",
+      "/bills?status=overdue",
+    );
+    expect(screen.getByRole("link", { name: /2\. revisar gastos do mes/i })).toHaveAttribute(
+      "href",
+      "/transactions",
+    );
+    expect(screen.getByRole("link", { name: /3\. ajustar orcamento/i })).toHaveAttribute(
+      "href",
+      "/budget",
+    );
+    expect(screen.queryByRole("link", { name: /continuar acompanhando/i })).not.toBeInTheDocument();
   });
 
   it("Dashboard_WithMonthHealth_ShowsActiveInsights", async () => {

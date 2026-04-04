@@ -205,6 +205,7 @@ export default function DashboardPage() {
   const firstUseState = data ? isFirstUseState(data) : false;
   const showSecondarySections = data ? !firstUseState || !data.monthHealth : false;
   const activationMessage = data ? getActivationMessage(data) : null;
+  const prioritizedRecommendedActions = data?.monthHealth?.recommendedActions?.slice(0, 3) ?? [];
   const visibleQuickEntryCategories = useMemo(
     () =>
       (data?.categories ?? []).filter(
@@ -995,6 +996,29 @@ export default function DashboardPage() {
                       ? activationMessage.action
                       : data.monthHealth.summary.action}
                   </div>
+                  {!firstUseState && prioritizedRecommendedActions.length > 0 ? (
+                    <div className="mt-4">
+                      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-accent)]">
+                        Prioridades do momento
+                      </div>
+                      <div className="mt-3 space-y-2">
+                        {prioritizedRecommendedActions.map((action, index) => (
+                          <Link
+                            className="flex items-center justify-between gap-3 rounded-[18px] border border-[var(--color-line)] bg-white px-4 py-3 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-[var(--color-panel)]"
+                            href={action.target}
+                            key={action.id}
+                          >
+                            <span className="min-w-0">
+                              {index + 1}. {action.label}
+                            </span>
+                            <span className="shrink-0 text-[var(--color-accent)]">
+                              Abrir
+                            </span>
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                   {firstUseState ? (
                     <div className="mt-4 flex flex-wrap gap-3">
                       {!data.onboarding.hasAccount ? (
