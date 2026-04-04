@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 type LoadErrorStateProps = {
   title: string;
@@ -23,8 +23,8 @@ export function LoadErrorState({
         {message}
       </p>
       <p className="mt-2 text-xs leading-6 text-red-700">
-        Se isso continuar, confirme se a API local e o banco estão ativos e
-        tente novamente.
+        Se isso continuar, atualize a pagina ou tente novamente em alguns
+        instantes.
       </p>
       <button
         className="mt-5 rounded-2xl bg-[var(--color-foreground)] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[var(--color-accent)]"

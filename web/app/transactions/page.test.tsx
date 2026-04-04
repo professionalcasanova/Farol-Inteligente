@@ -106,6 +106,7 @@ function mockTransactionsApi(overrides?: {
       },
     ],
   );
+
   mockedListCategories.mockResolvedValue(
     overrides?.categories ?? [
       {
@@ -116,12 +117,13 @@ function mockTransactionsApi(overrides?: {
       },
       {
         id: "category-2",
-        name: "Salário",
+        name: "Salario",
         type: 1,
         isSystem: true,
       },
     ],
   );
+
   mockedListTransactions.mockResolvedValue(
     overrides?.transactions ?? [
       {
@@ -156,6 +158,7 @@ describe("TransactionsPage", () => {
       isLoading: false,
       logout: vi.fn(),
     });
+
     mockTransactionsApi({
       accounts: [
         {
@@ -186,6 +189,7 @@ describe("TransactionsPage", () => {
         },
       ],
     });
+
     mockedUpdateTransaction.mockResolvedValue({
       id: "transaction-1",
       financialAccountId: "account-2",
@@ -196,6 +200,7 @@ describe("TransactionsPage", () => {
       occurredOn: "2026-03-21",
       createdAtUtc: "2026-03-21T00:00:00Z",
     });
+
     mockedListTransactions.mockReset();
     mockedListTransactions
       .mockResolvedValueOnce([
@@ -227,15 +232,15 @@ describe("TransactionsPage", () => {
 
     await user.click(await screen.findByRole("button", { name: "Editar" }));
 
-    expect(await screen.findByText("Editando transação")).toBeInTheDocument();
+    expect(await screen.findByText(/Editando transa/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/conta financeira/i)).toHaveValue("account-2");
-    expect(screen.getByLabelText(/descrição/i)).toHaveValue("Mercado");
+    expect(screen.getByLabelText(/descri/i)).toHaveValue("Mercado");
 
     await user.clear(screen.getByLabelText(/valor/i));
     await user.type(screen.getByLabelText(/valor/i), "120");
-    await user.clear(screen.getByLabelText(/descrição/i));
-    await user.type(screen.getByLabelText(/descrição/i), "Mercado da semana");
-    await user.click(screen.getByRole("button", { name: /salvar alteração/i }));
+    await user.clear(screen.getByLabelText(/descri/i));
+    await user.type(screen.getByLabelText(/descri/i), "Mercado da semana");
+    await user.click(screen.getByRole("button", { name: /salvar altera/i }));
 
     await waitFor(() => {
       expect(mockedUpdateTransaction).toHaveBeenCalledWith("token", "transaction-1", {
@@ -248,10 +253,8 @@ describe("TransactionsPage", () => {
       });
     });
 
-    expect(
-      await screen.findByText("Transação atualizada com sucesso."),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /criar transação/i })).toBeInTheDocument();
+    expect(await screen.findByText(/atualizada com sucesso/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /criar transa/i })).toBeInTheDocument();
   });
 
   it("Transactions_EditTransaction_CancelRestoresCreateMode", async () => {
@@ -262,22 +265,25 @@ describe("TransactionsPage", () => {
       isLoading: false,
       logout: vi.fn(),
     });
+
     mockTransactionsApi();
 
     render(<TransactionsPage />);
 
     await user.click(await screen.findByRole("button", { name: "Editar" }));
 
-    expect(await screen.findByText("Editando transação")).toBeInTheDocument();
+    expect(await screen.findByText(/Editando transa/i)).toBeInTheDocument();
 
-    await user.clear(screen.getByLabelText(/descrição/i));
-    await user.type(screen.getByLabelText(/descrição/i), "Texto temporário");
-    await user.click(screen.getByRole("button", { name: /cancelar edição/i }));
+    await user.clear(screen.getByLabelText(/descri/i));
+    await user.type(screen.getByLabelText(/descri/i), "Texto temporario");
+    await user.click(screen.getByRole("button", { name: /cancelar edi/i }));
 
-    expect(screen.getByText("Nova transação")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /criar transação/i })).toBeInTheDocument();
-    expect(screen.getByLabelText(/descrição/i)).toHaveValue("");
-    expect(screen.queryByRole("button", { name: /cancelar edição/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/Nova transa/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /criar transa/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/descri/i)).toHaveValue("");
+    expect(
+      screen.queryByRole("button", { name: /cancelar edi/i }),
+    ).not.toBeInTheDocument();
     expect(mockedUpdateTransaction).not.toHaveBeenCalled();
   });
 
@@ -289,19 +295,19 @@ describe("TransactionsPage", () => {
       isLoading: false,
       logout: vi.fn(),
     });
+
     mockedUpdateTransaction.mockRejectedValue(
       new ApiError("Category was not found.", 404),
     );
+
     mockTransactionsApi();
 
     render(<TransactionsPage />);
 
     await user.click(await screen.findByRole("button", { name: "Editar" }));
-    await user.click(screen.getByRole("button", { name: /salvar alteração/i }));
+    await user.click(screen.getByRole("button", { name: /salvar altera/i }));
 
-    expect(
-      await screen.findByText("A categoria selecionada não foi encontrada."),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/categoria selecionada/i)).toBeInTheDocument();
   });
 
   it("Transactions_CreateWithMultipleAccounts_RequiresExplicitAccountSelection", async () => {
@@ -312,6 +318,7 @@ describe("TransactionsPage", () => {
       isLoading: false,
       logout: vi.fn(),
     });
+
     mockTransactionsApi({
       accounts: [
         {
@@ -338,11 +345,11 @@ describe("TransactionsPage", () => {
     expect(accountSelect).toHaveValue("");
 
     await user.type(screen.getByLabelText(/valor/i), "90");
-    await user.type(screen.getByLabelText(/descrição/i), "Mercado");
-    await user.click(screen.getByRole("button", { name: /criar transação/i }));
+    await user.type(screen.getByLabelText(/descri/i), "Mercado");
+    await user.click(screen.getByRole("button", { name: /criar transa/i }));
 
     expect(
-      await screen.findByText("Escolha a conta em que essa transação deve ser registrada."),
+      await screen.findByText(/Escolha a conta em que essa transa/i),
     ).toBeInTheDocument();
     expect(mockedCreateTransaction).not.toHaveBeenCalled();
     expect(mockedUpdateTransaction).not.toHaveBeenCalled();

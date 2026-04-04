@@ -466,7 +466,7 @@ describe("DashboardPage", () => {
       });
     });
 
-    expect(await screen.findByText("Registrado 👍")).toBeInTheDocument();
+    expect(await screen.findByText("Registrado.")).toBeInTheDocument();
     expect(screen.getByLabelText(/quanto foi/i)).toHaveValue(null);
     expect(
       screen.queryByLabelText(/descrição \(se quiser\)/i),
@@ -929,7 +929,7 @@ describe("DashboardPage", () => {
     expect(screen.getByText("Não foi possível abrir o dashboard")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Não foi possível carregar o dashboard agora. Confira se a API local está ativa e tente novamente.",
+        "Nao foi possivel carregar o dashboard agora. Tente novamente em alguns instantes.",
       ),
     ).toBeInTheDocument();
   });

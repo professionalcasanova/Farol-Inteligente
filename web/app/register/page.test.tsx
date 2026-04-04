@@ -42,8 +42,14 @@ describe("RegisterPage", () => {
   async function fillAndSubmit() {
     const user = userEvent.setup();
 
-    await user.type(await screen.findByRole("textbox", { name: /nome/i }), "Maria Silva");
-    await user.type(screen.getByRole("textbox", { name: /e-mail/i }), "maria@email.com");
+    await user.type(
+      await screen.findByRole("textbox", { name: /nome/i }),
+      "Maria Silva",
+    );
+    await user.type(
+      screen.getByRole("textbox", { name: /e-mail/i }),
+      "maria@email.com",
+    );
     await user.type(screen.getByLabelText(/senha/i), "123456");
     await user.click(screen.getByRole("button", { name: /criar conta/i }));
   }
@@ -62,9 +68,7 @@ describe("RegisterPage", () => {
   });
 
   it("Register_DuplicateEmail_ShowsFriendlyError", async () => {
-    mockedRegister.mockRejectedValue(
-      new ApiError("Email is already in use.", 409),
-    );
+    mockedRegister.mockRejectedValue(new ApiError("Email is already in use.", 409));
 
     render(<RegisterPage />);
 
@@ -72,7 +76,7 @@ describe("RegisterPage", () => {
 
     expect(
       await screen.findByText(
-        "Já existe uma conta com esse e-mail. Tente entrar ou use outro endereço.",
+        "Ja existe uma conta com esse e-mail. Tente entrar ou use outro endereco.",
       ),
     ).toBeInTheDocument();
   });

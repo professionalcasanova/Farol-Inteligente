@@ -133,7 +133,7 @@ export default function TransactionsPage() {
           setLoadError(
             getFriendlyApiMessage(
               caughtError,
-              "Não foi possível carregar as transações agora. Confira se a API local está ativa e tente novamente.",
+              "Nao foi possivel carregar as transacoes agora. Tente novamente em alguns instantes.",
               { messageMap: transactionMessageMap },
             ),
           );

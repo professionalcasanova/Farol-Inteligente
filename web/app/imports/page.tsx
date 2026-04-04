@@ -58,7 +58,7 @@ export default function ImportsPage() {
           setLoadError(
             getFriendlyApiMessage(
               caughtError,
-              "Não foi possível preparar a importação agora. Confira se a API local está ativa e tente novamente.",
+              "Nao foi possivel preparar a importacao agora. Tente novamente em alguns instantes.",
             ),
           );
         }

@@ -44,11 +44,11 @@ export default function RegisterPage() {
       setError(
         getFriendlyApiMessage(
           caughtError,
-          "Não foi possível criar sua conta agora. Tente novamente em alguns instantes.",
+          "Nao foi possivel criar sua conta agora. Tente novamente em alguns instantes.",
           {
             messageMap: {
               "Email is already in use.":
-                "Já existe uma conta com esse e-mail. Tente entrar ou use outro endereço.",
+                "Ja existe uma conta com esse e-mail. Tente entrar ou use outro endereco.",
             },
           },
         ),
@@ -59,7 +59,7 @@ export default function RegisterPage() {
   }
 
   if (isCheckingSession) {
-    return <LoadingScreen message="Verificando sua sessão..." />;
+    return <LoadingScreen message="Verificando sua sessao..." />;
   }
 
   return (
@@ -74,16 +74,16 @@ export default function RegisterPage() {
             Comece com uma conta nova e veja valor logo no primeiro acesso.
           </h1>
           <p className="mt-6 max-w-xl text-lg leading-8 text-[var(--color-muted)]">
-            Cadastre-se, registre suas primeiras movimentações e acompanhe o mês
-            com alertas, orçamento e contas a pagar no mesmo fluxo.
+            Cadastre-se, registre suas primeiras movimentacoes e acompanhe o
+            mes com alertas, orcamento e contas a pagar no mesmo fluxo.
           </p>
         </div>
 
         <div className="relative grid gap-4">
           {[
             "Crie sua conta e entre no Farol sem depender de setup manual.",
-            "Veja dashboard, transações e orçamento no mesmo ambiente.",
-            "Organize vencimentos e importações CSV com poucos passos.",
+            "Veja dashboard, transacoes e orcamento no mesmo ambiente.",
+            "Organize vencimentos e importacoes CSV com poucos passos.",
           ].map((item) => (
             <div
               className="rounded-[24px] border border-[var(--color-line)] bg-[color:rgba(255,255,255,0.76)] px-5 py-4 text-sm leading-6 text-[var(--color-foreground)]"
@@ -105,7 +105,7 @@ export default function RegisterPage() {
               Abra seu acesso ao Farol
             </h2>
             <p className="mt-3 text-sm leading-6 text-[var(--color-muted)]">
-              Use seus dados básicos para começar. Depois do cadastro, você já
+              Use seus dados basicos para comecar. Depois do cadastro, voce ja
               entra direto no dashboard.
             </p>
           </div>
@@ -160,7 +160,7 @@ export default function RegisterPage() {
           </form>
 
           <p className="mt-6 text-center text-sm text-[var(--color-muted)]">
-            Já tem conta?{" "}
+            Ja tem conta?{" "}
             <Link
               className="font-semibold text-[var(--color-foreground)] transition hover:text-[var(--color-accent)]"
               href="/login"

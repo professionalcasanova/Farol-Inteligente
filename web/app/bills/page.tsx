@@ -142,7 +142,7 @@ export default function BillsPage() {
           setLoadError(
             getFriendlyApiMessage(
               caughtError,
-              "Não foi possível carregar as contas a pagar agora. Confira se a API local está ativa e tente novamente.",
+              "Nao foi possivel carregar as contas a pagar agora. Tente novamente em alguns instantes.",
               { messageMap: billMessageMap },
             ),
           );

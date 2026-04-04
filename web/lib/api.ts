@@ -1,4 +1,4 @@
-import type { StoredSession } from "@/lib/auth";
+﻿import type { StoredSession } from "@/lib/auth";
 
 export type TransactionType = 1 | 2;
 export type CategoryType = 1 | 2;
@@ -199,23 +199,24 @@ export class ApiError extends Error {
 }
 
 const defaultMessageMap: Record<string, string> = {
-  "Invalid access token.": "Sua sessão expirou. Entre novamente para continuar.",
+  "Invalid access token.": "Sua sessao expirou. Entre novamente para continuar.",
   "Invalid email or password.":
-    "E-mail ou senha inválidos. Confira os dados e tente novamente.",
+    "E-mail ou senha invalidos. Confira os dados e tente novamente.",
   "Email and password are required.": "Informe e-mail e senha para entrar.",
-  "Financial account was not found.": "A conta selecionada não foi encontrada.",
-  "Category was not found.": "A categoria selecionada não foi encontrada.",
-  "Transaction was not found.": "A transação não foi encontrada.",
+  "Financial account was not found.": "A conta selecionada nao foi encontrada.",
+  "Category was not found.": "A categoria selecionada nao foi encontrada.",
+  "Transaction was not found.": "A transacao nao foi encontrada.",
   "One or more categories were not found.":
-    "Uma ou mais categorias não foram encontradas.",
+    "Uma ou mais categorias nao foram encontradas.",
   "Budget categories must be expense categories.":
-    "Use apenas categorias de despesa no orçamento.",
+    "Use apenas categorias de despesa no orcamento.",
   "Budget categories cannot be duplicated in the same payload.":
-    "Cada categoria pode aparecer apenas uma vez no orçamento.",
-  "Bill was not found.": "A conta a pagar não foi encontrada.",
+    "Cada categoria pode aparecer apenas uma vez no orcamento.",
+  "Bill was not found.": "A conta a pagar nao foi encontrada.",
 };
 
 const technicalMessagePatterns = [
+  /request failed with status/i,
   /exception/i,
   /npgsql/i,
   /system\./i,
@@ -242,7 +243,7 @@ export function getFriendlyApiMessage(
   }
 
   if (error.status === 0) {
-    return "Não foi possível falar com a API do Farol agora. Confira se o backend local está ativo e tente novamente.";
+    return "Nao foi possivel falar com o Farol agora. Verifique sua conexao e tente novamente.";
   }
 
   const rawMessage = error.message.trim();
@@ -295,7 +296,7 @@ async function apiRequest<T>(path: string, options: RequestOptions = {}) {
       cache: "no-store",
     });
   } catch {
-    throw new ApiError("Não foi possível conectar com a API do Farol.", 0);
+    throw new ApiError("Nao foi possivel conectar com a API do Farol.", 0);
   }
 
   if (!response.ok) {

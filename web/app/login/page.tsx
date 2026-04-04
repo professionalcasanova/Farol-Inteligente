@@ -29,7 +29,7 @@ export default function LoginPage() {
     const authNotice = consumeAuthNotice();
 
     if (authNotice === "session-expired") {
-      setNotice("Sua sessão expirou. Entre novamente para continuar.");
+      setNotice("Sua sessao expirou. Entre novamente para continuar.");
     }
 
     setIsCheckingSession(false);
@@ -49,7 +49,7 @@ export default function LoginPage() {
       setError(
         getFriendlyApiMessage(
           caughtError,
-          "Não foi possível entrar agora. Tente novamente em alguns instantes.",
+          "Nao foi possivel entrar agora. Tente novamente em alguns instantes.",
         ),
       );
     } finally {
@@ -58,7 +58,7 @@ export default function LoginPage() {
   }
 
   if (isCheckingSession) {
-    return <LoadingScreen message="Verificando sua sessão..." />;
+    return <LoadingScreen message="Verificando sua sessao..." />;
   }
 
   return (
@@ -70,19 +70,19 @@ export default function LoginPage() {
             Farol MVP
           </div>
           <h1 className="mt-8 max-w-xl text-5xl font-semibold tracking-[-0.05em] text-[var(--color-foreground)]">
-            Clareza financeira para mostrar valor já na primeira demo.
+            Clareza financeira para mostrar valor ja na primeira demo.
           </h1>
           <p className="mt-6 max-w-xl text-lg leading-8 text-[var(--color-muted)]">
-            Faça login, veja seu saldo do mês, quanto ainda está reservado no
-            orçamento e onde o dinheiro está escapando.
+            Faca login, veja seu saldo do mes, quanto ainda esta reservado no
+            orcamento e onde o dinheiro esta escapando.
           </p>
         </div>
 
         <div className="relative grid gap-4">
           {[
             "Resumo mensal e dinheiro livre no mesmo painel.",
-            "Transações e orçamento consumindo a API já pronta.",
-            "Importação CSV para reduzir atrito de demonstração.",
+            "Transacoes e orcamento consumindo a API ja pronta.",
+            "Importacao CSV para reduzir atrito de demonstracao.",
           ].map((item) => (
             <div
               className="rounded-[24px] border border-[var(--color-line)] bg-[color:rgba(255,255,255,0.76)] px-5 py-4 text-sm leading-6 text-[var(--color-foreground)]"
@@ -104,8 +104,8 @@ export default function LoginPage() {
               Acesse seu painel
             </h2>
             <p className="mt-3 text-sm leading-6 text-[var(--color-muted)]">
-              Use o mesmo login do backend do Farol. O token fica salvo localmente
-              apenas para este MVP.
+              Use o mesmo login do backend do Farol. O token fica salvo
+              localmente apenas para este MVP.
             </p>
           </div>
 
@@ -154,7 +154,7 @@ export default function LoginPage() {
           </form>
 
           <p className="mt-6 text-center text-sm text-[var(--color-muted)]">
-            Não tem conta?{" "}
+            Nao tem conta?{" "}
             <Link
               className="font-semibold text-[var(--color-foreground)] transition hover:text-[var(--color-accent)]"
               href="/register"

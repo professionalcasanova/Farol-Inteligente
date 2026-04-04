@@ -373,7 +373,7 @@ export default function DashboardPage() {
           setLoadError(
             getFriendlyApiMessage(
               caughtError,
-              "Não foi possível carregar o dashboard agora. Confira se a API local está ativa e tente novamente.",
+              "Nao foi possivel carregar o dashboard agora. Tente novamente em alguns instantes.",
             ),
           );
         }
@@ -547,7 +547,7 @@ export default function DashboardPage() {
         financialAccountId: current.financialAccountId,
       }));
       setShowQuickEntryDetails(false);
-      setQuickEntrySuccess("Registrado 👍");
+      setQuickEntrySuccess("Registrado.");
     } catch (caughtError) {
       if (isUnauthorizedApiError(caughtError)) {
         logout("session-expired");

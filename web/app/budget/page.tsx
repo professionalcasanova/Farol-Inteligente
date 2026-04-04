@@ -117,7 +117,7 @@ export default function BudgetPage() {
           setLoadError(
             getFriendlyApiMessage(
               caughtError,
-              "Não foi possível carregar o orçamento agora. Confira se a API local está ativa e tente novamente.",
+              "Nao foi possivel carregar o orcamento agora. Tente novamente em alguns instantes.",
               { messageMap: budgetMessageMap },
             ),
           );

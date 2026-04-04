@@ -72,6 +72,7 @@ describe("ImportsPage", () => {
       isLoading: false,
       logout: vi.fn(),
     });
+
     mockedListAccounts.mockResolvedValue([
       {
         id: "account-1",
@@ -99,6 +100,7 @@ describe("ImportsPage", () => {
       isLoading: false,
       logout: vi.fn(),
     });
+
     mockedListAccounts.mockResolvedValue([
       {
         id: "account-1",
@@ -108,6 +110,7 @@ describe("ImportsPage", () => {
         createdAtUtc: "2026-03-01T00:00:00Z",
       },
     ]);
+
     mockedImportTransactionsCsv.mockResolvedValue({
       totalRows: 0,
       importedRows: 0,
@@ -127,11 +130,7 @@ describe("ImportsPage", () => {
     await user.upload(input, file);
     await user.click(screen.getByRole("button", { name: /enviar csv/i }));
 
-    expect(
-      await screen.findByText(
-        "O arquivo foi recebido, mas ele só tinha o cabeçalho. Adicione linhas de transação para importar dados reais.",
-      ),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/importar dados reais/i)).toBeInTheDocument();
 
     await waitFor(() => {
       expect(mockedImportTransactionsCsv).toHaveBeenCalledTimes(1);

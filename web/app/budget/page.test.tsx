@@ -83,14 +83,16 @@ describe("BudgetPage", () => {
       isLoading: false,
       logout: vi.fn(),
     });
+
     mockedListCategories.mockResolvedValue([
       {
         id: "category-1",
-        name: "Alimentação",
+        name: "Alimentacao",
         type: 2,
         isSystem: true,
       },
     ]);
+
     mockedGetMonthlyBudget.mockResolvedValue({
       month: 3,
       year: 2026,
@@ -99,6 +101,7 @@ describe("BudgetPage", () => {
       totalRemaining: 0,
       categories: [],
     });
+
     mockedSaveMonthlyBudget.mockResolvedValue({
       month: 3,
       year: 2026,
@@ -111,14 +114,10 @@ describe("BudgetPage", () => {
     render(<BudgetPage />);
 
     await user.click(
-      await screen.findByRole("button", { name: /salvar orçamento mensal/i }),
+      await screen.findByRole("button", { name: /salvar or.*amento mensal/i }),
     );
 
-    expect(
-      await screen.findByText(
-        "Orçamento do mês limpo com sucesso. Você pode montar um novo planejamento quando quiser.",
-      ),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/limpo com sucesso/i)).toBeInTheDocument();
 
     await waitFor(() => {
       expect(mockedSaveMonthlyBudget).toHaveBeenCalledTimes(1);

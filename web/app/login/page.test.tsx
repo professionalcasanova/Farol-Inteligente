@@ -47,7 +47,10 @@ describe("LoginPage", () => {
   async function fillAndSubmit() {
     const user = userEvent.setup();
 
-    await user.type(await screen.findByRole("textbox", { name: /email/i }), "maria@email.com");
+    await user.type(
+      await screen.findByRole("textbox", { name: /email/i }),
+      "maria@email.com",
+    );
     await user.type(screen.getByLabelText(/senha/i), "123456");
     await user.click(screen.getByRole("button", { name: /entrar no farol/i }));
   }
@@ -77,9 +80,7 @@ describe("LoginPage", () => {
   });
 
   it("Login_SubmitInvalidCredentials_ShowsFriendlyError", async () => {
-    mockedLogin.mockRejectedValue(
-      new ApiError("Invalid email or password.", 401),
-    );
+    mockedLogin.mockRejectedValue(new ApiError("Invalid email or password.", 401));
 
     render(<LoginPage />);
 
@@ -87,7 +88,7 @@ describe("LoginPage", () => {
 
     expect(
       await screen.findByText(
-        "E-mail ou senha inválidos. Confira os dados e tente novamente.",
+        "E-mail ou senha invalidos. Confira os dados e tente novamente.",
       ),
     ).toBeInTheDocument();
   });
@@ -101,7 +102,7 @@ describe("LoginPage", () => {
 
     expect(
       await screen.findByText(
-        "Não foi possível entrar agora. Tente novamente em alguns instantes.",
+        "Nao foi possivel entrar agora. Tente novamente em alguns instantes.",
       ),
     ).toBeInTheDocument();
   });
@@ -123,7 +124,7 @@ describe("LoginPage", () => {
 
     expect(
       await screen.findByText(
-        "Sua sessão expirou. Entre novamente para continuar.",
+        "Sua sessao expirou. Entre novamente para continuar.",
       ),
     ).toBeInTheDocument();
   });
