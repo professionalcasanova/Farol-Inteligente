@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Farol.Api.Modules.Auth;
 using Farol.Api.Modules.Insights;
+using Farol.Domain.Bills;
 using Farol.Domain.Budgets;
 using Farol.Domain.Categories;
 using Farol.Domain.Ledger;
@@ -208,6 +209,50 @@ public sealed class FreeMoneyInsightsEndpointsTests : IClassFixture<FarolApiFact
     }
 
     [Fact]
+    public async Task GetFreeMoney_ShouldNotDiscountUnpaidBillsFromFreeToSpend()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var seed = await SeedAccountAndCategoriesAsync(
+            "maria@email.com",
+            ("Salario", CategoryType.Income),
+            ("Alimentacao", CategoryType.Expense));
+
+        await SeedBudgetAsync(
+            "maria@email.com",
+            3,
+            2026,
+            (seed.CategoryIds["Alimentacao"], 500m));
+
+        await SeedTransactionsAsync(
+            "maria@email.com",
+            seed.AccountId,
+            [
+                (new DateOnly(2026, 3, 5), "Salario", 3000m, TransactionType.Income, seed.CategoryIds["Salario"]),
+                (new DateOnly(2026, 3, 6), "Mercado", 200m, TransactionType.Expense, seed.CategoryIds["Alimentacao"])
+            ]);
+
+        await SeedBillsAsync(
+            "maria@email.com",
+            [
+                (new DateOnly(2026, 3, 20), "Internet", 180m, false),
+                (new DateOnly(2026, 3, 25), "Energia", 220m, false)
+            ]);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await client.GetFromJsonAsync<FreeMoneyResponse>("/api/insights/free-money?month=3&year=2026");
+
+        Assert.NotNull(response);
+        Assert.Equal(2800m, response.Balance);
+        Assert.Equal(500m, response.TotalPlannedBudget);
+        Assert.Equal(200m, response.TotalBudgetSpent);
+        Assert.Equal(300m, response.TotalBudgetRemaining);
+        Assert.Equal(2500m, response.FreeToSpend);
+    }
+
+    [Fact]
     public async Task GetFreeMoney_ShouldReturnZerosForUserWithoutTransactions()
     {
         await _factory.ResetDatabaseAsync();
@@ -332,6 +377,29 @@ public sealed class FreeMoneyInsightsEndpointsTests : IClassFixture<FarolApiFact
                 item.Description,
                 item.OccurredOn,
                 category));
+        }
+
+        await dbContext.SaveChangesAsync();
+    }
+
+    private async Task SeedBillsAsync(
+        string email,
+        IReadOnlyList<(DateOnly DueOn, string Description, decimal Amount, bool IsPaid)> items)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<FarolDbContext>();
+        var userId = dbContext.Users.Single(user => user.Email == email).Id;
+
+        foreach (var item in items)
+        {
+            var bill = new Bill(userId, item.Description, item.Amount, item.DueOn);
+
+            if (item.IsPaid)
+            {
+                bill.MarkAsPaid(new DateTime(2026, 3, 10, 12, 0, 0, DateTimeKind.Utc));
+            }
+
+            dbContext.Bills.Add(bill);
         }
 
         await dbContext.SaveChangesAsync();

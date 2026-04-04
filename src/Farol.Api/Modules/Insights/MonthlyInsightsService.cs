@@ -89,10 +89,6 @@ public sealed class MonthlyInsightsService(FarolDbContext dbContext, TimeProvide
             });
         }
 
-        var totalBudgetRemaining = totalPlannedBudget - totalBudgetSpent;
-        var plannedRemaining = Math.Max(totalBudgetRemaining, 0m);
-        var freeToSpend = balance - plannedRemaining;
-
         var bills = await dbContext.Bills
             .AsNoTracking()
             .Where(bill =>
@@ -106,6 +102,10 @@ public sealed class MonthlyInsightsService(FarolDbContext dbContext, TimeProvide
                 bill.IsPaid
             })
             .ToListAsync(cancellationToken);
+
+        var totalBudgetRemaining = totalPlannedBudget - totalBudgetSpent;
+        var plannedRemaining = Math.Max(totalBudgetRemaining, 0m);
+        var freeToSpend = balance - plannedRemaining;
 
         var pendingBills = bills
             .Where(bill => !bill.IsPaid && bill.DueOn >= today)
