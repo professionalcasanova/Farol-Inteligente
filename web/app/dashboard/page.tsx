@@ -203,6 +203,7 @@ export default function DashboardPage() {
     [monthValue],
   );
   const firstUseState = data ? isFirstUseState(data) : false;
+  const showSecondarySections = data ? !firstUseState || !data.monthHealth : false;
   const activationMessage = data ? getActivationMessage(data) : null;
   const visibleQuickEntryCategories = useMemo(
     () =>
@@ -1055,7 +1056,9 @@ export default function DashboardPage() {
           </>
           ) : null}
 
-          <section className="space-y-8">
+          {showSecondarySections ? (
+            <>
+              <section className="space-y-8">
             <article className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
               <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
                 Resumo financeiro
@@ -1221,9 +1224,9 @@ export default function DashboardPage() {
                 </article>
               </div>
             </article>
-          </section>
+              </section>
 
-          <section className="grid items-start gap-8 xl:grid-cols-[minmax(0,0.94fr)_minmax(0,1.06fr)]">
+              <section className="grid items-start gap-8 xl:grid-cols-[minmax(0,0.94fr)_minmax(0,1.06fr)]">
             <article className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
               <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
                 Contas a pagar do mês
@@ -1316,9 +1319,9 @@ export default function DashboardPage() {
                 )}
               </div>
             </article>
-          </section>
+              </section>
 
-          <section className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
+              <section className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
             <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
               Leitura por categoria
             </div>
@@ -1359,7 +1362,9 @@ export default function DashboardPage() {
                 ))
               )}
             </div>
-          </section>
+              </section>
+            </>
+          ) : null}
         </div>
       )}
     </AppShell>

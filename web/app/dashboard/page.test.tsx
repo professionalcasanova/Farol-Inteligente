@@ -246,6 +246,9 @@ describe("DashboardPage", () => {
     expect(await screen.findAllByText("Criar primeira conta")).toHaveLength(2);
     expect(screen.getByLabelText(/nome da conta/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/^tipo$/i)).toBeInTheDocument();
+    expect(screen.queryByText("Resumo financeiro")).not.toBeInTheDocument();
+    expect(screen.queryByText("Contas a pagar do mês")).not.toBeInTheDocument();
+    expect(screen.queryByText("Leitura por categoria")).not.toBeInTheDocument();
   });
 
   it("Dashboard_CriticalHealth_ShowsProminentCriticalBlock", async () => {
@@ -327,6 +330,9 @@ describe("DashboardPage", () => {
     expect(
       screen.getAllByRole("link", { name: /importar (dados de )?arquivo/i }),
     ).not.toHaveLength(0);
+    expect(screen.queryByText("Resumo financeiro")).not.toBeInTheDocument();
+    expect(screen.queryByText("Contas a pagar do mês")).not.toBeInTheDocument();
+    expect(screen.queryByText("Leitura por categoria")).not.toBeInTheDocument();
   });
 
   it("Dashboard_RegisterNow_SubmitSuccess_RefreshesDataAndClearsForm", async () => {
