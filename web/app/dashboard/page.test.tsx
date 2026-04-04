@@ -449,6 +449,7 @@ describe("DashboardPage", () => {
 
     render(<DashboardPage />);
 
+    expect(await screen.findByLabelText(/conta financeira/i)).toBeDisabled();
     await user.type(await screen.findByLabelText(/quanto foi/i), "85");
     await user.click(screen.getByRole("button", { name: /adicionar descrição/i }));
     await user.type(screen.getByLabelText(/descrição \(se quiser\)/i), "Mercado");
@@ -578,6 +579,74 @@ describe("DashboardPage", () => {
 
     expect(await screen.findByRole("button", { name: "Salário" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Mercado" })).not.toBeInTheDocument();
+  });
+
+  it("Dashboard_RegisterNow_WithMultipleAccounts_RequiresExplicitSelection", async () => {
+    const user = userEvent.setup();
+
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+    mockedCreateTransaction.mockResolvedValue({
+      id: "transaction-4",
+      financialAccountId: "account-2",
+      categoryId: null,
+      type: 2,
+      amount: 220,
+      description: "Mercado",
+      occurredOn: "2026-03-21",
+      createdAtUtc: "2026-03-21T00:00:00Z",
+    });
+    mockDashboardApi({
+      accounts: [
+        {
+          id: "account-1",
+          name: "Conta principal",
+          type: 2,
+          isActive: true,
+          createdAtUtc: "2026-03-01T00:00:00Z",
+        },
+        {
+          id: "account-2",
+          name: "Cartão do dia a dia",
+          type: 3,
+          isActive: true,
+          createdAtUtc: "2026-03-02T00:00:00Z",
+        },
+      ],
+    });
+
+    render(<DashboardPage />);
+
+    const accountSelect = await screen.findByLabelText(/conta financeira/i);
+
+    expect(accountSelect).not.toBeDisabled();
+
+    await user.type(screen.getByLabelText(/quanto foi/i), "220");
+    await user.click(screen.getByRole("button", { name: /registrar saída/i }));
+
+    expect(
+      await screen.findByText(
+        "Escolha a conta em que essa movimentação deve ser registrada.",
+      ),
+    ).toBeInTheDocument();
+    expect(mockedCreateTransaction).not.toHaveBeenCalled();
+
+    await user.selectOptions(accountSelect, "account-2");
+    await user.click(screen.getByRole("button", { name: /registrar saída/i }));
+
+    await waitFor(() => {
+      expect(mockedCreateTransaction).toHaveBeenCalledWith("token", {
+        financialAccountId: "account-2",
+        categoryId: undefined,
+        type: 2,
+        amount: 220,
+        description: "Saída rápida",
+        occurredOn: expect.any(String),
+      });
+    });
   });
 
   it("Dashboard_RegisterNow_ShowsCategoryChoicesAndKeepsDescriptionCollapsed", async () => {

@@ -20,14 +20,18 @@ builder.Services
         options.InvalidModelStateResponseFactory = ApiValidationErrorFactory.Create;
     });
 builder.Services.AddEndpointsApiExplorer();
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("FarolWeb", policy =>
     {
+        if (allowedOrigins.Length == 0)
+        {
+            return;
+        }
+
         policy
-            .WithOrigins(
-                "http://localhost:3000",
-                "http://localhost:3001")
+            .WithOrigins(allowedOrigins)
             .AllowAnyHeader()
             .AllowAnyMethod();
     });

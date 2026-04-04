@@ -63,6 +63,7 @@ type DashboardData = {
 };
 
 type QuickEntryFormState = {
+  financialAccountId: string;
   amount: string;
   type: TransactionType;
   description: string;
@@ -75,6 +76,7 @@ const defaultAccountForm: AccountFormState = {
 };
 
 const defaultQuickEntryForm: QuickEntryFormState = {
+  financialAccountId: "",
   amount: "",
   type: 2,
   description: "",
@@ -231,6 +233,37 @@ export default function DashboardPage() {
   const budgetFlowMax = data
     ? Math.max(1, data.budget.totalPlanned, data.budget.totalSpent)
     : 1;
+
+  useEffect(() => {
+    const accounts = data?.accounts ?? [];
+
+    setQuickEntryForm((current) => {
+      const hasSelectedAccount = accounts.some(
+        (account) => account.id === current.financialAccountId,
+      );
+
+      if (accounts.length === 0) {
+        return current.financialAccountId
+          ? { ...current, financialAccountId: "" }
+          : current;
+      }
+
+      if (hasSelectedAccount) {
+        return current;
+      }
+
+      if (accounts.length === 1) {
+        return {
+          ...current,
+          financialAccountId: accounts[0].id,
+        };
+      }
+
+      return current.financialAccountId
+        ? { ...current, financialAccountId: "" }
+        : current;
+    });
+  }, [data?.accounts]);
 
   useEffect(() => {
     if (
@@ -436,6 +469,13 @@ export default function DashboardPage() {
       return;
     }
 
+    if (!quickEntryForm.financialAccountId) {
+      setQuickEntryError(
+        "Escolha a conta em que essa movimentação deve ser registrada.",
+      );
+      return;
+    }
+
     const amount = Number(quickEntryForm.amount.replace(",", "."));
 
     if (!Number.isFinite(amount) || amount <= 0) {
@@ -450,7 +490,7 @@ export default function DashboardPage() {
 
     try {
       await createTransaction(accessToken, {
-        financialAccountId: data.accounts[0].id,
+        financialAccountId: quickEntryForm.financialAccountId,
         categoryId: quickEntryForm.categoryId || undefined,
         type: quickEntryForm.type,
         amount,
@@ -502,7 +542,10 @@ export default function DashboardPage() {
             }
           : current,
       );
-      setQuickEntryForm(defaultQuickEntryForm);
+      setQuickEntryForm((current) => ({
+        ...defaultQuickEntryForm,
+        financialAccountId: current.financialAccountId,
+      }));
       setShowQuickEntryDetails(false);
       setQuickEntrySuccess("Registrado 👍");
     } catch (caughtError) {
@@ -709,6 +752,38 @@ export default function DashboardPage() {
               </div>
             ) : (
               <form className="mt-6 space-y-5" onSubmit={handleQuickEntrySubmit}>
+                <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
+                  <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
+                    <span>Conta financeira</span>
+                    <select
+                      className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-4 text-base font-medium text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)] disabled:cursor-not-allowed disabled:bg-[var(--color-panel)]"
+                      disabled={data.accounts.length === 1}
+                      onChange={(event) =>
+                        setQuickEntryForm((current) => ({
+                          ...current,
+                          financialAccountId: event.target.value,
+                        }))
+                      }
+                      value={quickEntryForm.financialAccountId}
+                    >
+                      {data.accounts.length > 1 ? (
+                        <option value="">Escolha a conta para registrar</option>
+                      ) : null}
+                      {data.accounts.map((account) => (
+                        <option key={account.id} value={account.id}>
+                          {account.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <div className="rounded-[24px] border border-[var(--color-line)] bg-white px-5 py-4 text-sm leading-6 text-[var(--color-muted)]">
+                    {data.accounts.length === 1
+                      ? "Essa movimentação será registrada na sua conta disponível."
+                      : "Escolha explicitamente a conta para evitar lançar a movimentação no lugar errado."}
+                  </div>
+                </div>
+
                 <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_auto] xl:items-end">
                   <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
                     <span>Quanto foi?</span>

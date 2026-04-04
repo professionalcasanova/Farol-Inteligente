@@ -8,6 +8,10 @@ public sealed class FinancialIntelligenceService(
     IFinancialIntelligenceClient financialIntelligenceClient,
     IOptions<FinancialIntelligenceOptions> options)
 {
+    private const int HealthyPriority = 10;
+    private const int AttentionPriority = 60;
+    private const int CriticalPriority = 100;
+
     public async Task<MonthHealthResponse> GetMonthHealthAsync(
         Guid userId,
         DateOnly periodStart,
@@ -34,9 +38,17 @@ public sealed class FinancialIntelligenceService(
             })
             .ToList();
 
-        var mappedReasons = response.Reasons ?? mappedInsightList.Select(i => i.Cause).ToList();
-        var mappedActions = response.Actions ?? mappedInsightList.Select(i => i.Action).ToList();
-        var mappedPriority = response.Priority ?? mappedInsightList.Max(i => i.Priority);
+        var mappedReasons = MapFallbackList(
+            response.Reasons,
+            mappedInsightList.Select(i => i.Cause),
+            response.Summary.Cause);
+        var mappedActions = MapFallbackList(
+            response.Actions,
+            mappedInsightList.Select(i => i.Action),
+            response.Summary.Action);
+        var mappedPriority = response.Priority
+            ?? mappedInsightList.MaxBy(static insight => insight.Priority)?.Priority
+            ?? ResolvePriorityFromStatus(response.Status);
 
         return new MonthHealthResponse
         {
@@ -61,6 +73,41 @@ public sealed class FinancialIntelligenceService(
                     Target = item.Target
                 })
                 .ToList()
+        };
+    }
+
+    private static IReadOnlyList<string> MapFallbackList(
+        IReadOnlyList<string>? values,
+        IEnumerable<string> insightValues,
+        string summaryValue)
+    {
+        if (values is { Count: > 0 })
+        {
+            return values;
+        }
+
+        var mappedInsightValues = insightValues
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .Distinct()
+            .ToList();
+
+        if (mappedInsightValues.Count > 0)
+        {
+            return mappedInsightValues;
+        }
+
+        return string.IsNullOrWhiteSpace(summaryValue)
+            ? Array.Empty<string>()
+            : [summaryValue];
+    }
+
+    private static int ResolvePriorityFromStatus(string status)
+    {
+        return status switch
+        {
+            "critical" => CriticalPriority,
+            "attention" => AttentionPriority,
+            _ => HealthyPriority
         };
     }
 

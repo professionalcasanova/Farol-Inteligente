@@ -106,9 +106,9 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
         Assert.Equal(32, response.Score);
         Assert.Equal("Crítico: saldo negativo e dívidas atrasadas.", response.Message);
         Assert.Equal(2, response.Reasons.Count);
-        Assert.Contains("Conta de energia vencida", response.Reasons);
+        Assert.Contains(response.Reasons, reason => reason.Contains("Conta de energia vencida", StringComparison.Ordinal));
         Assert.Equal(2, response.Actions.Count);
-        Assert.Contains("Priorize o pagamento das contas fixas vencidas", response.Actions);
+        Assert.Contains(response.Actions, action => action.Contains("Priorize o pagamento das contas fixas vencidas", StringComparison.Ordinal));
         Assert.Equal(110, response.Priority);
         Assert.Equal("Há contas vencidas no seu mês.", response.Summary.Message);
         Assert.Equal("overdue_bills", Assert.Single(response.Insights).Type);
@@ -331,6 +331,46 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
         var payload = await response.Content.ReadFromJsonAsync<ErrorResponse>();
         Assert.NotNull(payload);
         Assert.Equal("A inteligência financeira está indisponível no momento.", payload.Message);
+    }
+
+    [Fact]
+    public async Task GetMonthHealth_WithHealthyPayloadWithoutInsights_ShouldUseSummaryFallbacks()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        _factory.FinancialIntelligenceClient.Handler = (_, _) =>
+            Task.FromResult(new FinancialAnalysisResponse
+            {
+                ContractVersion = "v1",
+                Status = "healthy",
+                Score = 100,
+                Summary = new FinancialAnalysisSummaryResponse
+                {
+                    Message = "Seu mÃªs estÃ¡ sob controle atÃ© aqui.",
+                    Cause = "VocÃª nÃ£o tem sinais fortes de pressÃ£o financeira imediata neste perÃ­odo.",
+                    Action = "Continue registrando o mÃªs para manter essa clareza."
+                },
+                Insights = [],
+                RecommendedActions = []
+            });
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await client.GetFromJsonAsync<MonthHealthResponse>(
+            $"/api/insights/month-health?month={today.Month}&year={today.Year}");
+
+        Assert.NotNull(response);
+        Assert.Equal("healthy", response.Status);
+        Assert.Equal(100, response.Score);
+        Assert.Equal("Seu mÃªs estÃ¡ sob controle atÃ© aqui.", response.Message);
+        Assert.Equal(["VocÃª nÃ£o tem sinais fortes de pressÃ£o financeira imediata neste perÃ­odo."], response.Reasons);
+        Assert.Equal(["Continue registrando o mÃªs para manter essa clareza."], response.Actions);
+        Assert.Equal(10, response.Priority);
+        Assert.Empty(response.Insights);
+        Assert.Empty(response.RecommendedActions);
     }
 
     private async Task<(Guid AccountId, Dictionary<string, Guid> CategoryIds)> SeedAccountAndCategoriesAsync(
