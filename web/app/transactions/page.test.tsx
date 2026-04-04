@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import TransactionsPage from "@/app/transactions/page";
 import {
   ApiError,
+  createTransaction,
   listAccounts,
   listCategories,
   listTransactions,
@@ -47,6 +48,7 @@ vi.mock("@/lib/api", async () => {
 
   return {
     ...actual,
+    createTransaction: vi.fn(),
     listAccounts: vi.fn(),
     listCategories: vi.fn(),
     listTransactions: vi.fn(),
@@ -55,6 +57,7 @@ vi.mock("@/lib/api", async () => {
 });
 
 const mockedUseProtectedSession = vi.mocked(useProtectedSession);
+const mockedCreateTransaction = vi.mocked(createTransaction);
 const mockedListAccounts = vi.mocked(listAccounts);
 const mockedListCategories = vi.mocked(listCategories);
 const mockedListTransactions = vi.mocked(listTransactions);
@@ -138,6 +141,7 @@ function mockTransactionsApi(overrides?: {
 describe("TransactionsPage", () => {
   beforeEach(() => {
     mockedUseProtectedSession.mockReset();
+    mockedCreateTransaction.mockReset();
     mockedListAccounts.mockReset();
     mockedListCategories.mockReset();
     mockedListTransactions.mockReset();
@@ -298,5 +302,49 @@ describe("TransactionsPage", () => {
     expect(
       await screen.findByText("A categoria selecionada não foi encontrada."),
     ).toBeInTheDocument();
+  });
+
+  it("Transactions_CreateWithMultipleAccounts_RequiresExplicitAccountSelection", async () => {
+    const user = userEvent.setup();
+
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+    mockTransactionsApi({
+      accounts: [
+        {
+          id: "account-1",
+          name: "Conta principal",
+          type: 2,
+          isActive: true,
+          createdAtUtc: "2026-03-01T00:00:00Z",
+        },
+        {
+          id: "account-2",
+          name: "Carteira do dia a dia",
+          type: 1,
+          isActive: true,
+          createdAtUtc: "2026-03-02T00:00:00Z",
+        },
+      ],
+    });
+
+    render(<TransactionsPage />);
+
+    const accountSelect = await screen.findByLabelText(/conta financeira/i);
+
+    expect(accountSelect).toHaveValue("");
+
+    await user.type(screen.getByLabelText(/valor/i), "90");
+    await user.type(screen.getByLabelText(/descrição/i), "Mercado");
+    await user.click(screen.getByRole("button", { name: /criar transação/i }));
+
+    expect(
+      await screen.findByText("Escolha a conta em que essa transação deve ser registrada."),
+    ).toBeInTheDocument();
+    expect(mockedCreateTransaction).not.toHaveBeenCalled();
+    expect(mockedUpdateTransaction).not.toHaveBeenCalled();
   });
 });

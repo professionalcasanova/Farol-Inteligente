@@ -123,11 +123,6 @@ export default function TransactionsPage() {
         setAccounts(accountsResponse);
         setCategories(categoriesResponse);
         setTransactions(transactionsResponse);
-        setForm((current) => ({
-          ...current,
-          financialAccountId:
-            current.financialAccountId || accountsResponse[0]?.id || "",
-        }));
       } catch (caughtError) {
         if (isUnauthorizedApiError(caughtError)) {
           logout("session-expired");
@@ -158,6 +153,35 @@ export default function TransactionsPage() {
   }, [logout, reloadKey, session]);
 
   useEffect(() => {
+    setForm((current) => {
+      const hasSelectedAccount = accounts.some(
+        (account) => account.id === current.financialAccountId,
+      );
+
+      if (accounts.length === 0) {
+        return current.financialAccountId
+          ? { ...current, financialAccountId: "" }
+          : current;
+      }
+
+      if (hasSelectedAccount) {
+        return current;
+      }
+
+      if (accounts.length === 1) {
+        return {
+          ...current,
+          financialAccountId: accounts[0].id,
+        };
+      }
+
+      return current.financialAccountId
+        ? { ...current, financialAccountId: "" }
+        : current;
+    });
+  }, [accounts]);
+
+  useEffect(() => {
     if (
       form.categoryId &&
       !visibleCategories.some((category) => category.id === form.categoryId)
@@ -169,7 +193,7 @@ export default function TransactionsPage() {
     }
   }, [form.categoryId, visibleCategories]);
 
-  function resetForm(financialAccountId = "") {
+  function resetForm(financialAccountId = accounts.length === 1 ? accounts[0].id : "") {
     setEditingTransactionId(null);
     setForm(buildCreateFormState(financialAccountId));
   }
@@ -191,6 +215,11 @@ export default function TransactionsPage() {
     event.preventDefault();
 
     if (!session) {
+      return;
+    }
+
+    if (!form.financialAccountId) {
+      setFormError("Escolha a conta em que essa transação deve ser registrada.");
       return;
     }
 
@@ -343,6 +372,9 @@ export default function TransactionsPage() {
                     }
                     value={form.financialAccountId}
                   >
+                    {accounts.length > 1 ? (
+                      <option value="">Escolha a conta para continuar</option>
+                    ) : null}
                     {accounts.map((account) => (
                       <option key={account.id} value={account.id}>
                         {account.name}
