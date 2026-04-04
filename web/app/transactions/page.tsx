@@ -13,6 +13,7 @@ import {
   listCategories,
   listTransactions,
   transactionTypeOptions,
+  updateTransaction,
   type AccountResponse,
   type CategoryResponse,
   type TransactionResponse,
@@ -54,12 +55,32 @@ const defaultFormState: TransactionFormState = {
   occurredOn: getCurrentDateInputValue(),
 };
 
+function buildCreateFormState(financialAccountId = ""): TransactionFormState {
+  return {
+    ...defaultFormState,
+    financialAccountId,
+    occurredOn: getCurrentDateInputValue(),
+  };
+}
+
+function buildEditFormState(transaction: TransactionResponse): TransactionFormState {
+  return {
+    financialAccountId: transaction.financialAccountId,
+    categoryId: transaction.categoryId ?? "",
+    type: transaction.type,
+    amount: String(transaction.amount),
+    description: transaction.description,
+    occurredOn: transaction.occurredOn,
+  };
+}
+
 export default function TransactionsPage() {
   const { session, isLoading, logout } = useProtectedSession();
   const [accounts, setAccounts] = useState<AccountResponse[]>([]);
   const [categories, setCategories] = useState<CategoryResponse[]>([]);
   const [transactions, setTransactions] = useState<TransactionResponse[]>([]);
   const [form, setForm] = useState<TransactionFormState>(defaultFormState);
+  const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState("");
   const [formError, setFormError] = useState("");
   const [success, setSuccess] = useState("");
@@ -71,6 +92,9 @@ export default function TransactionsPage() {
     () => categories.filter((category) => category.type === form.type),
     [categories, form.type],
   );
+  const editingTransaction =
+    transactions.find((transaction) => transaction.id === editingTransactionId) ?? null;
+  const isEditing = editingTransactionId !== null;
 
   useEffect(() => {
     if (!session) {
@@ -145,6 +169,24 @@ export default function TransactionsPage() {
     }
   }, [form.categoryId, visibleCategories]);
 
+  function resetForm(financialAccountId = "") {
+    setEditingTransactionId(null);
+    setForm(buildCreateFormState(financialAccountId));
+  }
+
+  function startEditing(transaction: TransactionResponse) {
+    setEditingTransactionId(transaction.id);
+    setFormError("");
+    setSuccess("");
+    setForm(buildEditFormState(transaction));
+  }
+
+  function handleCancelEditing() {
+    setFormError("");
+    setSuccess("");
+    resetForm(form.financialAccountId);
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -158,23 +200,29 @@ export default function TransactionsPage() {
     setSuccess("");
 
     try {
-      await createTransaction(accessToken, {
+      const payload = {
         financialAccountId: form.financialAccountId,
         categoryId: form.categoryId || undefined,
         type: form.type,
         amount: Number(form.amount),
         description: form.description,
         occurredOn: form.occurredOn,
-      });
+      };
+
+      if (editingTransactionId) {
+        await updateTransaction(accessToken, editingTransactionId, payload);
+      } else {
+        await createTransaction(accessToken, payload);
+      }
 
       const transactionsResponse = await listTransactions(accessToken);
       setTransactions(transactionsResponse);
-      setSuccess("Transação criada com sucesso.");
-      setForm((current) => ({
-        ...defaultFormState,
-        financialAccountId: current.financialAccountId,
-        occurredOn: getCurrentDateInputValue(),
-      }));
+      setSuccess(
+        editingTransactionId
+          ? "Transação atualizada com sucesso."
+          : "Transação criada com sucesso.",
+      );
+      resetForm(form.financialAccountId);
     } catch (caughtError) {
       if (isUnauthorizedApiError(caughtError)) {
         logout("session-expired");
@@ -184,7 +232,9 @@ export default function TransactionsPage() {
       setFormError(
         getFriendlyApiMessage(
           caughtError,
-          "Não foi possível registrar a transação agora. Revise os dados e tente novamente.",
+          editingTransactionId
+            ? "Não foi possível atualizar a transação agora. Revise os dados e tente novamente."
+            : "Não foi possível registrar a transação agora. Revise os dados e tente novamente.",
           { messageMap: transactionMessageMap },
         ),
       );
@@ -250,10 +300,10 @@ export default function TransactionsPage() {
         <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,0.94fr)_minmax(0,1.06fr)]">
           <section className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
             <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
-              Nova transação
+              {isEditing ? "Editando transação" : "Nova transação"}
             </div>
             <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
-              Lançamento rápido
+              {isEditing ? "Corrigir lançamento" : "Lançamento rápido"}
             </h2>
 
             {accounts.length === 0 ? (
@@ -266,6 +316,21 @@ export default function TransactionsPage() {
               </div>
             ) : (
               <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
+                {isEditing ? (
+                  <div className="rounded-[24px] border border-[color:rgba(15,118,110,0.14)] bg-[var(--color-accent-soft)] px-4 py-4 text-sm text-[var(--color-foreground)]">
+                    <div className="font-medium">
+                      Você está editando{" "}
+                      <span className="font-semibold">
+                        {editingTransaction?.description ?? "esta transação"}
+                      </span>
+                      .
+                    </div>
+                    <div className="mt-1 text-[var(--color-muted)]">
+                      Ajuste conta, tipo, valor, data ou categoria e salve quando terminar.
+                    </div>
+                  </div>
+                ) : null}
+
                 <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
                   <span>Conta financeira</span>
                   <select
@@ -379,13 +444,30 @@ export default function TransactionsPage() {
                   </label>
                 </div>
 
-                <button
-                  className="w-full rounded-2xl bg-[var(--color-foreground)] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-70"
-                  disabled={isSubmitting}
-                  type="submit"
-                >
-                  {isSubmitting ? "Salvando..." : "Criar transação"}
-                </button>
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <button
+                    className="w-full rounded-2xl bg-[var(--color-foreground)] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-70"
+                    disabled={isSubmitting}
+                    type="submit"
+                  >
+                    {isSubmitting
+                      ? "Salvando..."
+                      : isEditing
+                        ? "Salvar alteração"
+                        : "Criar transação"}
+                  </button>
+
+                  {isEditing ? (
+                    <button
+                      className="w-full rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3 text-sm font-semibold text-[var(--color-foreground)] transition hover:bg-[var(--color-panel)] disabled:cursor-not-allowed disabled:opacity-70"
+                      disabled={isSubmitting}
+                      onClick={handleCancelEditing}
+                      type="button"
+                    >
+                      Cancelar edição
+                    </button>
+                  ) : null}
+                </div>
               </form>
             )}
           </section>
@@ -458,6 +540,13 @@ export default function TransactionsPage() {
                           <div className="mt-2 text-xs text-[var(--color-muted)]">
                             criado em {formatDateTime(transaction.createdAtUtc)}
                           </div>
+                          <button
+                            className="mt-3 rounded-full border border-[var(--color-line)] px-3 py-2 text-xs font-semibold text-[var(--color-foreground)] transition hover:bg-[var(--color-panel)]"
+                            onClick={() => startEditing(transaction)}
+                            type="button"
+                          >
+                            {editingTransactionId === transaction.id ? "Editando" : "Editar"}
+                          </button>
                         </div>
                       </div>
                     </article>

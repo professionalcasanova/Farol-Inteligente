@@ -400,6 +400,32 @@ export async function createTransaction(
   });
 }
 
+export async function updateTransaction(
+  token: string,
+  transactionId: string,
+  payload: {
+    financialAccountId: string;
+    categoryId?: string;
+    type: TransactionType;
+    amount: number;
+    description: string;
+    occurredOn: string;
+  },
+) {
+  return apiRequest<TransactionResponse>(`/api/transactions/${transactionId}`, {
+    method: "PUT",
+    token,
+    body: {
+      financialAccountId: payload.financialAccountId,
+      categoryId: payload.categoryId || null,
+      type: payload.type,
+      amount: payload.amount,
+      description: payload.description,
+      occurredOn: payload.occurredOn,
+    },
+  });
+}
+
 export async function getMonthlySummary(
   token: string,
   month: number,
