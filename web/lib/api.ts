@@ -75,6 +75,8 @@ export type FreeMoneyResponse = {
   totalPlannedBudget: number;
   totalBudgetSpent: number;
   totalBudgetRemaining: number;
+  plannedReserve: number;
+  unpaidBillsReserve: number;
   freeToSpend: number;
 };
 

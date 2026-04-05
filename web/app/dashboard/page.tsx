@@ -221,6 +221,25 @@ export default function DashboardPage() {
   const monthlyFlowMax = data
     ? Math.max(1, data.freeMoney.totalIncome, data.freeMoney.totalExpense)
     : 1;
+  const freeMoneyReserveRows = data
+    ? [
+        {
+          label: "Reservado no planejamento",
+          value: data.freeMoney.plannedReserve,
+        },
+        {
+          label: "Em contas em aberto",
+          value: data.freeMoney.unpaidBillsReserve,
+        },
+      ].filter((item) => item.value > 0)
+    : [];
+  const freeMoneyReserveNote = data
+    ? data.freeMoney.unpaidBillsReserve > 0
+      ? "Seu saldo atual ainda inclui contas já lançadas e não pagas."
+      : data.freeMoney.plannedReserve > 0
+        ? "Parte do seu saldo já está reservada no planejamento do mês."
+        : ""
+    : "";
 
   const isCriticalHealth = data?.monthHealth?.status === "critical";
   const criticalReasons = data?.monthHealth
@@ -1131,6 +1150,8 @@ export default function DashboardPage() {
                     value: formatCurrency(data.freeMoney.freeToSpend),
                     detail: "O quanto ainda sobra sem furar o que já foi planejado.",
                     tone: "bg-[color:rgba(41,128,90,0.12)] text-[var(--color-success)]",
+                    composition: freeMoneyReserveRows,
+                    note: freeMoneyReserveNote,
                   },
                 ].map((item) => (
                   <article
@@ -1148,6 +1169,30 @@ export default function DashboardPage() {
                     <div className="mt-2 text-xs leading-5 text-[var(--color-muted)]">
                       {item.detail}
                     </div>
+                    {item.composition?.length ? (
+                      <div className="mt-4 rounded-[18px] border border-[var(--color-line)] bg-[var(--color-panel)] p-3">
+                        <div className="space-y-2">
+                          {item.composition.map((compositionItem) => (
+                            <div
+                              className="flex items-center justify-between gap-3 text-xs"
+                              key={compositionItem.label}
+                            >
+                              <span className="text-[var(--color-muted)]">
+                                {compositionItem.label}
+                              </span>
+                              <span className="font-semibold text-[var(--color-foreground)]">
+                                {formatCurrency(compositionItem.value)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                        {item.note ? (
+                          <div className="mt-3 text-xs leading-5 text-[var(--color-muted)]">
+                            {item.note}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </article>
                 ))}
               </div>

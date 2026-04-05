@@ -16,6 +16,7 @@ import {
   listBills,
   listCategories,
   listTransactions,
+  type FreeMoneyResponse,
 } from "@/lib/api";
 import { useProtectedSession } from "@/lib/use-protected-session";
 
@@ -92,6 +93,25 @@ const session = {
   email: "maria@email.com",
 };
 
+function createFreeMoneyResponse(
+  overrides?: Partial<FreeMoneyResponse>,
+): FreeMoneyResponse {
+  return {
+    month: 3,
+    year: 2026,
+    totalIncome: 0,
+    totalExpense: 0,
+    balance: 0,
+    totalPlannedBudget: 0,
+    totalBudgetSpent: 0,
+    totalBudgetRemaining: 0,
+    plannedReserve: 0,
+    unpaidBillsReserve: 0,
+    freeToSpend: 0,
+    ...overrides,
+  };
+}
+
 function mockDashboardApi(overrides?: {
   accounts?: Array<{
     id: string;
@@ -147,6 +167,7 @@ function mockDashboardApi(overrides?: {
       action: string;
     }>;
   } | null;
+  freeMoney?: Partial<FreeMoneyResponse>;
 }) {
   mockedGetMonthHealth.mockResolvedValue(
     overrides?.monthHealth ?? {
@@ -178,17 +199,7 @@ function mockDashboardApi(overrides?: {
     countPaid: 0,
     upcoming: [],
   });
-  mockedGetFreeMoney.mockResolvedValue({
-    month: 3,
-    year: 2026,
-    totalIncome: 0,
-    totalExpense: 0,
-    balance: 0,
-    totalPlannedBudget: 0,
-    totalBudgetSpent: 0,
-    totalBudgetRemaining: 0,
-    freeToSpend: 0,
-  });
+  mockedGetFreeMoney.mockResolvedValue(createFreeMoneyResponse(overrides?.freeMoney));
   mockedGetMonthlyBudget.mockResolvedValue({
     month: 3,
     year: 2026,
@@ -407,15 +418,11 @@ describe("DashboardPage", () => {
       upcoming: [],
     });
     mockedGetFreeMoney.mockResolvedValue({
-      month: 3,
-      year: 2026,
-      totalIncome: 0,
-      totalExpense: 85,
-      balance: -85,
-      totalPlannedBudget: 0,
-      totalBudgetSpent: 0,
-      totalBudgetRemaining: 0,
-      freeToSpend: -85,
+      ...createFreeMoneyResponse({
+        totalExpense: 85,
+        balance: -85,
+        freeToSpend: -85,
+      }),
     });
     mockedGetMonthlyBudget.mockResolvedValue({
       month: 3,
@@ -758,6 +765,58 @@ describe("DashboardPage", () => {
     expect(screen.queryByText("Alertas do mês")).not.toBeInTheDocument();
   });
 
+  it("Dashboard_FreeMoneyComposition_ShowsPlannedAndUnpaidReservesBelowDinheiroLivre", async () => {
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+    mockDashboardApi({
+      accounts: [
+        {
+          id: "account-1",
+          name: "Conta principal",
+          type: 2,
+          isActive: true,
+          createdAtUtc: "2026-03-01T00:00:00Z",
+        },
+      ],
+      transactions: [
+        {
+          id: "transaction-1",
+          financialAccountId: "account-1",
+          categoryId: null,
+          type: 1,
+          amount: 3000,
+          description: "Salario",
+          occurredOn: "2026-03-01",
+          createdAtUtc: "2026-03-01T00:00:00Z",
+        },
+      ],
+      freeMoney: {
+        totalIncome: 3000,
+        balance: 3000,
+        totalPlannedBudget: 1200,
+        totalBudgetRemaining: 1200,
+        plannedReserve: 1200,
+        unpaidBillsReserve: 850,
+        freeToSpend: 1800,
+      },
+    });
+
+    render(<DashboardPage />);
+
+    expect(await screen.findByText("Resumo financeiro")).toBeInTheDocument();
+    expect(screen.getByText("Dinheiro livre")).toBeInTheDocument();
+    expect(screen.getByText("Reservado no planejamento")).toBeInTheDocument();
+    expect(screen.getByText("Em contas em aberto")).toBeInTheDocument();
+    expect(screen.getByText(/1\.200,00/)).toBeInTheDocument();
+    expect(screen.getByText(/850,00/)).toBeInTheDocument();
+    expect(
+      screen.getByText("Seu saldo atual ainda inclui contas já lançadas e não pagas."),
+    ).toBeInTheDocument();
+  });
+
   it("Dashboard_WithRecommendedActions_ShowsPrioritizedLinks", async () => {
     mockedUseProtectedSession.mockReturnValue({
       session,
@@ -993,17 +1052,7 @@ describe("DashboardPage", () => {
       countPaid: 0,
       upcoming: [],
     });
-    mockedGetFreeMoney.mockResolvedValue({
-      month: 3,
-      year: 2026,
-      totalIncome: 0,
-      totalExpense: 0,
-      balance: 0,
-      totalPlannedBudget: 0,
-      totalBudgetSpent: 0,
-      totalBudgetRemaining: 0,
-      freeToSpend: 0,
-    });
+    mockedGetFreeMoney.mockResolvedValue(createFreeMoneyResponse());
     mockedGetMonthlyBudget.mockResolvedValue({
       month: 3,
       year: 2026,
@@ -1068,17 +1117,7 @@ describe("DashboardPage", () => {
       countPaid: 0,
       upcoming: [],
     });
-    mockedGetFreeMoney.mockResolvedValue({
-      month: 3,
-      year: 2026,
-      totalIncome: 0,
-      totalExpense: 0,
-      balance: 0,
-      totalPlannedBudget: 0,
-      totalBudgetSpent: 0,
-      totalBudgetRemaining: 0,
-      freeToSpend: 0,
-    });
+    mockedGetFreeMoney.mockResolvedValue(createFreeMoneyResponse());
     mockedGetMonthlyBudget.mockResolvedValue({
       month: 3,
       year: 2026,
@@ -1134,17 +1173,7 @@ describe("DashboardPage", () => {
       countPaid: 0,
       upcoming: [],
     });
-    mockedGetFreeMoney.mockResolvedValue({
-      month: 3,
-      year: 2026,
-      totalIncome: 0,
-      totalExpense: 0,
-      balance: 0,
-      totalPlannedBudget: 0,
-      totalBudgetSpent: 0,
-      totalBudgetRemaining: 0,
-      freeToSpend: 0,
-    });
+    mockedGetFreeMoney.mockResolvedValue(createFreeMoneyResponse());
     mockedGetMonthlyBudget.mockResolvedValue({
       month: 3,
       year: 2026,
