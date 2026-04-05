@@ -95,6 +95,8 @@ public sealed class FreeMoneyInsightsEndpointsTests : IClassFixture<FarolApiFact
         Assert.Equal(550m, response.TotalPlannedBudget);
         Assert.Equal(600m, response.TotalBudgetSpent);
         Assert.Equal(-50m, response.TotalBudgetRemaining);
+        Assert.Equal(0m, response.PlannedReserve);
+        Assert.Equal(0m, response.UnpaidBillsReserve);
         Assert.Equal(2250m, response.FreeToSpend);
     }
 
@@ -135,6 +137,8 @@ public sealed class FreeMoneyInsightsEndpointsTests : IClassFixture<FarolApiFact
         Assert.Equal(500m, response.TotalPlannedBudget);
         Assert.Equal(0m, response.TotalBudgetSpent);
         Assert.Equal(500m, response.TotalBudgetRemaining);
+        Assert.Equal(500m, response.PlannedReserve);
+        Assert.Equal(0m, response.UnpaidBillsReserve);
         Assert.Equal(500m, response.FreeToSpend);
     }
 
@@ -172,6 +176,8 @@ public sealed class FreeMoneyInsightsEndpointsTests : IClassFixture<FarolApiFact
         Assert.Equal(500m, response.TotalPlannedBudget);
         Assert.Equal(700m, response.TotalBudgetSpent);
         Assert.Equal(-200m, response.TotalBudgetRemaining);
+        Assert.Equal(0m, response.PlannedReserve);
+        Assert.Equal(0m, response.UnpaidBillsReserve);
         Assert.Equal(2300m, response.FreeToSpend);
     }
 
@@ -205,6 +211,8 @@ public sealed class FreeMoneyInsightsEndpointsTests : IClassFixture<FarolApiFact
         Assert.Equal(0m, response.TotalPlannedBudget);
         Assert.Equal(0m, response.TotalBudgetSpent);
         Assert.Equal(0m, response.TotalBudgetRemaining);
+        Assert.Equal(0m, response.PlannedReserve);
+        Assert.Equal(0m, response.UnpaidBillsReserve);
         Assert.Equal(800m, response.FreeToSpend);
     }
 
@@ -249,6 +257,8 @@ public sealed class FreeMoneyInsightsEndpointsTests : IClassFixture<FarolApiFact
         Assert.Equal(500m, response.TotalPlannedBudget);
         Assert.Equal(200m, response.TotalBudgetSpent);
         Assert.Equal(300m, response.TotalBudgetRemaining);
+        Assert.Equal(300m, response.PlannedReserve);
+        Assert.Equal(400m, response.UnpaidBillsReserve);
         Assert.Equal(2500m, response.FreeToSpend);
     }
 
@@ -270,6 +280,8 @@ public sealed class FreeMoneyInsightsEndpointsTests : IClassFixture<FarolApiFact
         Assert.Equal(0m, response.TotalPlannedBudget);
         Assert.Equal(0m, response.TotalBudgetSpent);
         Assert.Equal(0m, response.TotalBudgetRemaining);
+        Assert.Equal(0m, response.PlannedReserve);
+        Assert.Equal(0m, response.UnpaidBillsReserve);
         Assert.Equal(0m, response.FreeToSpend);
     }
 
@@ -308,7 +320,52 @@ public sealed class FreeMoneyInsightsEndpointsTests : IClassFixture<FarolApiFact
         Assert.Equal(0m, response.TotalExpense);
         Assert.Equal(0m, response.TotalPlannedBudget);
         Assert.Equal(0m, response.TotalBudgetSpent);
+        Assert.Equal(0m, response.PlannedReserve);
+        Assert.Equal(0m, response.UnpaidBillsReserve);
         Assert.Equal(0m, response.FreeToSpend);
+    }
+
+    [Fact]
+    public async Task GetFreeMoney_ShouldExposeUnpaidBillsReserveIncludingPendingAndOverdueBills()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var seed = await SeedAccountAndCategoriesAsync(
+            "maria@email.com",
+            ("Salario", CategoryType.Income),
+            ("Alimentacao", CategoryType.Expense));
+
+        await SeedBudgetAsync(
+            "maria@email.com",
+            3,
+            2026,
+            (seed.CategoryIds["Alimentacao"], 500m));
+
+        await SeedTransactionsAsync(
+            "maria@email.com",
+            seed.AccountId,
+            [
+                (new DateOnly(2026, 3, 5), "Salario", 3000m, TransactionType.Income, seed.CategoryIds["Salario"]),
+                (new DateOnly(2026, 3, 6), "Mercado", 200m, TransactionType.Expense, seed.CategoryIds["Alimentacao"])
+            ]);
+
+        await SeedBillsAsync(
+            "maria@email.com",
+            [
+                (new DateOnly(2026, 3, 8), "Aluguel", 700m, false),
+                (new DateOnly(2026, 3, 20), "Internet", 180m, false),
+                (new DateOnly(2026, 3, 25), "Energia", 220m, true)
+            ]);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await client.GetFromJsonAsync<FreeMoneyResponse>("/api/insights/free-money?month=3&year=2026");
+
+        Assert.NotNull(response);
+        Assert.Equal(300m, response.PlannedReserve);
+        Assert.Equal(880m, response.UnpaidBillsReserve);
+        Assert.Equal(2500m, response.FreeToSpend);
     }
 
     private async Task<(Guid AccountId, Dictionary<string, Guid> CategoryIds)> SeedAccountAndCategoriesAsync(

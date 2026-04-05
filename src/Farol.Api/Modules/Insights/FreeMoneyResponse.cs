@@ -10,5 +10,7 @@ public sealed class FreeMoneyResponse
     public required decimal TotalPlannedBudget { get; init; }
     public required decimal TotalBudgetSpent { get; init; }
     public required decimal TotalBudgetRemaining { get; init; }
+    public required decimal PlannedReserve { get; init; }
+    public required decimal UnpaidBillsReserve { get; init; }
     public required decimal FreeToSpend { get; init; }
 }

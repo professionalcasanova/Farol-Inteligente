@@ -179,6 +179,8 @@ public sealed class MonthlyInsightsService(FarolDbContext dbContext, TimeProvide
             TotalPlannedBudget = snapshot.TotalPlannedBudget,
             TotalBudgetSpent = snapshot.TotalBudgetSpent,
             TotalBudgetRemaining = snapshot.TotalBudgetRemaining,
+            PlannedReserve = snapshot.PlannedReserve,
+            UnpaidBillsReserve = snapshot.UnpaidBillsReserve,
             FreeToSpend = snapshot.FreeToSpend
         };
     }
@@ -259,6 +261,8 @@ public sealed record MonthlyInsightSnapshot(
     IReadOnlyList<MonthlyInsightCategorySnapshot> Categories)
 {
     public decimal BudgetOverrun => TotalBudgetSpent - TotalPlannedBudget;
+    public decimal PlannedReserve => Math.Max(TotalBudgetRemaining, 0m);
+    public decimal UnpaidBillsReserve => TotalPendingBills + TotalOverdueBills;
 }
 
 public sealed record MonthlyInsightCategorySnapshot(
