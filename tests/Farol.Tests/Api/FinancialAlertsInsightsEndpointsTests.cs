@@ -49,12 +49,19 @@ public sealed class FinancialAlertsInsightsEndpointsTests : IClassFixture<FarolA
             $"/api/insights/alerts?month={referenceDate.Month}&year={referenceDate.Year}");
 
         Assert.NotNull(response);
-        var alert = Assert.Single(response.Alerts);
-        Assert.Equal("overdue_bills", alert.Type);
-        Assert.Equal("high", alert.Severity);
-        Assert.Equal(300m, alert.Amount);
-        Assert.Equal("/bills?status=overdue", alert.ActionUrl);
-        Assert.Contains("contas vencidas", alert.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(2, response.Alerts.Count);
+
+        var overdueAlert = Assert.Single(response.Alerts, alert => alert.Type == "overdue_bills");
+        Assert.Equal("high", overdueAlert.Severity);
+        Assert.Equal(300m, overdueAlert.Amount);
+        Assert.Equal("/bills?status=overdue", overdueAlert.ActionUrl);
+        Assert.Contains("contas vencidas", overdueAlert.Message, StringComparison.OrdinalIgnoreCase);
+
+        var lowBalanceAlert = Assert.Single(response.Alerts, alert => alert.Type == "low_balance");
+        Assert.Equal("medium", lowBalanceAlert.Severity);
+        Assert.Equal(-300m, lowBalanceAlert.Amount);
+        Assert.Equal("/dashboard", lowBalanceAlert.ActionUrl);
+        Assert.Contains("dinheiro livre", lowBalanceAlert.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
