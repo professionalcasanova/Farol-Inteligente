@@ -334,18 +334,40 @@ describe("DashboardPage", () => {
         ],
         insights: [],
       },
+      alerts: {
+        alerts: [
+          {
+            type: "overdue_bills",
+            severity: "high",
+            message: "Conta de energia vencida há 8 dias",
+            amount: 240,
+            actionUrl: "/bills?status=overdue",
+          },
+          {
+            type: "low_balance",
+            severity: "medium",
+            message: "Saldo do mês está em -R$ 1.200,00",
+            amount: 1200,
+            actionUrl: "/transactions",
+          },
+        ],
+      },
     });
 
     render(<DashboardPage />);
 
     expect(await screen.findByText("Risco financeiro crítico")).toBeInTheDocument();
     expect(screen.getByText("Saldo negativo e contas atrasadas.")).toBeInTheDocument();
-    expect(screen.getByText("Conta de energia vencida há 8 dias")).toBeInTheDocument();
+    expect(screen.getByText("O que puxou esse alerta")).toBeInTheDocument();
+    expect(screen.getAllByText("Conta de energia vencida há 8 dias")).toHaveLength(2);
+    expect(screen.getByText("Alertas visíveis no mês")).toBeInTheDocument();
+    expect(screen.getByText(/240,00/)).toBeInTheDocument();
     expect(screen.getByText(/Priorize o pagamento das contas fixas vencidas/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Ver saídas do mês" })).toHaveAttribute(
       "href",
       "/transactions",
     );
+    expect(screen.getAllByRole("link", { name: "Abrir alerta" })).toHaveLength(2);
     expect(
       screen.getByRole("link", { name: /Abrir foco do mes: Ver saídas do mês/i }),
     ).toHaveAttribute("href", "/transactions");
@@ -1174,7 +1196,17 @@ describe("DashboardPage", () => {
 
     expect(await screen.findByText("Resumo financeiro")).toBeInTheDocument();
     expect(screen.queryByText("Visão do mês")).not.toBeInTheDocument();
-    expect(screen.queryByText("Alertas do mês")).not.toBeInTheDocument();
+    expect(screen.getByText("Alertas do mês")).toBeInTheDocument();
+    expect(
+      screen.getByText("O dashboard já encontrou sinais que pedem atenção."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Voce tem contas vencidas que precisam de atencao imediata."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Abrir alerta" })).toHaveAttribute(
+      "href",
+      "/bills?status=overdue",
+    );
     expect(screen.getByText("Base do mês")).toBeInTheDocument();
     expect(
       screen.queryByText(/month_health|Npgsql|PostgresException/i),

@@ -271,6 +271,8 @@ export default function DashboardPage() {
     primaryRecommendedAction?.label ??
     primaryAlertAction?.message ??
     "Ver resumo do mes";
+  const visibleAlertHighlights = data?.alerts.alerts.slice(0, 3) ?? [];
+  const showFallbackAlertHighlights = !data?.monthHealth && visibleAlertHighlights.length > 0;
   const budgetFlowMax = data
     ? Math.max(1, data.budget.totalPlanned, data.budget.totalSpent)
     : 1;
@@ -966,40 +968,178 @@ export default function DashboardPage() {
             )}
           </section>
 
+          {showFallbackAlertHighlights ? (
+            <section className="rounded-[28px] border border-[color:rgba(217,119,6,0.18)] bg-[color:rgba(255,247,237,0.92)] p-6">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--color-warm)]">
+                    Alertas do mês
+                  </div>
+                  <h2 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-[var(--color-foreground)]">
+                    O dashboard já encontrou sinais que pedem atenção.
+                  </h2>
+                  <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--color-muted)]">
+                    Mesmo sem a leitura completa do mês, estes alertas continuam visíveis
+                    aqui para você não depender só do sino para entender o que precisa ver.
+                  </p>
+                </div>
+                <div className="rounded-full border border-[color:rgba(217,119,6,0.16)] bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-warm)]">
+                  {visibleAlertHighlights.length} alerta
+                  {visibleAlertHighlights.length > 1 ? "s" : ""} ativo
+                  {visibleAlertHighlights.length > 1 ? "s" : ""}
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {visibleAlertHighlights.map((alert) => (
+                  <article
+                    className="rounded-[22px] border border-[color:rgba(217,119,6,0.12)] bg-white px-5 py-4"
+                    key={`${alert.type}-${alert.message}`}
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <span
+                        className={`rounded-full border px-3 py-1 text-xs font-semibold ${alertSeverityStyles[alert.severity]}`}
+                      >
+                        Prioridade {alertSeverityLabels[alert.severity]}
+                      </span>
+                      {alert.amount > 0 ? (
+                        <span className="text-sm font-semibold text-[var(--color-foreground)]">
+                          {formatCurrency(alert.amount)}
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="mt-4 text-sm font-semibold leading-6 text-[var(--color-foreground)]">
+                      {alert.message}
+                    </div>
+                    {alert.actionUrl ? (
+                      <div className="mt-4">
+                        <Link
+                          className="inline-flex rounded-full border border-[var(--color-line)] px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-[var(--color-panel)]"
+                          href={alert.actionUrl}
+                        >
+                          Abrir alerta
+                        </Link>
+                      </div>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
           {data.monthHealth ? (
             <>
               {isCriticalHealth ? (
-                <section className="rounded-[28px] border border-[color:rgba(185,28,28,0.3)] bg-[color:rgba(254,226,226,0.8)] p-6">
-                  <div className="text-sm font-semibold uppercase tracking-[0.18em] text-red-700">
-                    Risco financeiro crítico
+                <section className="rounded-[28px] border border-[color:rgba(185,28,28,0.3)] bg-[color:rgba(254,226,226,0.82)] p-6">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold uppercase tracking-[0.18em] text-red-700">
+                        Risco financeiro crítico
+                      </div>
+                      <div className="mt-3 text-2xl font-bold tracking-[-0.04em] text-red-800">
+                        {data.monthHealth.message ?? data.monthHealth.summary.message}
+                      </div>
+                    </div>
+                    {notificationCount > 0 ? (
+                      <div className="rounded-full border border-[color:rgba(185,28,28,0.14)] bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-red-700">
+                        {notificationCount} foco
+                        {notificationCount > 1 ? "s" : ""} ativo
+                        {notificationCount > 1 ? "s" : ""}
+                      </div>
+                    ) : null}
                   </div>
-                  <div className="mt-3 text-xl font-bold text-red-800">
-                    {data.monthHealth.message ?? data.monthHealth.summary.message}
+
+                  <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.12fr)_minmax(280px,0.88fr)]">
+                    <div className="min-w-0">
+                      <p className="max-w-3xl text-sm leading-6 text-[var(--color-foreground)]">
+                        {data.monthHealth.summary.cause}
+                      </p>
+
+                      {criticalReasons.length > 0 ? (
+                        <div className="mt-5">
+                          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-red-700">
+                            O que puxou esse alerta
+                          </div>
+                          <div className="mt-3 grid gap-3 md:grid-cols-2">
+                            {criticalReasons.map((reason, index) => (
+                              <div
+                                className="rounded-[20px] border border-[color:rgba(185,28,28,0.12)] bg-white px-4 py-4 text-sm leading-6 text-[var(--color-foreground)]"
+                                key={`reason-${index}`}
+                              >
+                                {reason}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="rounded-[24px] border border-[color:rgba(185,28,28,0.14)] bg-white/80 px-5 py-5">
+                      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-red-700">
+                        Próximo movimento
+                      </div>
+                      <div className="mt-3 text-base font-semibold leading-7 text-[var(--color-foreground)]">
+                        {data.monthHealth.summary.action}
+                      </div>
+                      {criticalActions.length > 0 ? (
+                        <div className="mt-4 space-y-2 text-sm leading-6 text-[var(--color-muted)]">
+                          {criticalActions.slice(0, 2).map((action, index) => (
+                            <p key={`action-${index}`}>• {action}</p>
+                          ))}
+                        </div>
+                      ) : null}
+                      <div className="mt-5">
+                        <Link
+                          href={primaryRecommendedAction?.target ?? "/dashboard"}
+                          className="inline-flex rounded-xl bg-red-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-800"
+                        >
+                          {primaryRecommendedAction?.label ?? "Ver resumo do mes"}
+                        </Link>
+                      </div>
+                    </div>
                   </div>
-                  {criticalReasons.length > 0 ? (
-                    <ul className="mt-3 list-disc pl-5 text-sm text-[var(--color-foreground)]">
-                      {criticalReasons.map((reason, index) => (
-                        <li key={`reason-${index}`}>{reason}</li>
-                      ))}
-                    </ul>
-                  ) : null}
-                  {criticalActions.length > 0 ? (
-                    <div className="mt-3 text-sm text-[var(--color-muted)]">
-                      {criticalActions.slice(0, 2).map((action, index) => (
-                        <p key={`action-${index}`} className="mt-1">
-                          • {action}
-                        </p>
-                      ))}
+
+                  {visibleAlertHighlights.length > 0 ? (
+                    <div className="mt-5">
+                      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-red-700">
+                        Alertas visíveis no mês
+                      </div>
+                      <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                        {visibleAlertHighlights.map((alert) => (
+                          <article
+                            className="rounded-[22px] border border-[color:rgba(185,28,28,0.12)] bg-white px-5 py-4"
+                            key={`${alert.type}-${alert.message}`}
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <span
+                                className={`rounded-full border px-3 py-1 text-xs font-semibold ${alertSeverityStyles[alert.severity]}`}
+                              >
+                                Prioridade {alertSeverityLabels[alert.severity]}
+                              </span>
+                              {alert.amount > 0 ? (
+                                <span className="text-sm font-semibold text-[var(--color-foreground)]">
+                                  {formatCurrency(alert.amount)}
+                                </span>
+                              ) : null}
+                            </div>
+                            <div className="mt-4 text-sm font-semibold leading-6 text-[var(--color-foreground)]">
+                              {alert.message}
+                            </div>
+                            {alert.actionUrl ? (
+                              <div className="mt-4">
+                                <Link
+                                  className="inline-flex rounded-full border border-[var(--color-line)] px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-[var(--color-panel)]"
+                                  href={alert.actionUrl}
+                                >
+                                  Abrir alerta
+                                </Link>
+                              </div>
+                            ) : null}
+                          </article>
+                        ))}
+                      </div>
                     </div>
                   ) : null}
-                  <div className="mt-4">
-                    <Link
-                      href={primaryRecommendedAction?.target ?? "/dashboard"}
-                      className="rounded-xl bg-red-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-800"
-                    >
-                      {primaryRecommendedAction?.label ?? "Ver resumo do mes"}
-                    </Link>
-                  </div>
                 </section>
               ) : null}
 
