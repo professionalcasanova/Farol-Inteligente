@@ -96,7 +96,7 @@ def analyze_financial_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
         insights = [_healthy_month_insight()]
 
     top_insights = insights[:3]
-    summary = _build_summary(top_insights[0])
+    summary = _build_summary(facts, top_insights)
     recommended_actions = _resolve_recommended_actions(top_insights)
 
     return {
@@ -307,11 +307,66 @@ def _healthy_month_insight() -> InsightDefinition:
     )
 
 
-def _build_summary(insight: InsightDefinition) -> dict[str, str]:
+def _build_summary(
+    facts: dict[str, Any],
+    insights: list[InsightDefinition],
+) -> dict[str, str]:
+    if facts["free_to_spend"] < 0:
+        return _build_negative_free_money_summary(facts)
+
+    insight = insights[0]
     return {
         "message": insight.message,
         "cause": insight.cause,
         "action": insight.action,
+    }
+
+
+def _build_negative_free_money_summary(facts: dict[str, Any]) -> dict[str, str]:
+    if facts.get("overdue_count", 0) > 0:
+        cause = (
+            "Depois dos gastos e compromissos do mes, seu dinheiro livre ficou negativo e "
+            "as contas vencidas aumentam o risco de faltar dinheiro para o restante do periodo."
+        )
+        action = (
+            "Priorize primeiro as contas essenciais ja vencidas e suspenda gastos ajustaveis "
+            "ate recuperar folga no caixa."
+        )
+    elif (
+        facts.get("upcoming_7_days_count", 0) > 0
+        and facts.get("upcoming_7_days_amount", 0.0) > facts["free_to_spend"]
+    ):
+        cause = (
+            "Depois dos gastos e reservas do mes, seu dinheiro livre ficou negativo e os "
+            "proximos vencimentos nao cabem sem reorganizar prioridades agora."
+        )
+        action = (
+            "Pare novos gastos ajustaveis e organize a ordem dos proximos pagamentos "
+            "antes que o atraso se espalhe pelo restante do mes."
+        )
+    elif facts.get("variable_expense_ratio", 0.0) > 0.8:
+        cause = (
+            "Depois dos gastos do mes, seu dinheiro livre ficou negativo e as despesas "
+            "variaveis estao altas demais em relacao a sua renda."
+        )
+        action = (
+            "Corte ou adie despesas variaveis agora e revise as maiores saidas do mes "
+            "para recuperar folga financeira."
+        )
+    else:
+        cause = (
+            "Depois dos gastos e do que ja esta comprometido no mes, seu dinheiro livre ficou "
+            "negativo e voce corre risco de nao conseguir bancar o restante do periodo sem ajuste."
+        )
+        action = (
+            "Pause novos gastos ajustaveis e revise as maiores saidas do mes para decidir "
+            "o que pode ser reduzido ou adiado agora."
+        )
+
+    return {
+        "message": "Seu dinheiro livre ficou negativo neste mes.",
+        "cause": cause,
+        "action": action,
     }
 
 

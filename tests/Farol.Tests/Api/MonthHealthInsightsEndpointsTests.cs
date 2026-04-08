@@ -179,6 +179,68 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
     }
 
     [Fact]
+    public async Task GetMonthHealth_ShouldPreserveExplicitNegativeSummaryFromFinancialIntelligenceResponse()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        _factory.FinancialIntelligenceClient.Handler = (_, _) =>
+            Task.FromResult(new FinancialAnalysisResponse
+            {
+                ContractVersion = "v1",
+                Status = "critical",
+                Score = 22,
+                Message = "Seu dinheiro livre ficou negativo neste mes.",
+                Reasons = new[] { "Saldo do mes esta em -R$ 480,00" },
+                Actions = new[] { "Pause novos gastos ajustaveis e reorganize o restante do mes" },
+                Priority = 100,
+                Summary = new FinancialAnalysisSummaryResponse
+                {
+                    Message = "Seu dinheiro livre ficou negativo neste mes.",
+                    Cause = "Depois dos gastos e compromissos do mes, seu dinheiro livre ficou negativo e voce corre risco de nao conseguir bancar o restante do periodo sem ajuste.",
+                    Action = "Pause novos gastos ajustaveis e revise as maiores saidas do mes para decidir o que pode ser reduzido ou adiado agora."
+                },
+                Insights = new List<FinancialAnalysisInsightResponse>
+                {
+                    new FinancialAnalysisInsightResponse
+                    {
+                        Type = "negative_free_money",
+                        Severity = "high",
+                        Priority = 90,
+                        Message = "Seu dinheiro livre ficou negativo neste mes.",
+                        Cause = "Depois dos gastos e do que ainda esta reservado, faltou folga no mes.",
+                        Action = "Evite novos gastos agora e revise as maiores saidas do periodo."
+                    }
+                },
+                RecommendedActions = new List<FinancialAnalysisRecommendedActionResponse>
+                {
+                    new FinancialAnalysisRecommendedActionResponse
+                    {
+                        Id = "review_expenses",
+                        Label = "Ver saidas do mes",
+                        Target = "/transactions"
+                    }
+                }
+            });
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await client.GetFromJsonAsync<MonthHealthResponse>(
+            $"/api/insights/month-health?month={today.Month}&year={today.Year}");
+
+        Assert.NotNull(response);
+        Assert.Equal("critical", response.Status);
+        Assert.Equal("Seu dinheiro livre ficou negativo neste mes.", response.Message);
+        Assert.Equal("Seu dinheiro livre ficou negativo neste mes.", response.Summary.Message);
+        Assert.Contains("dinheiro livre ficou negativo", response.Summary.Cause, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("baixo", response.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("negative_free_money", Assert.Single(response.Insights).Type);
+        Assert.Equal("review_expenses", Assert.Single(response.RecommendedActions).Id);
+    }
+
+    [Fact]
     public async Task GetMonthHealth_ShouldSendBillsSnapshotToFinancialIntelligenceService()
     {
         await _factory.ResetDatabaseAsync();

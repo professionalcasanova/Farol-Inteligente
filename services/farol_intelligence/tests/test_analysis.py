@@ -87,6 +87,10 @@ class FinancialAnalysisTests(unittest.TestCase):
         self.assertEqual("critical", result["status"])
         self.assertEqual(70, result["score"])
         self.assertEqual("negative_free_money", result["insights"][0]["type"])
+        self.assertEqual("Seu dinheiro livre ficou negativo neste mes.", result["message"])
+        self.assertIn("dinheiro livre ficou negativo", result["summary"]["cause"])
+        self.assertIn("Pause novos gastos ajustaveis", result["summary"]["action"])
+        self.assertNotIn("baixo", result["message"].lower())
         self.assertEqual("review_expenses", result["recommendedActions"][0]["id"])
 
     def test_analyze_should_return_critical_when_balance_negative_and_variable_expense_high(self) -> None:
@@ -105,7 +109,15 @@ class FinancialAnalysisTests(unittest.TestCase):
 
         self.assertEqual("critical", result["status"])
         self.assertEqual("negative_balance_high_variable_expense", result["insights"][0]["type"])
-        self.assertTrue(any("Saldo do mês está" in reason or "despesas variáveis" in reason for reason in result["reasons"]))
+        self.assertEqual("Seu dinheiro livre ficou negativo neste mes.", result["message"])
+        self.assertIn("despesas variaveis", result["summary"]["cause"])
+        self.assertIn("Corte ou adie despesas variaveis", result["summary"]["action"])
+        self.assertTrue(
+            any(
+                "Saldo do m" in reason or "despesas vari" in reason
+                for reason in result["reasons"]
+            )
+        )
 
     def test_analyze_should_return_critical_when_max_overdue_days_is_7_or_more(self) -> None:
         payload = make_payload()
@@ -208,6 +220,8 @@ class FinancialAnalysisTests(unittest.TestCase):
         self.assertEqual("overdue_bills", result["insights"][0]["type"])
         self.assertEqual("negative_free_money", result["insights"][1]["type"])
         self.assertEqual("short_term_bills_pressure", result["insights"][2]["type"])
+        self.assertEqual("Seu dinheiro livre ficou negativo neste mes.", result["message"])
+        self.assertIn("dinheiro livre ficou negativo", result["summary"]["cause"])
 
     def test_analyze_should_deduplicate_recommended_actions_when_multiple_insights_share_target(self) -> None:
         payload = make_payload()
