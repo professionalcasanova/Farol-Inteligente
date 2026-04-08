@@ -13,7 +13,10 @@ permissions:
 jobs:
   backend:
     name: backend-build-and-test
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
+    env:
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1"
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
 
     steps:
       - name: Checkout
@@ -23,6 +26,10 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
+
+      - name: Validate NuGet config
+        shell: pwsh
+        run: ./scripts/validate-nuget-config.ps1
 
       - name: Restore backend
         run: dotnet restore Farol.sln

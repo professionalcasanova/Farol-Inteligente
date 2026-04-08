@@ -180,6 +180,10 @@ function getComparisonBarWidth(value: number, max: number) {
   return `${Math.max(10, Math.min(100, (value / max) * 100))}%`;
 }
 
+function isActionNavigableFromDashboard(target?: string | null) {
+  return Boolean(target && target.trim() && target !== "/dashboard");
+}
+
 export default function DashboardPage() {
   const { session, isLoading, logout } = useProtectedSession();
   const [monthValue, setMonthValue] = useState(getCurrentMonthInputValue());
@@ -251,6 +255,22 @@ export default function DashboardPage() {
     ? data.monthHealth.actions?.slice(0, 2) ??
       [data.monthHealth.summary?.action].filter(Boolean)
     : [];
+  const primaryRecommendedAction =
+    prioritizedRecommendedActions.find((action) =>
+      isActionNavigableFromDashboard(action.target),
+    ) ?? prioritizedRecommendedActions[0] ?? null;
+  const primaryAlertAction =
+    data?.alerts.alerts.find((alert) => isActionNavigableFromDashboard(alert.actionUrl)) ??
+    data?.alerts.alerts[0] ??
+    null;
+  const primaryNotificationHref =
+    primaryRecommendedAction?.target ??
+    primaryAlertAction?.actionUrl ??
+    "/dashboard";
+  const primaryNotificationLabel =
+    primaryRecommendedAction?.label ??
+    primaryAlertAction?.message ??
+    "Ver resumo do mes";
   const budgetFlowMax = data
     ? Math.max(1, data.budget.totalPlanned, data.budget.totalSpent)
     : 1;
@@ -605,9 +625,9 @@ export default function DashboardPage() {
       utilityActions={
         <div className="flex items-center">
           <Link
-            aria-label="Ver notificações do mês"
+            aria-label={`Abrir foco do mes: ${primaryNotificationLabel}`}
             className="relative inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-[var(--color-line)] bg-white px-3 py-2 text-[var(--color-foreground)] transition hover:bg-[var(--color-accent-soft)]"
-            href="/bills"
+            href={primaryNotificationHref}
           >
             <svg
               aria-hidden="true"
@@ -974,10 +994,10 @@ export default function DashboardPage() {
                   ) : null}
                   <div className="mt-4">
                     <Link
-                      href="/bills"
+                      href={primaryRecommendedAction?.target ?? "/dashboard"}
                       className="rounded-xl bg-red-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-800"
                     >
-                      Ver contas a pagar
+                      {primaryRecommendedAction?.label ?? "Ver resumo do mes"}
                     </Link>
                   </div>
                 </section>
