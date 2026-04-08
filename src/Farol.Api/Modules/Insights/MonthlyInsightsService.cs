@@ -210,7 +210,7 @@ public sealed class MonthlyInsightsService(FarolDbContext dbContext, TimeProvide
                 Severity = MediumSeverity,
                 Message = "Seu dinheiro livre para o mes esta baixo.",
                 Amount = snapshot.FreeToSpend,
-                ActionUrl = "/dashboard"
+                ActionUrl = "/transactions"
             });
         }
 
@@ -234,7 +234,7 @@ public sealed class MonthlyInsightsService(FarolDbContext dbContext, TimeProvide
                 Severity = MediumSeverity,
                 Message = "Voce ainda tem muitas contas para pagar neste mes.",
                 Amount = snapshot.TotalPendingBills,
-                ActionUrl = "/bills"
+                ActionUrl = "/bills?status=pending"
             });
         }
 

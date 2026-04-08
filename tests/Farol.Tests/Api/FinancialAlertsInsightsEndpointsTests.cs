@@ -60,7 +60,7 @@ public sealed class FinancialAlertsInsightsEndpointsTests : IClassFixture<FarolA
         var lowBalanceAlert = Assert.Single(response.Alerts, alert => alert.Type == "low_balance");
         Assert.Equal("medium", lowBalanceAlert.Severity);
         Assert.Equal(-300m, lowBalanceAlert.Amount);
-        Assert.Equal("/dashboard", lowBalanceAlert.ActionUrl);
+        Assert.Equal("/transactions", lowBalanceAlert.ActionUrl);
         Assert.Contains("dinheiro livre", lowBalanceAlert.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -94,7 +94,7 @@ public sealed class FinancialAlertsInsightsEndpointsTests : IClassFixture<FarolA
         Assert.Equal("low_balance", alert.Type);
         Assert.Equal("medium", alert.Severity);
         Assert.Equal(150m, alert.Amount);
-        Assert.Equal("/dashboard", alert.ActionUrl);
+        Assert.Equal("/transactions", alert.ActionUrl);
         Assert.Contains("dinheiro livre", alert.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -206,7 +206,7 @@ public sealed class FinancialAlertsInsightsEndpointsTests : IClassFixture<FarolA
         Assert.Equal("many_pending_bills", alert.Type);
         Assert.Equal("medium", alert.Severity);
         Assert.Equal(600m, alert.Amount);
-        Assert.Equal("/bills", alert.ActionUrl);
+        Assert.Equal("/bills?status=pending", alert.ActionUrl);
         Assert.Contains("contas para pagar", alert.Message, StringComparison.OrdinalIgnoreCase);
     }
 

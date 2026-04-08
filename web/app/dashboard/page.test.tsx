@@ -32,15 +32,21 @@ vi.mock("@/components/app-shell", () => ({
   AppShell: ({
     title,
     description,
+    actions,
+    utilityActions,
     children,
   }: {
     title: string;
     description: string;
+    actions?: ReactNode;
+    utilityActions?: ReactNode;
     children: ReactNode;
   }) => (
     <div>
       <h1>{title}</h1>
       <p>{description}</p>
+      {actions}
+      {utilityActions}
       {children}
     </div>
   ),
@@ -148,6 +154,10 @@ function mockDashboardApi(overrides?: {
   }>;
   monthHealth?: {
     status: "healthy" | "attention" | "critical";
+    message?: string;
+    reasons?: string[];
+    actions?: string[];
+    priority?: number;
     recommendedActions?: Array<{
       id: string;
       label: string;
@@ -167,6 +177,15 @@ function mockDashboardApi(overrides?: {
       action: string;
     }>;
   } | null;
+  alerts?: {
+    alerts: Array<{
+      type: string;
+      severity: "high" | "medium";
+      message: string;
+      amount: number;
+      actionUrl?: string | null;
+    }>;
+  };
   freeMoney?: Partial<FreeMoneyResponse>;
 }) {
   mockedGetMonthHealth.mockResolvedValue(
@@ -189,7 +208,7 @@ function mockDashboardApi(overrides?: {
     balance: 0,
     byCategory: [],
   });
-  mockedGetAlerts.mockResolvedValue({ alerts: [] });
+  mockedGetAlerts.mockResolvedValue(overrides?.alerts ?? { alerts: [] });
   mockedGetBillsSummary.mockResolvedValue({
     totalPending: 0,
     totalOverdue: 0,
@@ -301,6 +320,18 @@ describe("DashboardPage", () => {
           cause: "A análise mostra alta pressão de caixa e dívidas em atraso.",
           action: "Execute imediatamente um plano de pagamento prioritário.",
         },
+        recommendedActions: [
+          {
+            id: "review_expenses",
+            label: "Ver saídas do mês",
+            target: "/transactions",
+          },
+          {
+            id: "review_overdue_bills",
+            label: "Ver contas vencidas",
+            target: "/bills?status=overdue",
+          },
+        ],
         insights: [],
       },
     });
@@ -311,7 +342,13 @@ describe("DashboardPage", () => {
     expect(screen.getByText("Saldo negativo e contas atrasadas.")).toBeInTheDocument();
     expect(screen.getByText("Conta de energia vencida há 8 dias")).toBeInTheDocument();
     expect(screen.getByText(/Priorize o pagamento das contas fixas vencidas/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Ver contas a pagar" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Ver saídas do mês" })).toHaveAttribute(
+      "href",
+      "/transactions",
+    );
+    expect(
+      screen.getByRole("link", { name: /Abrir foco do mes: Ver saídas do mês/i }),
+    ).toHaveAttribute("href", "/transactions");
   });
 
   it("Dashboard_FirstUseWithAccount_ShowsPathToAddOrImportData", async () => {
@@ -882,7 +919,9 @@ describe("DashboardPage", () => {
 
     expect(await screen.findByText("Prioridades do momento")).toBeInTheDocument();
 
-    const actionLinks = screen.getAllByRole("link", { name: /abrir/i });
+    const actionLinks = screen.getAllByRole("link").filter((link) =>
+      /^\d+\./i.test(link.textContent ?? ""),
+    );
 
     expect(actionLinks).toHaveLength(3);
     expect(screen.getByRole("link", { name: /1\. ver contas vencidas/i })).toHaveAttribute(
@@ -1140,6 +1179,65 @@ describe("DashboardPage", () => {
     expect(
       screen.queryByText(/month_health|Npgsql|PostgresException/i),
     ).not.toBeInTheDocument();
+  });
+
+  it("Dashboard_WhenMonthHealthIsUnavailable_UsesAlertActionAsNotificationFallback", async () => {
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+    mockedGetMonthHealth.mockRejectedValue(new ApiError("month health unavailable", 500));
+    mockedGetMonthlySummary.mockResolvedValue({
+      month: 3,
+      year: 2026,
+      totalIncome: 0,
+      totalExpense: 0,
+      balance: 0,
+      byCategory: [],
+    });
+    mockedGetAlerts.mockResolvedValue({
+      alerts: [
+        {
+          type: "low_balance",
+          severity: "medium",
+          message: "Seu dinheiro livre para o mes esta baixo.",
+          amount: 150,
+          actionUrl: "/transactions",
+        },
+      ],
+    });
+    mockedGetBillsSummary.mockResolvedValue({
+      totalPending: 0,
+      totalOverdue: 0,
+      totalPaid: 0,
+      countPending: 0,
+      countOverdue: 0,
+      countPaid: 0,
+      upcoming: [],
+    });
+    mockedGetFreeMoney.mockResolvedValue(createFreeMoneyResponse());
+    mockedGetMonthlyBudget.mockResolvedValue({
+      month: 3,
+      year: 2026,
+      totalPlanned: 0,
+      totalSpent: 0,
+      totalRemaining: 0,
+      categories: [],
+    });
+    mockedListAccounts.mockResolvedValue([]);
+    mockedListCategories.mockResolvedValue([]);
+    mockedListTransactions.mockResolvedValue([]);
+    mockedListBills.mockResolvedValue([]);
+
+    render(<DashboardPage />);
+
+    expect(await screen.findByText("Resumo financeiro")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", {
+        name: /Abrir foco do mes: Seu dinheiro livre para o mes esta baixo\./i,
+      }),
+    ).toHaveAttribute("href", "/transactions");
   });
 
   it("Dashboard_WhenSessionExpires_TriggersConsistentLogout", async () => {
