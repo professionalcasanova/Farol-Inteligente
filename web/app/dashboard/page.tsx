@@ -595,6 +595,15 @@ export default function DashboardPage() {
     <AppShell
       actions={
         <div className="flex flex-wrap items-center gap-3">
+          <MonthPicker
+            label="Mês de referência"
+            onChange={setMonthValue}
+            value={monthValue}
+          />
+        </div>
+      }
+      utilityActions={
+        <div className="flex items-center">
           <Link
             aria-label="Ver notificações do mês"
             className="relative inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-[var(--color-line)] bg-white px-3 py-2 text-[var(--color-foreground)] transition hover:bg-[var(--color-accent-soft)]"
@@ -619,12 +628,6 @@ export default function DashboardPage() {
               </span>
             ) : null}
           </Link>
-
-          <MonthPicker
-            label="Mês de referência"
-            onChange={setMonthValue}
-            value={monthValue}
-          />
         </div>
       }
       description="Acompanhe o mês, veja o que pede atenção e registre o que entrou ou saiu sem sair da página."

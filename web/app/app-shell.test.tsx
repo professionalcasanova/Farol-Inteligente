@@ -53,6 +53,7 @@ describe("AppShell", () => {
     render(
       <AppShell
         actions={<div>Mês das contas</div>}
+        utilityActions={<button type="button">Alertas</button>}
         description="Descrição"
         onLogout={vi.fn()}
         session={session}
@@ -63,6 +64,7 @@ describe("AppShell", () => {
     );
 
     expect(screen.getByText("Mês das contas")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Alertas" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Sair" })).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "Contas a pagar" }),

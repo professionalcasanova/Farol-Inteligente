@@ -11,6 +11,7 @@ type AppShellProps = {
   description: string;
   onLogout: () => void;
   actions?: ReactNode;
+  utilityActions?: ReactNode;
   children: ReactNode;
 };
 
@@ -28,6 +29,7 @@ export function AppShell({
   description,
   onLogout,
   actions,
+  utilityActions,
   children,
 }: AppShellProps) {
   const pathname = usePathname();
@@ -58,7 +60,7 @@ export function AppShell({
               </div>
 
               <nav aria-label="Navegação principal" className="min-w-0 lg:max-w-full">
-                <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:justify-end">
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 md:overflow-visible lg:justify-end">
                   {navItems.map((item) => {
                     const isActive = pathname === item.href;
 
@@ -67,7 +69,7 @@ export function AppShell({
                         aria-current={isActive ? "page" : undefined}
                         className={`inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold transition ${
                           isActive
-                            ? "border-[var(--color-foreground)] bg-[var(--color-foreground)] !text-white shadow-[0_12px_28px_rgba(19,36,51,0.16)]"
+                            ? "border-[var(--color-foreground)] bg-[var(--color-foreground)] !text-white"
                             : "border-transparent bg-white text-[var(--color-foreground)] hover:border-[var(--color-line)] hover:bg-[var(--color-accent-soft)]"
                         }`}
                         href={item.href}
@@ -84,6 +86,7 @@ export function AppShell({
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0">{actions}</div>
               <div className="flex flex-wrap items-center gap-3 lg:justify-end">
+                {utilityActions}
                 <div className="min-w-0 rounded-[24px] border border-[var(--color-line)] bg-white px-4 py-3 text-right">
                   <div className="truncate text-sm font-semibold text-[var(--color-foreground)]">
                     {session.name}
