@@ -27,6 +27,10 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
+      - name: Validate NuGet config
+        shell: pwsh
+        run: ./scripts/validate-nuget-config.ps1
+
       - name: Restore backend
         run: dotnet restore Farol.sln
 
