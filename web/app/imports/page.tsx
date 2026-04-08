@@ -123,14 +123,6 @@ export default function ImportsPage() {
 
   return (
     <AppShell
-      actions={
-        <Link
-          className="rounded-full border border-[var(--color-line)] px-4 py-3 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-white"
-          href="/dashboard"
-        >
-          Voltar ao dashboard
-        </Link>
-      }
       description="Envie um CSV simples para uma conta existente e veja na hora quantas linhas entraram, quantas foram ignoradas e por quê."
       onLogout={logout}
       session={session}

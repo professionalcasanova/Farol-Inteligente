@@ -10,6 +10,7 @@ const testFiles = [
   "lib/auth.test.ts",
   "lib/use-protected-session.test.ts",
   "app/page.test.tsx",
+  "app/app-shell.test.tsx",
   "app/login/page.test.tsx",
   "app/register/page.test.tsx",
   "app/dashboard/page.test.tsx",

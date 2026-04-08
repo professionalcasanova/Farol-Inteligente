@@ -284,12 +284,6 @@ export default function BillsPage() {
               ))}
             </select>
           </label>
-          <Link
-            className="rounded-full border border-[var(--color-line)] px-4 py-3 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-white"
-            href="/dashboard"
-          >
-            Voltar ao dashboard
-          </Link>
         </div>
       }
       description="Acompanhe vencimentos, destaque atrasos e marque pagamentos sem sair do MVP. O dashboard reflete tudo isso no mesmo mês."

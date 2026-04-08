@@ -250,12 +250,6 @@ export default function BudgetPage() {
             onChange={setMonthValue}
             value={monthValue}
           />
-          <Link
-            className="rounded-full border border-[var(--color-line)] px-4 py-3 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-white"
-            href="/dashboard"
-          >
-            Voltar ao dashboard
-          </Link>
         </div>
       }
       description="Monte, substitua ou limpe o orçamento mensal por categoria de despesa e acompanhe o restante em tempo real no dashboard."

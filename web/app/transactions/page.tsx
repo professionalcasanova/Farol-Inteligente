@@ -278,14 +278,6 @@ export default function TransactionsPage() {
 
   return (
     <AppShell
-      actions={
-        <Link
-          className="rounded-full border border-[var(--color-line)] px-4 py-3 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-white"
-          href="/dashboard"
-        >
-          Voltar ao dashboard
-        </Link>
-      }
       description="Registre entradas e saídas sem sair do MVP. Cada lançamento já atualiza saldo, dinheiro livre e alertas."
       onLogout={logout}
       session={session}
