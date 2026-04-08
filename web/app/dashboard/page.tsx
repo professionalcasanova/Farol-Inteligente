@@ -136,7 +136,7 @@ function getFinancialSupportText(data: DashboardData) {
     return "Este painel mostra a base do mês. Conforme você registrar movimentações, vencimentos e planejamento, a leitura fica mais precisa.";
   }
 
-  return "Entradas, saídas, saldo e dinheiro livre ajudam a confirmar o contexto do mês antes de agir sobre planejamento e vencimentos. Aqui, o dinheiro livre já considera o que ainda ficou reservado no planejamento.";
+  return "Entradas, saídas, saldo e dinheiro livre ajudam a confirmar o contexto do mês antes de agir. Aqui, o dinheiro livre já considera o que ficou reservado no planejamento e as contas em aberto do mês.";
 }
 
 function isFirstUseState(data: DashboardData) {
@@ -235,9 +235,9 @@ export default function DashboardPage() {
     : [];
   const freeMoneyReserveNote = data
     ? data.freeMoney.unpaidBillsReserve > 0
-      ? "Seu saldo atual ainda inclui contas já lançadas e não pagas."
+      ? "Esse valor já desconta as contas em aberto do mês."
       : data.freeMoney.plannedReserve > 0
-        ? "Parte do seu saldo já está reservada no planejamento do mês."
+        ? "Esse valor já desconta o que segue reservado no planejamento."
         : ""
     : "";
 
@@ -1148,7 +1148,7 @@ export default function DashboardPage() {
                   {
                     label: "Dinheiro livre",
                     value: formatCurrency(data.freeMoney.freeToSpend),
-                    detail: "O quanto ainda sobra sem furar o que já foi planejado.",
+                    detail: "O que ainda sobra depois do planejamento e das contas em aberto do mês.",
                     tone: "bg-[color:rgba(41,128,90,0.12)] text-[var(--color-success)]",
                     composition: freeMoneyReserveRows,
                     note: freeMoneyReserveNote,

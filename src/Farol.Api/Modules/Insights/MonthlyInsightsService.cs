@@ -103,10 +103,6 @@ public sealed class MonthlyInsightsService(FarolDbContext dbContext, TimeProvide
             })
             .ToListAsync(cancellationToken);
 
-        var totalBudgetRemaining = totalPlannedBudget - totalBudgetSpent;
-        var plannedRemaining = Math.Max(totalBudgetRemaining, 0m);
-        var freeToSpend = balance - plannedRemaining;
-
         var pendingBills = bills
             .Where(bill => !bill.IsPaid && bill.DueOn >= today)
             .ToList();
@@ -121,6 +117,11 @@ public sealed class MonthlyInsightsService(FarolDbContext dbContext, TimeProvide
         var overdueBills = bills
             .Where(bill => !bill.IsPaid && bill.DueOn < today)
             .ToList();
+
+        var totalBudgetRemaining = totalPlannedBudget - totalBudgetSpent;
+        var plannedRemaining = Math.Max(totalBudgetRemaining, 0m);
+        var unpaidBillsReserve = pendingBills.Sum(bill => bill.Amount) + overdueBills.Sum(bill => bill.Amount);
+        var freeToSpend = balance - plannedRemaining - unpaidBillsReserve;
 
         var categoryIdsForSummary = transactions
             .Where(transaction => transaction.CategoryId.HasValue)

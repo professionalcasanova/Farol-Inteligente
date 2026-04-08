@@ -200,6 +200,7 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
         var request = _factory.FinancialIntelligenceClient.LastRequest;
 
         Assert.NotNull(request);
+        Assert.Equal(-690m, request.Totals.FreeToSpend);
         Assert.Equal(1, request.Bills.OverdueCount);
         Assert.Equal(300m, request.Bills.OverdueAmount);
         Assert.Equal(3, request.Bills.PendingCount);

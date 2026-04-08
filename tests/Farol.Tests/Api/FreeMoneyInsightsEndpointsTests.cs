@@ -217,7 +217,7 @@ public sealed class FreeMoneyInsightsEndpointsTests : IClassFixture<FarolApiFact
     }
 
     [Fact]
-    public async Task GetFreeMoney_ShouldNotDiscountUnpaidBillsFromFreeToSpend()
+    public async Task GetFreeMoney_ShouldDiscountUnpaidBillsFromFreeToSpend()
     {
         await _factory.ResetDatabaseAsync();
         using var client = _factory.CreateClient();
@@ -259,7 +259,7 @@ public sealed class FreeMoneyInsightsEndpointsTests : IClassFixture<FarolApiFact
         Assert.Equal(300m, response.TotalBudgetRemaining);
         Assert.Equal(300m, response.PlannedReserve);
         Assert.Equal(400m, response.UnpaidBillsReserve);
-        Assert.Equal(2500m, response.FreeToSpend);
+        Assert.Equal(2100m, response.FreeToSpend);
     }
 
     [Fact]
@@ -365,7 +365,7 @@ public sealed class FreeMoneyInsightsEndpointsTests : IClassFixture<FarolApiFact
         Assert.NotNull(response);
         Assert.Equal(300m, response.PlannedReserve);
         Assert.Equal(880m, response.UnpaidBillsReserve);
-        Assert.Equal(2500m, response.FreeToSpend);
+        Assert.Equal(1620m, response.FreeToSpend);
     }
 
     private async Task<(Guid AccountId, Dictionary<string, Guid> CategoryIds)> SeedAccountAndCategoriesAsync(

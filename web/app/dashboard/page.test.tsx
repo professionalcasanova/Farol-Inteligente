@@ -813,7 +813,7 @@ describe("DashboardPage", () => {
     expect(screen.getByText(/1\.200,00/)).toBeInTheDocument();
     expect(screen.getByText(/850,00/)).toBeInTheDocument();
     expect(
-      screen.getByText("Seu saldo atual ainda inclui contas já lançadas e não pagas."),
+      screen.getByText("Esse valor já desconta as contas em aberto do mês."),
     ).toBeInTheDocument();
   });
 
