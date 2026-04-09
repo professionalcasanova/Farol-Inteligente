@@ -3,6 +3,7 @@ using System;
 using Farol.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Farol.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(FarolDbContext))]
-    partial class FarolDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260409121858_AddBudgetTemplates")]
+    partial class AddBudgetTemplates
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

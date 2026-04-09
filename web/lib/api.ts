@@ -67,6 +67,17 @@ export type MonthlyBudgetResponse = {
   categories: MonthlyBudgetCategoryResponse[];
 };
 
+export type BudgetTemplateCategoryResponse = {
+  categoryId: string;
+  categoryName: string;
+  planned: number;
+};
+
+export type BudgetTemplateResponse = {
+  totalPlanned: number;
+  categories: BudgetTemplateCategoryResponse[];
+};
+
 export type FreeMoneyResponse = {
   month: number;
   year: number;
@@ -504,6 +515,38 @@ export async function saveMonthlyBudget(
   },
 ) {
   return apiRequest<MonthlyBudgetResponse>("/api/budgets/monthly", {
+    method: "POST",
+    token,
+    body: payload,
+  });
+}
+
+export async function getBudgetTemplate(token: string) {
+  return apiRequest<BudgetTemplateResponse>("/api/budgets/template", { token });
+}
+
+export async function saveBudgetTemplate(
+  token: string,
+  payload: Array<{
+    categoryId: string;
+    planned: number;
+  }>,
+) {
+  return apiRequest<BudgetTemplateResponse>("/api/budgets/template", {
+    method: "POST",
+    token,
+    body: payload,
+  });
+}
+
+export async function applyBudgetTemplate(
+  token: string,
+  payload: {
+    month: number;
+    year: number;
+  },
+) {
+  return apiRequest<MonthlyBudgetResponse>("/api/budgets/template/apply", {
     method: "POST",
     token,
     body: payload,
