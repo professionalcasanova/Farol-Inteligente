@@ -29,6 +29,13 @@ class AnalysisBillsRequest(BaseModel):
     overdueCount: int = Field(ge=0)
     upcoming7DaysAmount: float
     upcoming7DaysCount: int = Field(ge=0)
+    maxOverdueDays: int = Field(default=0, ge=0)
+    predictableAmount: float = 0
+    predictableCount: int = Field(default=0, ge=0)
+    recurringAmount: float = 0
+    recurringCount: int = Field(default=0, ge=0)
+    installmentAmount: float = 0
+    installmentCount: int = Field(default=0, ge=0)
 
 
 class AnalysisCategoryRequest(BaseModel):

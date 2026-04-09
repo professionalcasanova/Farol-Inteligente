@@ -144,7 +144,14 @@ public sealed class FinancialIntelligenceService(
                 PendingCount = snapshot.CountPendingBills,
                 OverdueCount = snapshot.CountOverdueBills,
                 Upcoming7DaysAmount = snapshot.TotalUpcoming7DaysBills,
-                Upcoming7DaysCount = snapshot.CountUpcoming7DaysBills
+                Upcoming7DaysCount = snapshot.CountUpcoming7DaysBills,
+                MaxOverdueDays = snapshot.MaxOverdueDays,
+                PredictableAmount = snapshot.TotalPredictableObligations,
+                PredictableCount = snapshot.CountPredictableObligations,
+                RecurringAmount = snapshot.TotalRecurringObligations,
+                RecurringCount = snapshot.CountRecurringObligations,
+                InstallmentAmount = snapshot.TotalInstallmentObligations,
+                InstallmentCount = snapshot.CountInstallmentObligations
             },
             Categories = snapshot.Categories
                 .Select(item => new FinancialAnalysisCategoryRequest

@@ -89,6 +89,12 @@ export type FreeMoneyResponse = {
   totalBudgetRemaining: number;
   plannedReserve: number;
   unpaidBillsReserve: number;
+  predictableObligationsReserve: number;
+  recurringBillsReserve: number;
+  installmentBillsReserve: number;
+  predictableObligationsCount: number;
+  recurringBillsCount: number;
+  installmentBillsCount: number;
   freeToSpend: number;
 };
 
@@ -139,15 +145,24 @@ export type BillsSummaryUpcomingResponse = {
   amount: number;
   dueOn: string;
   status: BillStatus;
+  seriesKind?: BillSeriesKind | null;
+  occurrenceNumber?: number | null;
+  totalOccurrences?: number | null;
 };
 
 export type BillsSummaryResponse = {
   totalPending: number;
   totalOverdue: number;
   totalPaid: number;
+  predictableTotal: number;
+  recurringTotal: number;
+  installmentTotal: number;
   countPending: number;
   countOverdue: number;
   countPaid: number;
+  countPredictable: number;
+  countRecurring: number;
+  countInstallment: number;
   upcoming: BillsSummaryUpcomingResponse[];
 };
 

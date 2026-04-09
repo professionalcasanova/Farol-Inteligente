@@ -90,6 +90,54 @@ public sealed class BillsSummaryEndpointsTests : IClassFixture<FarolApiFactory>
     }
 
     [Fact]
+    public async Task GetBillsSummary_ShouldExpandRecurringSeriesAndExposePredictableMetadata()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var nextMonthStart = new DateOnly(_factory.Today.Year, _factory.Today.Month, 1).AddMonths(1);
+
+        await SeedSeriesAsync(
+            "maria@email.com",
+            "Internet fibra",
+            160m,
+            nextMonthStart,
+            BillSeries.RecurringKind,
+            BillSeries.OccurrenceCountEndMode,
+            occurrenceCount: 12);
+        await SeedSeriesAsync(
+            "maria@email.com",
+            "Notebook",
+            500m,
+            nextMonthStart,
+            BillSeries.InstallmentKind,
+            BillSeries.OccurrenceCountEndMode,
+            occurrenceCount: 10);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var summary = await client.GetFromJsonAsync<BillsSummaryResponse>(
+            $"/api/dashboard/bills-summary?month={nextMonthStart.Month}&year={nextMonthStart.Year}");
+
+        Assert.NotNull(summary);
+        Assert.Equal(660m, summary.TotalPending);
+        Assert.Equal(660m, summary.PredictableTotal);
+        Assert.Equal(160m, summary.RecurringTotal);
+        Assert.Equal(500m, summary.InstallmentTotal);
+        Assert.Equal(2, summary.CountPredictable);
+
+        var recurringBill = Assert.Single(summary.Upcoming, item => item.SeriesKind == BillSeries.RecurringKind);
+        Assert.Equal("Internet fibra", recurringBill.Description);
+        Assert.Equal(1, recurringBill.OccurrenceNumber);
+        Assert.Equal(12, recurringBill.TotalOccurrences);
+
+        var installmentBill = Assert.Single(summary.Upcoming, item => item.SeriesKind == BillSeries.InstallmentKind);
+        Assert.Equal("Notebook", installmentBill.Description);
+        Assert.Equal(1, installmentBill.OccurrenceNumber);
+        Assert.Equal(10, installmentBill.TotalOccurrences);
+    }
+
+    [Fact]
     public async Task GetBillsSummary_ShouldBeIsolatedByAuthenticatedUser()
     {
         await _factory.ResetDatabaseAsync();
@@ -138,6 +186,34 @@ public sealed class BillsSummaryEndpointsTests : IClassFixture<FarolApiFactory>
         await dbContext.SaveChangesAsync();
 
         return bill.Id;
+    }
+
+    private async Task SeedSeriesAsync(
+        string email,
+        string description,
+        decimal amount,
+        DateOnly firstDueOn,
+        string kind,
+        string endMode,
+        int? occurrenceCount = null)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<FarolDbContext>();
+        var userId = dbContext.Users.Single(user => user.Email == email).Id;
+        var series = new BillSeries(
+            userId,
+            description,
+            amount,
+            firstDueOn,
+            kind,
+            BillSeries.MonthlyFrequency,
+            endMode,
+            untilDate: null,
+            occurrenceCount: occurrenceCount);
+
+        dbContext.BillSeries.Add(series);
+        dbContext.Bills.Add(series.CreateFirstOccurrence());
+        await dbContext.SaveChangesAsync();
     }
 
     private static async Task<string> RegisterAndGetTokenAsync(HttpClient client, string email)

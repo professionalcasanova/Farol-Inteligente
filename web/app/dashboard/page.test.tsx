@@ -16,6 +16,7 @@ import {
   listBills,
   listCategories,
   listTransactions,
+  type BillsSummaryResponse,
   type FreeMoneyResponse,
 } from "@/lib/api";
 import { useProtectedSession } from "@/lib/use-protected-session";
@@ -113,7 +114,34 @@ function createFreeMoneyResponse(
     totalBudgetRemaining: 0,
     plannedReserve: 0,
     unpaidBillsReserve: 0,
+    predictableObligationsReserve: 0,
+    recurringBillsReserve: 0,
+    installmentBillsReserve: 0,
+    predictableObligationsCount: 0,
+    recurringBillsCount: 0,
+    installmentBillsCount: 0,
     freeToSpend: 0,
+    ...overrides,
+  };
+}
+
+function createBillsSummaryResponse(
+  overrides?: Partial<BillsSummaryResponse>,
+): BillsSummaryResponse {
+  return {
+    totalPending: 0,
+    totalOverdue: 0,
+    totalPaid: 0,
+    predictableTotal: 0,
+    recurringTotal: 0,
+    installmentTotal: 0,
+    countPending: 0,
+    countOverdue: 0,
+    countPaid: 0,
+    countPredictable: 0,
+    countRecurring: 0,
+    countInstallment: 0,
+    upcoming: [],
     ...overrides,
   };
 }
@@ -186,6 +214,7 @@ function mockDashboardApi(overrides?: {
       actionUrl?: string | null;
     }>;
   };
+  billsSummary?: Partial<BillsSummaryResponse>;
   freeMoney?: Partial<FreeMoneyResponse>;
 }) {
   mockedGetMonthHealth.mockResolvedValue(
@@ -209,15 +238,9 @@ function mockDashboardApi(overrides?: {
     byCategory: [],
   });
   mockedGetAlerts.mockResolvedValue(overrides?.alerts ?? { alerts: [] });
-  mockedGetBillsSummary.mockResolvedValue({
-    totalPending: 0,
-    totalOverdue: 0,
-    totalPaid: 0,
-    countPending: 0,
-    countOverdue: 0,
-    countPaid: 0,
-    upcoming: [],
-  });
+  mockedGetBillsSummary.mockResolvedValue(
+    createBillsSummaryResponse(overrides?.billsSummary),
+  );
   mockedGetFreeMoney.mockResolvedValue(createFreeMoneyResponse(overrides?.freeMoney));
   mockedGetMonthlyBudget.mockResolvedValue({
     month: 3,
@@ -489,15 +512,7 @@ describe("DashboardPage", () => {
         byCategory: [],
       });
     mockedGetAlerts.mockResolvedValue({ alerts: [] });
-    mockedGetBillsSummary.mockResolvedValue({
-      totalPending: 0,
-      totalOverdue: 0,
-      totalPaid: 0,
-      countPending: 0,
-      countOverdue: 0,
-      countPaid: 0,
-      upcoming: [],
-    });
+    mockedGetBillsSummary.mockResolvedValue(createBillsSummaryResponse());
     mockedGetFreeMoney.mockResolvedValue({
       ...createFreeMoneyResponse({
         totalExpense: 85,
@@ -898,6 +913,93 @@ describe("DashboardPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("Dashboard_PredictableObligations_ShowsRecurringAndInstallmentPressure", async () => {
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+    mockDashboardApi({
+      accounts: [
+        {
+          id: "account-1",
+          name: "Conta principal",
+          type: 2,
+          isActive: true,
+          createdAtUtc: "2026-03-01T00:00:00Z",
+        },
+      ],
+      transactions: [
+        {
+          id: "transaction-1",
+          financialAccountId: "account-1",
+          categoryId: null,
+          type: 1,
+          amount: 4200,
+          description: "Salario",
+          occurredOn: "2026-03-01",
+          createdAtUtc: "2026-03-01T00:00:00Z",
+        },
+      ],
+      billsSummary: {
+        totalPending: 1680,
+        predictableTotal: 1460,
+        recurringTotal: 960,
+        installmentTotal: 500,
+        countPending: 4,
+        countPredictable: 3,
+        countRecurring: 2,
+        countInstallment: 1,
+        upcoming: [
+          {
+            id: "bill-1",
+            description: "Internet fibra",
+            amount: 160,
+            dueOn: "2026-03-12",
+            status: "pending",
+            seriesKind: "recurring",
+          },
+          {
+            id: "bill-2",
+            description: "Notebook",
+            amount: 500,
+            dueOn: "2026-03-15",
+            status: "pending",
+            seriesKind: "installment",
+            occurrenceNumber: 3,
+            totalOccurrences: 12,
+          },
+        ],
+      },
+      freeMoney: {
+        totalIncome: 4200,
+        balance: 4200,
+        unpaidBillsReserve: 1680,
+        predictableObligationsReserve: 1460,
+        recurringBillsReserve: 960,
+        installmentBillsReserve: 500,
+        predictableObligationsCount: 3,
+        recurringBillsCount: 2,
+        installmentBillsCount: 1,
+        freeToSpend: 1520,
+      },
+    });
+
+    render(<DashboardPage />);
+
+    expect(await screen.findByText("Compromissos previsiveis em aberto")).toBeInTheDocument();
+    expect(screen.getByText("Recorrentes")).toBeInTheDocument();
+    expect(screen.getByText("Parceladas")).toBeInTheDocument();
+    expect(screen.getAllByText(/1\.460,00/).length).toBeGreaterThan(0);
+    expect(
+      screen.getByText(
+        "Desse total em contas abertas, R$ 1.460,00 ja vem de contas recorrentes e parcelas.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Recorrente")).toBeInTheDocument();
+    expect(screen.getByText("Parcela 3/12")).toBeInTheDocument();
+  });
+
   it("Dashboard_WithRecommendedActions_ShowsPrioritizedLinks", async () => {
     mockedUseProtectedSession.mockReturnValue({
       session,
@@ -1126,15 +1228,7 @@ describe("DashboardPage", () => {
       ),
     );
     mockedGetAlerts.mockResolvedValue({ alerts: [] });
-    mockedGetBillsSummary.mockResolvedValue({
-      totalPending: 0,
-      totalOverdue: 0,
-      totalPaid: 0,
-      countPending: 0,
-      countOverdue: 0,
-      countPaid: 0,
-      upcoming: [],
-    });
+    mockedGetBillsSummary.mockResolvedValue(createBillsSummaryResponse());
     mockedGetFreeMoney.mockResolvedValue(createFreeMoneyResponse());
     mockedGetMonthlyBudget.mockResolvedValue({
       month: 3,
@@ -1191,15 +1285,7 @@ describe("DashboardPage", () => {
         },
       ],
     });
-    mockedGetBillsSummary.mockResolvedValue({
-      totalPending: 0,
-      totalOverdue: 0,
-      totalPaid: 0,
-      countPending: 0,
-      countOverdue: 0,
-      countPaid: 0,
-      upcoming: [],
-    });
+    mockedGetBillsSummary.mockResolvedValue(createBillsSummaryResponse());
     mockedGetFreeMoney.mockResolvedValue(createFreeMoneyResponse());
     mockedGetMonthlyBudget.mockResolvedValue({
       month: 3,
@@ -1261,15 +1347,7 @@ describe("DashboardPage", () => {
         },
       ],
     });
-    mockedGetBillsSummary.mockResolvedValue({
-      totalPending: 0,
-      totalOverdue: 0,
-      totalPaid: 0,
-      countPending: 0,
-      countOverdue: 0,
-      countPaid: 0,
-      upcoming: [],
-    });
+    mockedGetBillsSummary.mockResolvedValue(createBillsSummaryResponse());
     mockedGetFreeMoney.mockResolvedValue(createFreeMoneyResponse());
     mockedGetMonthlyBudget.mockResolvedValue({
       month: 3,
@@ -1316,15 +1394,7 @@ describe("DashboardPage", () => {
       new ApiError("Invalid access token.", 401),
     );
     mockedGetAlerts.mockResolvedValue({ alerts: [] });
-    mockedGetBillsSummary.mockResolvedValue({
-      totalPending: 0,
-      totalOverdue: 0,
-      totalPaid: 0,
-      countPending: 0,
-      countOverdue: 0,
-      countPaid: 0,
-      upcoming: [],
-    });
+    mockedGetBillsSummary.mockResolvedValue(createBillsSummaryResponse());
     mockedGetFreeMoney.mockResolvedValue(createFreeMoneyResponse());
     mockedGetMonthlyBudget.mockResolvedValue({
       month: 3,

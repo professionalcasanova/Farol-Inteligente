@@ -1,10 +1,15 @@
+using Farol.Api.Modules.Bills;
+using Farol.Domain.Bills;
 using Farol.Domain.Ledger;
 using Farol.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Farol.Api.Modules.Insights;
 
-public sealed class MonthlyInsightsService(FarolDbContext dbContext, TimeProvider timeProvider)
+public sealed class MonthlyInsightsService(
+    FarolDbContext dbContext,
+    TimeProvider timeProvider,
+    BillSeriesExpansionService billSeriesExpansionService)
 {
     private const string HighSeverity = "high";
     private const string MediumSeverity = "medium";
@@ -16,6 +21,11 @@ public sealed class MonthlyInsightsService(FarolDbContext dbContext, TimeProvide
     {
         var periodEnd = periodStart.AddMonths(1);
         var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+
+        await billSeriesExpansionService.ExpandForMonthAsync(
+            userId,
+            periodStart,
+            cancellationToken);
 
         var transactions = await dbContext.Transactions
             .AsNoTracking()
@@ -99,9 +109,21 @@ public sealed class MonthlyInsightsService(FarolDbContext dbContext, TimeProvide
             {
                 bill.Amount,
                 bill.DueOn,
-                bill.IsPaid
+                bill.IsPaid,
+                bill.BillSeriesId
             })
             .ToListAsync(cancellationToken);
+        var seriesIds = bills
+            .Where(bill => bill.BillSeriesId.HasValue)
+            .Select(bill => bill.BillSeriesId!.Value)
+            .Distinct()
+            .ToArray();
+        var seriesKindsById = seriesIds.Length == 0
+            ? new Dictionary<Guid, string>()
+            : await dbContext.BillSeries
+                .AsNoTracking()
+                .Where(series => seriesIds.Contains(series.Id))
+                .ToDictionaryAsync(series => series.Id, series => series.Kind, cancellationToken);
 
         var pendingBills = bills
             .Where(bill => !bill.IsPaid && bill.DueOn >= today)
@@ -117,6 +139,24 @@ public sealed class MonthlyInsightsService(FarolDbContext dbContext, TimeProvide
         var overdueBills = bills
             .Where(bill => !bill.IsPaid && bill.DueOn < today)
             .ToList();
+        var predictableBills = bills
+            .Where(bill => !bill.IsPaid && bill.BillSeriesId.HasValue)
+            .ToList();
+        var recurringBills = predictableBills
+            .Where(bill =>
+                bill.BillSeriesId.HasValue &&
+                seriesKindsById.TryGetValue(bill.BillSeriesId.Value, out var kind) &&
+                kind == BillSeries.RecurringKind)
+            .ToList();
+        var installmentBills = predictableBills
+            .Where(bill =>
+                bill.BillSeriesId.HasValue &&
+                seriesKindsById.TryGetValue(bill.BillSeriesId.Value, out var kind) &&
+                kind == BillSeries.InstallmentKind)
+            .ToList();
+        var maxOverdueDays = overdueBills.Count == 0
+            ? 0
+            : overdueBills.Max(bill => today.DayNumber - bill.DueOn.DayNumber);
 
         var totalBudgetRemaining = totalPlannedBudget - totalBudgetSpent;
         var plannedRemaining = Math.Max(totalBudgetRemaining, 0m);
@@ -162,6 +202,13 @@ public sealed class MonthlyInsightsService(FarolDbContext dbContext, TimeProvide
             overdueBills.Count,
             upcoming7DaysBills.Sum(bill => bill.Amount),
             upcoming7DaysBills.Count,
+            maxOverdueDays,
+            predictableBills.Sum(bill => bill.Amount),
+            predictableBills.Count,
+            recurringBills.Sum(bill => bill.Amount),
+            recurringBills.Count,
+            installmentBills.Sum(bill => bill.Amount),
+            installmentBills.Count,
             categories);
     }
 
@@ -182,6 +229,12 @@ public sealed class MonthlyInsightsService(FarolDbContext dbContext, TimeProvide
             TotalBudgetRemaining = snapshot.TotalBudgetRemaining,
             PlannedReserve = snapshot.PlannedReserve,
             UnpaidBillsReserve = snapshot.UnpaidBillsReserve,
+            PredictableObligationsReserve = snapshot.TotalPredictableObligations,
+            PredictableObligationsCount = snapshot.CountPredictableObligations,
+            RecurringBillsReserve = snapshot.TotalRecurringObligations,
+            RecurringBillsCount = snapshot.CountRecurringObligations,
+            InstallmentBillsReserve = snapshot.TotalInstallmentObligations,
+            InstallmentBillsCount = snapshot.CountInstallmentObligations,
             FreeToSpend = snapshot.FreeToSpend
         };
     }
@@ -259,6 +312,13 @@ public sealed record MonthlyInsightSnapshot(
     int CountOverdueBills,
     decimal TotalUpcoming7DaysBills,
     int CountUpcoming7DaysBills,
+    int MaxOverdueDays,
+    decimal TotalPredictableObligations,
+    int CountPredictableObligations,
+    decimal TotalRecurringObligations,
+    int CountRecurringObligations,
+    decimal TotalInstallmentObligations,
+    int CountInstallmentObligations,
     IReadOnlyList<MonthlyInsightCategorySnapshot> Categories)
 {
     public decimal BudgetOverrun => TotalBudgetSpent - TotalPlannedBudget;

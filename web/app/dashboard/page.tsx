@@ -217,6 +217,18 @@ function isActionNavigableFromDashboard(target?: string | null) {
   return Boolean(target && target.trim() && target !== "/dashboard");
 }
 
+function getPredictableBillLabel(bill: BillsSummaryResponse["upcoming"][number]) {
+  if (bill.seriesKind === "installment" && bill.occurrenceNumber && bill.totalOccurrences) {
+    return `Parcela ${bill.occurrenceNumber}/${bill.totalOccurrences}`;
+  }
+
+  if (bill.seriesKind === "recurring") {
+    return "Recorrente";
+  }
+
+  return "";
+}
+
 export default function DashboardPage() {
   const { session, isLoading, logout } = useProtectedSession();
   const [monthValue, setMonthValue] = useState(getCurrentMonthInputValue());
@@ -271,7 +283,9 @@ export default function DashboardPage() {
       ].filter((item) => item.value > 0)
     : [];
   const freeMoneyReserveNote = data
-    ? data.freeMoney.unpaidBillsReserve > 0
+    ? data.freeMoney.predictableObligationsReserve > 0
+      ? `Desse total em contas abertas, ${formatCurrency(data.freeMoney.predictableObligationsReserve)} ja vem de contas recorrentes e parcelas.`
+      : data.freeMoney.unpaidBillsReserve > 0
       ? "Esse valor já desconta as contas em aberto do mês."
       : data.freeMoney.plannedReserve > 0
         ? "Esse valor já desconta o que segue reservado no planejamento."
@@ -1557,6 +1571,59 @@ export default function DashboardPage() {
                   </article>
                 ))}
               </div>
+
+              {data.billsSummary.countPredictable > 0 ? (
+                <div className="mt-6 rounded-[24px] border border-[var(--color-line)] bg-white p-5">
+                  <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+                    <div>
+                      <div className="text-sm font-semibold text-[var(--color-foreground)]">
+                        Compromissos previsiveis em aberto
+                      </div>
+                      <div className="mt-1 text-xs leading-5 text-[var(--color-muted)]">
+                        Contas recorrentes e parcelas ja previstas neste mes que ainda seguem abertas.
+                      </div>
+                    </div>
+                    <div className="text-sm font-semibold text-[var(--color-foreground)]">
+                      {formatCurrency(data.billsSummary.predictableTotal)}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 md:grid-cols-3">
+                    {[
+                      {
+                        label: "Previsiveis",
+                        total: data.billsSummary.predictableTotal,
+                        count: data.billsSummary.countPredictable,
+                      },
+                      {
+                        label: "Recorrentes",
+                        total: data.billsSummary.recurringTotal,
+                        count: data.billsSummary.countRecurring,
+                      },
+                      {
+                        label: "Parceladas",
+                        total: data.billsSummary.installmentTotal,
+                        count: data.billsSummary.countInstallment,
+                      },
+                    ].map((item) => (
+                      <div
+                        className="rounded-[20px] border border-[var(--color-line)] bg-[var(--color-panel)] px-4 py-3"
+                        key={item.label}
+                      >
+                        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--color-muted)]">
+                          {item.label}
+                        </div>
+                        <div className="mt-3 text-lg font-semibold text-[var(--color-foreground)]">
+                          {formatCurrency(item.total)}
+                        </div>
+                        <div className="mt-1 text-xs text-[var(--color-muted)]">
+                          {item.count} {item.count === 1 ? "conta" : "contas"}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </article>
 
             <article className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
@@ -1587,8 +1654,13 @@ export default function DashboardPage() {
                         <div className="text-sm font-semibold text-[var(--color-foreground)]">
                           {bill.description}
                         </div>
-                        <div className="mt-1 text-xs text-[var(--color-muted)]">
-                          Vence em {formatDate(bill.dueOn)}
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-muted)]">
+                          <span>Vence em {formatDate(bill.dueOn)}</span>
+                          {getPredictableBillLabel(bill) ? (
+                            <span className="rounded-full border border-[var(--color-line)] bg-[var(--color-panel)] px-2 py-1 font-semibold text-[var(--color-foreground)]">
+                              {getPredictableBillLabel(bill)}
+                            </span>
+                          ) : null}
                         </div>
                       </div>
                       <div className="flex items-center gap-3">

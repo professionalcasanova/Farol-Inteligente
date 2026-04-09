@@ -269,6 +269,47 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
         Assert.Equal(390m, request.Bills.PendingAmount);
         Assert.Equal(3, request.Bills.Upcoming7DaysCount);
         Assert.Equal(390m, request.Bills.Upcoming7DaysAmount);
+        Assert.Equal(3, request.Bills.MaxOverdueDays);
+    }
+
+    [Fact]
+    public async Task GetMonthHealth_ShouldSendPredictableObligationsSnapshotToFinancialIntelligenceService()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var nextMonthStart = new DateOnly(_factory.Today.Year, _factory.Today.Month, 1).AddMonths(1);
+
+        await SeedSeriesAsync(
+            "maria@email.com",
+            "Internet fibra",
+            160m,
+            nextMonthStart,
+            BillSeries.RecurringKind,
+            12);
+        await SeedSeriesAsync(
+            "maria@email.com",
+            "Notebook",
+            500m,
+            nextMonthStart,
+            BillSeries.InstallmentKind,
+            10);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await client.GetAsync($"/api/insights/month-health?month={nextMonthStart.Month}&year={nextMonthStart.Year}");
+
+        response.EnsureSuccessStatusCode();
+        var request = _factory.FinancialIntelligenceClient.LastRequest;
+
+        Assert.NotNull(request);
+        Assert.Equal(660m, request.Bills.PendingAmount);
+        Assert.Equal(660m, request.Bills.PredictableAmount);
+        Assert.Equal(2, request.Bills.PredictableCount);
+        Assert.Equal(160m, request.Bills.RecurringAmount);
+        Assert.Equal(1, request.Bills.RecurringCount);
+        Assert.Equal(500m, request.Bills.InstallmentAmount);
+        Assert.Equal(1, request.Bills.InstallmentCount);
     }
 
     [Fact]
@@ -528,6 +569,33 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
         await dbContext.SaveChangesAsync();
 
         return bill.Id;
+    }
+
+    private async Task SeedSeriesAsync(
+        string email,
+        string description,
+        decimal amount,
+        DateOnly firstDueOn,
+        string kind,
+        int occurrenceCount)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<FarolDbContext>();
+        var userId = dbContext.Users.Single(user => user.Email == email).Id;
+        var series = new BillSeries(
+            userId,
+            description,
+            amount,
+            firstDueOn,
+            kind,
+            BillSeries.MonthlyFrequency,
+            BillSeries.OccurrenceCountEndMode,
+            untilDate: null,
+            occurrenceCount: occurrenceCount);
+
+        dbContext.BillSeries.Add(series);
+        dbContext.Bills.Add(series.CreateFirstOccurrence());
+        await dbContext.SaveChangesAsync();
     }
 
     private static async Task<string> RegisterAndGetTokenAsync(HttpClient client, string email)

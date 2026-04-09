@@ -10,7 +10,10 @@ namespace Farol.Api.Modules.Bills;
 [ApiController]
 [Authorize]
 [Route("api/bills")]
-public sealed class BillsController(FarolDbContext dbContext, TimeProvider timeProvider) : ControllerBase
+public sealed class BillsController(
+    FarolDbContext dbContext,
+    TimeProvider timeProvider,
+    BillSeriesExpansionService billSeriesExpansionService) : ControllerBase
 {
     private const string PendingStatus = "pending";
     private const string PaidStatus = "paid";
@@ -107,7 +110,10 @@ public sealed class BillsController(FarolDbContext dbContext, TimeProvider timeP
             }
 
             var periodEnd = periodStart.AddMonths(1);
-            await ExpandRecurringSeriesAsync(userId, periodStart, periodEnd, cancellationToken);
+            await billSeriesExpansionService.ExpandForMonthAsync(
+                userId,
+                periodStart,
+                cancellationToken);
             query = query.Where(bill => bill.DueOn >= periodStart && bill.DueOn < periodEnd);
         }
 
@@ -242,70 +248,6 @@ public sealed class BillsController(FarolDbContext dbContext, TimeProvider timeP
         }
 
         return message[..parameterSuffixIndex];
-    }
-
-    private async Task ExpandRecurringSeriesAsync(
-        Guid userId,
-        DateOnly periodStart,
-        DateOnly periodEnd,
-        CancellationToken cancellationToken)
-    {
-        var series = await dbContext.BillSeries
-            .Where(item =>
-                item.UserId == userId &&
-                item.IsActive &&
-                item.FirstDueOn < periodEnd)
-            .ToListAsync(cancellationToken);
-
-        if (series.Count == 0)
-        {
-            return;
-        }
-
-        var seriesIds = series.Select(item => item.Id).ToArray();
-        var existingOccurrences = await dbContext.Bills
-            .Where(bill =>
-                bill.UserId == userId &&
-                bill.BillSeriesId.HasValue &&
-                seriesIds.Contains(bill.BillSeriesId.Value) &&
-                bill.DueOn >= periodStart &&
-                bill.DueOn < periodEnd)
-            .Select(bill => new { bill.BillSeriesId, bill.DueOn })
-            .ToListAsync(cancellationToken);
-
-        var existingKeys = existingOccurrences
-            .Select(item => $"{item.BillSeriesId:N}:{item.DueOn:yyyy-MM-dd}")
-            .ToHashSet(StringComparer.Ordinal);
-
-        var created = false;
-
-        foreach (var item in series)
-        {
-            if (!item.TryResolveOccurrenceForMonth(
-                    periodStart,
-                    out var dueOn,
-                    out _,
-                    out _))
-            {
-                continue;
-            }
-
-            var key = $"{item.Id:N}:{dueOn:yyyy-MM-dd}";
-
-            if (existingKeys.Contains(key))
-            {
-                continue;
-            }
-
-            dbContext.Bills.Add(item.CreateOccurrenceForMonth(periodStart));
-            existingKeys.Add(key);
-            created = true;
-        }
-
-        if (created)
-        {
-            await dbContext.SaveChangesAsync(cancellationToken);
-        }
     }
 
     private async Task<string?> ResolveSeriesKindAsync(Guid? billSeriesId, CancellationToken cancellationToken)

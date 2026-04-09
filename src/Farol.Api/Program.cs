@@ -1,5 +1,6 @@
 using System.Text;
 using Farol.Api.Common;
+using Farol.Api.Modules.Bills;
 using Farol.Api.Modules.Insights;
 using Farol.Infrastructure.Auth;
 using Farol.Infrastructure.Persistence;
@@ -103,6 +104,7 @@ builder.Services.AddDbContext<FarolDbContext>(options =>
     options.UseNpgsql(connectionString));
 builder.Services.AddScoped<PasswordService>();
 builder.Services.AddScoped<JwtTokenService>();
+builder.Services.AddScoped<BillSeriesExpansionService>();
 builder.Services.AddScoped<MonthlyInsightsService>();
 builder.Services.AddScoped<FinancialIntelligenceService>();
 builder.Services.AddSingleton(TimeProvider.System);

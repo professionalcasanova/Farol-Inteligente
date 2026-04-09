@@ -368,6 +368,54 @@ public sealed class FreeMoneyInsightsEndpointsTests : IClassFixture<FarolApiFact
         Assert.Equal(1620m, response.FreeToSpend);
     }
 
+    [Fact]
+    public async Task GetFreeMoney_ShouldExposePredictableRecurringAndInstallmentReserves()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var seed = await SeedAccountAndCategoriesAsync(
+            "maria@email.com",
+            ("Salario", CategoryType.Income));
+        var nextMonthStart = new DateOnly(_factory.Today.Year, _factory.Today.Month, 1).AddMonths(1);
+
+        await SeedTransactionsAsync(
+            "maria@email.com",
+            seed.AccountId,
+            [
+                (nextMonthStart, "Salario", 3000m, TransactionType.Income, seed.CategoryIds["Salario"])
+            ]);
+        await SeedSeriesAsync(
+            "maria@email.com",
+            "Internet",
+            160m,
+            nextMonthStart,
+            BillSeries.RecurringKind,
+            12);
+        await SeedSeriesAsync(
+            "maria@email.com",
+            "Notebook",
+            500m,
+            nextMonthStart,
+            BillSeries.InstallmentKind,
+            10);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await client.GetFromJsonAsync<FreeMoneyResponse>(
+            $"/api/insights/free-money?month={nextMonthStart.Month}&year={nextMonthStart.Year}");
+
+        Assert.NotNull(response);
+        Assert.Equal(660m, response.UnpaidBillsReserve);
+        Assert.Equal(660m, response.PredictableObligationsReserve);
+        Assert.Equal(2, response.PredictableObligationsCount);
+        Assert.Equal(160m, response.RecurringBillsReserve);
+        Assert.Equal(1, response.RecurringBillsCount);
+        Assert.Equal(500m, response.InstallmentBillsReserve);
+        Assert.Equal(1, response.InstallmentBillsCount);
+        Assert.Equal(2340m, response.FreeToSpend);
+    }
+
     private async Task<(Guid AccountId, Dictionary<string, Guid> CategoryIds)> SeedAccountAndCategoriesAsync(
         string email,
         params (string Name, CategoryType Type)[] categoryDefinitions)
@@ -459,6 +507,33 @@ public sealed class FreeMoneyInsightsEndpointsTests : IClassFixture<FarolApiFact
             dbContext.Bills.Add(bill);
         }
 
+        await dbContext.SaveChangesAsync();
+    }
+
+    private async Task SeedSeriesAsync(
+        string email,
+        string description,
+        decimal amount,
+        DateOnly firstDueOn,
+        string kind,
+        int occurrenceCount)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<FarolDbContext>();
+        var userId = dbContext.Users.Single(user => user.Email == email).Id;
+        var series = new BillSeries(
+            userId,
+            description,
+            amount,
+            firstDueOn,
+            kind,
+            BillSeries.MonthlyFrequency,
+            BillSeries.OccurrenceCountEndMode,
+            untilDate: null,
+            occurrenceCount: occurrenceCount);
+
+        dbContext.BillSeries.Add(series);
+        dbContext.Bills.Add(series.CreateFirstOccurrence());
         await dbContext.SaveChangesAsync();
     }
 

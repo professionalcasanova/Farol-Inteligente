@@ -225,6 +225,37 @@ class FinancialAnalysisTests(unittest.TestCase):
         self.assertEqual("period_financial_pressure", result["insights"][0]["type"])
         self.assertEqual(85, result["score"])
 
+    def test_analyze_should_flag_predictable_commitments_when_they_consume_month_folga(self) -> None:
+        payload = make_payload()
+        payload["totals"]["freeToSpend"] = 600.0
+        payload["bills"]["predictableCount"] = 3
+        payload["bills"]["predictableAmount"] = 2200.0
+        payload["bills"]["recurringCount"] = 2
+        payload["bills"]["recurringAmount"] = 1200.0
+        payload["bills"]["installmentCount"] = 1
+        payload["bills"]["installmentAmount"] = 1000.0
+
+        result = analyze_financial_snapshot(payload)
+
+        self.assertEqual("attention", result["status"])
+        self.assertEqual("predictable_commitments_pressure", result["insights"][0]["type"])
+        self.assertEqual("review_bills", result["recommendedActions"][0]["id"])
+
+    def test_analyze_should_explain_predictable_commitments_inside_negative_free_money_summary(self) -> None:
+        payload = make_payload()
+        payload["totals"]["freeToSpend"] = -300.0
+        payload["bills"]["upcoming7DaysCount"] = 0
+        payload["bills"]["upcoming7DaysAmount"] = 0.0
+        payload["bills"]["predictableCount"] = 2
+        payload["bills"]["predictableAmount"] = 900.0
+
+        result = analyze_financial_snapshot(payload)
+
+        self.assertEqual("critical", result["status"])
+        self.assertEqual("negative_free_money", result["insights"][0]["type"])
+        self.assertIn("contas recorrentes", result["summary"]["cause"])
+        self.assertIn("compromissos previsiveis", result["summary"]["action"])
+
     def test_analyze_should_limit_insights_to_top_three(self) -> None:
         payload = make_payload()
         payload["bills"]["overdueCount"] = 1
