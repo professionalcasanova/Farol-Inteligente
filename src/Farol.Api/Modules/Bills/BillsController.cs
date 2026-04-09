@@ -30,7 +30,27 @@ public sealed class BillsController(FarolDbContext dbContext, TimeProvider timeP
 
         try
         {
-            bill = new Bill(userId, request.Description, request.Amount, request.DueOn);
+            if (request.Recurrence is null)
+            {
+                bill = new Bill(userId, request.Description, request.Amount, request.DueOn);
+                dbContext.Bills.Add(bill);
+            }
+            else
+            {
+                var series = new BillSeries(
+                    userId,
+                    request.Description,
+                    request.Amount,
+                    request.DueOn,
+                    request.Recurrence.Frequency,
+                    request.Recurrence.EndMode,
+                    request.Recurrence.UntilDate,
+                    request.Recurrence.OccurrenceCount);
+
+                bill = series.CreateFirstOccurrence();
+                dbContext.BillSeries.Add(series);
+                dbContext.Bills.Add(bill);
+            }
         }
         catch (Exception exception) when (
             exception is ArgumentException or
@@ -39,7 +59,6 @@ public sealed class BillsController(FarolDbContext dbContext, TimeProvider timeP
             return BadRequest(new ErrorResponse(exception.Message));
         }
 
-        dbContext.Bills.Add(bill);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return Ok(ToResponse(bill, GetToday()));
@@ -84,6 +103,7 @@ public sealed class BillsController(FarolDbContext dbContext, TimeProvider timeP
             }
 
             var periodEnd = periodStart.AddMonths(1);
+            await ExpandRecurringSeriesAsync(userId, periodStart, periodEnd, cancellationToken);
             query = query.Where(bill => bill.DueOn >= periodStart && bill.DueOn < periodEnd);
         }
 
@@ -155,6 +175,9 @@ public sealed class BillsController(FarolDbContext dbContext, TimeProvider timeP
             Description = bill.Description,
             Amount = bill.Amount,
             DueOn = bill.DueOn,
+            BillSeriesId = bill.BillSeriesId,
+            OccurrenceNumber = bill.OccurrenceNumber,
+            TotalOccurrences = bill.TotalOccurrences,
             IsPaid = bill.IsPaid,
             PaidAtUtc = bill.PaidAtUtc,
             CreatedAtUtc = bill.CreatedAtUtc,
@@ -189,5 +212,69 @@ public sealed class BillsController(FarolDbContext dbContext, TimeProvider timeP
     private DateOnly GetToday()
     {
         return DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+    }
+
+    private async Task ExpandRecurringSeriesAsync(
+        Guid userId,
+        DateOnly periodStart,
+        DateOnly periodEnd,
+        CancellationToken cancellationToken)
+    {
+        var series = await dbContext.BillSeries
+            .Where(item =>
+                item.UserId == userId &&
+                item.IsActive &&
+                item.FirstDueOn < periodEnd)
+            .ToListAsync(cancellationToken);
+
+        if (series.Count == 0)
+        {
+            return;
+        }
+
+        var seriesIds = series.Select(item => item.Id).ToArray();
+        var existingOccurrences = await dbContext.Bills
+            .Where(bill =>
+                bill.UserId == userId &&
+                bill.BillSeriesId.HasValue &&
+                seriesIds.Contains(bill.BillSeriesId.Value) &&
+                bill.DueOn >= periodStart &&
+                bill.DueOn < periodEnd)
+            .Select(bill => new { bill.BillSeriesId, bill.DueOn })
+            .ToListAsync(cancellationToken);
+
+        var existingKeys = existingOccurrences
+            .Select(item => $"{item.BillSeriesId:N}:{item.DueOn:yyyy-MM-dd}")
+            .ToHashSet(StringComparer.Ordinal);
+
+        var created = false;
+
+        foreach (var item in series)
+        {
+            if (!item.TryResolveOccurrenceForMonth(
+                    periodStart,
+                    out var dueOn,
+                    out _,
+                    out _))
+            {
+                continue;
+            }
+
+            var key = $"{item.Id:N}:{dueOn:yyyy-MM-dd}";
+
+            if (existingKeys.Contains(key))
+            {
+                continue;
+            }
+
+            dbContext.Bills.Add(item.CreateOccurrenceForMonth(periodStart));
+            existingKeys.Add(key);
+            created = true;
+        }
+
+        if (created)
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
     }
 }

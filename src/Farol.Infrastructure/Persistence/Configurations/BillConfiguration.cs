@@ -17,6 +17,8 @@ public sealed class BillConfiguration : IEntityTypeConfiguration<Bill>
 
         builder.HasIndex(bill => new { bill.UserId, bill.IsPaid, bill.DueOn });
 
+        builder.HasIndex(bill => new { bill.BillSeriesId, bill.DueOn });
+
         builder.Property(bill => bill.UserId)
             .IsRequired();
 
@@ -31,6 +33,12 @@ public sealed class BillConfiguration : IEntityTypeConfiguration<Bill>
         builder.Property(bill => bill.DueOn)
             .IsRequired();
 
+        builder.Property(bill => bill.BillSeriesId);
+
+        builder.Property(bill => bill.OccurrenceNumber);
+
+        builder.Property(bill => bill.TotalOccurrences);
+
         builder.Property(bill => bill.IsPaid)
             .IsRequired();
 
@@ -42,6 +50,11 @@ public sealed class BillConfiguration : IEntityTypeConfiguration<Bill>
         builder.HasOne<User>()
             .WithMany()
             .HasForeignKey(bill => bill.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<BillSeries>()
+            .WithMany()
+            .HasForeignKey(bill => bill.BillSeriesId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

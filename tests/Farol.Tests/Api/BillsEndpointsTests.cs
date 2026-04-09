@@ -63,6 +63,44 @@ public sealed class BillsEndpointsTests : IClassFixture<FarolApiFactory>
     }
 
     [Fact]
+    public async Task PostBills_ShouldCreateRecurringBillSeriesAndFirstOccurrence()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var dueOn = new DateOnly(2026, 3, 10);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await client.PostAsJsonAsync("/api/bills", new CreateBillRequest
+        {
+            Description = "Internet",
+            Amount = 99.90m,
+            DueOn = dueOn,
+            Recurrence = new CreateRecurringBillRequest
+            {
+                Frequency = BillSeries.MonthlyFrequency,
+                EndMode = BillSeries.OpenEndedEndMode
+            }
+        });
+
+        response.EnsureSuccessStatusCode();
+
+        var bill = await response.Content.ReadFromJsonAsync<BillResponse>();
+
+        Assert.NotNull(bill);
+        Assert.Equal(dueOn, bill.DueOn);
+        Assert.NotNull(bill.BillSeriesId);
+        Assert.Equal(1, bill.OccurrenceNumber);
+        Assert.Null(bill.TotalOccurrences);
+
+        using var scope = _factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<FarolDbContext>();
+        Assert.Single(dbContext.BillSeries);
+        Assert.Single(dbContext.Bills);
+    }
+
+    [Fact]
     public async Task GetBills_ShouldReturnOnlyBillsFromAuthenticatedUser()
     {
         await _factory.ResetDatabaseAsync();
@@ -344,6 +382,90 @@ public sealed class BillsEndpointsTests : IClassFixture<FarolApiFactory>
         Assert.NotNull(bills);
         Assert.Single(bills);
         Assert.Equal("Internet", bills[0].Description);
+    }
+
+    [Fact]
+    public async Task GetBills_ShouldExpandRecurringSeriesForRequestedMonth()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var createResponse = await client.PostAsJsonAsync("/api/bills", new CreateBillRequest
+        {
+            Description = "Academia",
+            Amount = 120m,
+            DueOn = new DateOnly(2026, 3, 10),
+            Recurrence = new CreateRecurringBillRequest
+            {
+                Frequency = BillSeries.MonthlyFrequency,
+                EndMode = BillSeries.OccurrenceCountEndMode,
+                OccurrenceCount = 3
+            }
+        });
+
+        createResponse.EnsureSuccessStatusCode();
+        var firstBill = await createResponse.Content.ReadFromJsonAsync<BillResponse>();
+
+        var aprilBills = await client.GetFromJsonAsync<List<BillResponse>>("/api/bills?month=4&year=2026");
+        var mayBills = await client.GetFromJsonAsync<List<BillResponse>>("/api/bills?month=5&year=2026");
+        var juneBills = await client.GetFromJsonAsync<List<BillResponse>>("/api/bills?month=6&year=2026");
+
+        Assert.NotNull(firstBill);
+        Assert.NotNull(aprilBills);
+        Assert.NotNull(mayBills);
+        Assert.NotNull(juneBills);
+        Assert.Single(aprilBills);
+        Assert.Single(mayBills);
+        Assert.Empty(juneBills);
+        Assert.Equal(firstBill.BillSeriesId, aprilBills[0].BillSeriesId);
+        Assert.Equal(2, aprilBills[0].OccurrenceNumber);
+        Assert.Equal(3, aprilBills[0].TotalOccurrences);
+        Assert.Equal(new DateOnly(2026, 4, 10), aprilBills[0].DueOn);
+        Assert.Equal(3, mayBills[0].OccurrenceNumber);
+        Assert.Equal(3, mayBills[0].TotalOccurrences);
+    }
+
+    [Fact]
+    public async Task PatchPay_ShouldMarkOnlyOneRecurringOccurrenceAsPaid()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var createResponse = await client.PostAsJsonAsync("/api/bills", new CreateBillRequest
+        {
+            Description = "Curso",
+            Amount = 180m,
+            DueOn = new DateOnly(2026, 3, 5),
+            Recurrence = new CreateRecurringBillRequest
+            {
+                Frequency = BillSeries.MonthlyFrequency,
+                EndMode = BillSeries.UntilDateEndMode,
+                UntilDate = new DateOnly(2026, 5, 5)
+            }
+        });
+
+        createResponse.EnsureSuccessStatusCode();
+        var firstBill = await createResponse.Content.ReadFromJsonAsync<BillResponse>();
+
+        using (var request = new HttpRequestMessage(HttpMethod.Patch, $"/api/bills/{firstBill!.Id}/pay"))
+        {
+            var payResponse = await client.SendAsync(request);
+            payResponse.EnsureSuccessStatusCode();
+        }
+
+        var aprilBills = await client.GetFromJsonAsync<List<BillResponse>>("/api/bills?month=4&year=2026");
+
+        Assert.NotNull(aprilBills);
+        Assert.Single(aprilBills);
+        Assert.False(aprilBills[0].IsPaid);
+        Assert.Equal("pending", aprilBills[0].Status);
+        Assert.Equal(2, aprilBills[0].OccurrenceNumber);
     }
 
     private async Task<Guid> SeedBillAsync(
