@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Farol.Api.Modules.Auth;
 using Farol.Api.Modules.Budgets;
+using Farol.Domain.Budgets;
 using Farol.Domain.Categories;
 using Farol.Domain.Ledger;
 using Farol.Infrastructure.Persistence;
@@ -426,6 +427,103 @@ public sealed class BudgetsEndpointsTests : IClassFixture<FarolApiFactory>
 
         Assert.NotNull(error);
         Assert.Equal("Month and year are invalid.", error.Message);
+    }
+
+    [Fact]
+    public async Task PostBudgetTemplate_ShouldCreateTemplateForAuthenticatedUser()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var categories = await SeedCategoriesAsync("maria@email.com", ("Moradia", CategoryType.Expense), ("Internet", CategoryType.Expense));
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await client.PostAsJsonAsync<IReadOnlyList<CreateMonthlyBudgetCategoryRequest>>("/api/budgets/template",
+        [
+            new CreateMonthlyBudgetCategoryRequest { CategoryId = categories["Moradia"], Planned = 1200m },
+            new CreateMonthlyBudgetCategoryRequest { CategoryId = categories["Internet"], Planned = 110m }
+        ]);
+
+        response.EnsureSuccessStatusCode();
+
+        var template = await response.Content.ReadFromJsonAsync<BudgetTemplateResponse>();
+
+        Assert.NotNull(template);
+        Assert.Equal(1310m, template.TotalPlanned);
+        Assert.Equal(2, template.Categories.Count);
+
+        using var scope = _factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<FarolDbContext>();
+
+        Assert.Single(dbContext.BudgetTemplates);
+        Assert.Equal(2, dbContext.BudgetTemplateCategories.Count());
+    }
+
+    [Fact]
+    public async Task GetBudgetTemplate_ShouldReturnSavedTemplate()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var categories = await SeedCategoriesAsync("maria@email.com", ("Moradia", CategoryType.Expense));
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        await client.PostAsJsonAsync<IReadOnlyList<CreateMonthlyBudgetCategoryRequest>>("/api/budgets/template",
+        [
+            new CreateMonthlyBudgetCategoryRequest { CategoryId = categories["Moradia"], Planned = 1400m }
+        ]);
+
+        var response = await client.GetAsync("/api/budgets/template");
+
+        response.EnsureSuccessStatusCode();
+
+        var template = await response.Content.ReadFromJsonAsync<BudgetTemplateResponse>();
+
+        Assert.NotNull(template);
+        Assert.Equal(1400m, template.TotalPlanned);
+        Assert.Single(template.Categories);
+        Assert.Equal("Moradia", template.Categories[0].CategoryName);
+    }
+
+    [Fact]
+    public async Task PostApplyBudgetTemplate_ShouldCreateMonthlyBudgetFromTemplate()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var categories = await SeedCategoriesAsync("maria@email.com", ("Moradia", CategoryType.Expense), ("Transporte", CategoryType.Expense));
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        await client.PostAsJsonAsync<IReadOnlyList<CreateMonthlyBudgetCategoryRequest>>("/api/budgets/template",
+        [
+            new CreateMonthlyBudgetCategoryRequest { CategoryId = categories["Moradia"], Planned = 1200m },
+            new CreateMonthlyBudgetCategoryRequest { CategoryId = categories["Transporte"], Planned = 350m }
+        ]);
+
+        var response = await client.PostAsJsonAsync("/api/budgets/template/apply", new ApplyBudgetTemplateRequest
+        {
+            Month = 4,
+            Year = 2026,
+        });
+
+        response.EnsureSuccessStatusCode();
+
+        var summary = await response.Content.ReadFromJsonAsync<MonthlyBudgetResponse>();
+
+        Assert.NotNull(summary);
+        Assert.Equal(1550m, summary.TotalPlanned);
+        Assert.Equal(4, summary.Month);
+        Assert.Equal(2026, summary.Year);
+        Assert.Equal(2, summary.Categories.Count);
+
+        using var scope = _factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<FarolDbContext>();
+
+        Assert.Single(dbContext.MonthlyBudgets.Where(item => item.Month == 4 && item.Year == 2026));
+        Assert.Equal(2, dbContext.MonthlyBudgetCategories.Count());
     }
 
     private async Task<Dictionary<string, Guid>> SeedCategoriesAsync(string email, params (string Name, CategoryType Type)[] categoryDefinitions)
