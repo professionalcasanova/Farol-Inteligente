@@ -84,6 +84,12 @@ def analyze_financial_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
         "pending_amount": _to_decimal(bills["pendingAmount"]),
         "upcoming_7_days_count": int(bills["upcoming7DaysCount"]),
         "upcoming_7_days_amount": _to_decimal(bills["upcoming7DaysAmount"]),
+        "predictable_pending_count": int(bills.get("predictableCount", 0)),
+        "predictable_pending_amount": _to_decimal(bills.get("predictableAmount", 0.0)),
+        "recurring_pending_count": int(bills.get("recurringCount", 0)),
+        "recurring_pending_amount": _to_decimal(bills.get("recurringAmount", 0.0)),
+        "installment_pending_count": int(bills.get("installmentCount", 0)),
+        "installment_pending_amount": _to_decimal(bills.get("installmentAmount", 0.0)),
         "non_essential_expense_amount": non_essential_expense_amount,
         "non_essential_expense_ratio": non_essential_expense_ratio,
         "variable_expense_ratio": variable_expense_ratio,
@@ -137,6 +143,12 @@ def _resolve_status(facts: dict[str, Any]) -> str:
     if facts["budget_overrun"] >= 50:
         return STATUS_ATTENTION
 
+    if (
+        facts["predictable_pending_count"] >= 2
+        and facts["predictable_pending_amount"] >= facts["income"] * 0.3
+    ):
+        return STATUS_ATTENTION
+
     if facts["pending_count"] >= 2 and facts["pending_amount"] > facts["free_to_spend"]:
         return STATUS_ATTENTION
 
@@ -172,6 +184,12 @@ def _calculate_score(facts: dict[str, Any]) -> int:
 
     if facts["budget_overrun"] >= 50:
         score -= 15
+
+    if (
+        facts["predictable_pending_count"] >= 2
+        and facts["predictable_pending_amount"] >= facts["income"] * 0.3
+    ):
+        score -= 10
 
     if facts["pending_count"] >= 2 and facts["pending_amount"] > facts["free_to_spend"]:
         score -= 15
@@ -266,6 +284,24 @@ def _resolve_insights(facts: dict[str, Any]) -> list[InsightDefinition]:
             )
         )
 
+    if (
+        facts["predictable_pending_count"] >= 2
+        and facts["predictable_pending_amount"] >= facts["income"] * 0.3
+    ):
+        insights.append(
+            InsightDefinition(
+                type="predictable_commitments_pressure",
+                severity=SEVERITY_MEDIUM,
+                priority=55,
+                message="Compromissos previsiveis ja estao pesando no seu mes.",
+                cause=(
+                    "Contas recorrentes e parcelas abertas ja consomem uma parte relevante "
+                    "da sua folga antes de novos gastos entrarem."
+                ),
+                action="Revise as contas recorrentes e parcelas do mes antes de assumir novas saidas.",
+            )
+        )
+
     if facts["pending_count"] >= 2 and facts["pending_amount"] > facts["free_to_spend"]:
         insights.append(
             InsightDefinition(
@@ -331,6 +367,18 @@ def _build_negative_free_money_summary(facts: dict[str, Any]) -> dict[str, str]:
         action = (
             "Priorize primeiro as contas essenciais ja vencidas e suspenda gastos ajustaveis "
             "ate recuperar folga no caixa."
+        )
+    elif (
+        facts.get("predictable_pending_count", 0) > 0
+        and facts.get("predictable_pending_amount", 0.0) >= max(abs(facts["free_to_spend"]), 1.0)
+    ):
+        cause = (
+            "Depois dos gastos e compromissos do mes, seu dinheiro livre ficou negativo e "
+            "contas recorrentes ou parcelas ja tomam boa parte do que precisa caber no restante do periodo."
+        )
+        action = (
+            "Confirme primeiro os compromissos previsiveis que mantem sua rotina e depois "
+            "corte ou adie gastos ajustaveis para recuperar folga no caixa."
         )
     elif (
         facts.get("upcoming_7_days_count", 0) > 0
@@ -458,6 +506,18 @@ def _resolve_recommended_actions(
                 "target": "/transactions",
             },
         ],
+        "predictable_commitments_pressure": [
+            {
+                "id": "review_bills",
+                "label": "Ver compromissos do mes",
+                "target": "/bills",
+            },
+            {
+                "id": "review_budget",
+                "label": "Revisar planejamento",
+                "target": "/budget",
+            },
+        ],
         "high_non_essential_spending": [
             {
                 "id": "review_categories",
@@ -484,10 +544,11 @@ def _resolve_recommended_actions(
         "negative_free_money": 1,
         "short_term_bills_pressure": 2,
         "budget_overspent": 3,
-        "high_non_essential_spending": 4,
-        "overdue_bills_long": 5,
-        "overdue_bills": 6,
-        "period_financial_pressure": 7,
+        "predictable_commitments_pressure": 4,
+        "high_non_essential_spending": 5,
+        "overdue_bills_long": 6,
+        "overdue_bills": 7,
+        "period_financial_pressure": 8,
         "healthy_month": 99,
     }
 

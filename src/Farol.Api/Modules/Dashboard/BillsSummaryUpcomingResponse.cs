@@ -7,4 +7,7 @@ public sealed class BillsSummaryUpcomingResponse
     public required decimal Amount { get; init; }
     public required DateOnly DueOn { get; init; }
     public required string Status { get; init; }
+    public string? SeriesKind { get; init; }
+    public int? OccurrenceNumber { get; init; }
+    public int? TotalOccurrences { get; init; }
 }

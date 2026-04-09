@@ -341,6 +341,33 @@ public sealed class FinancialAlertsInsightsEndpointsTests : IClassFixture<FarolA
         return bill.Id;
     }
 
+    private async Task SeedSeriesAsync(
+        string email,
+        string description,
+        decimal amount,
+        DateOnly firstDueOn,
+        string kind,
+        int occurrenceCount)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<FarolDbContext>();
+        var userId = dbContext.Users.Single(user => user.Email == email).Id;
+        var series = new BillSeries(
+            userId,
+            description,
+            amount,
+            firstDueOn,
+            kind,
+            BillSeries.MonthlyFrequency,
+            BillSeries.OccurrenceCountEndMode,
+            untilDate: null,
+            occurrenceCount: occurrenceCount);
+
+        dbContext.BillSeries.Add(series);
+        dbContext.Bills.Add(series.CreateFirstOccurrence());
+        await dbContext.SaveChangesAsync();
+    }
+
     private static async Task<string> RegisterAndGetTokenAsync(HttpClient client, string email)
     {
         var response = await client.PostAsJsonAsync("/api/auth/register", new RegisterRequest

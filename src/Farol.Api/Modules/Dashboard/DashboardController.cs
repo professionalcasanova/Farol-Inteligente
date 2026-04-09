@@ -1,4 +1,5 @@
 using Farol.Api.Common;
+using Farol.Api.Modules.Bills;
 using Farol.Domain.Bills;
 using Farol.Domain.Ledger;
 using Farol.Infrastructure.Persistence;
@@ -11,7 +12,10 @@ namespace Farol.Api.Modules.Dashboard;
 [ApiController]
 [Authorize]
 [Route("api/dashboard")]
-public sealed class DashboardController(FarolDbContext dbContext, TimeProvider timeProvider) : ControllerBase
+public sealed class DashboardController(
+    FarolDbContext dbContext,
+    TimeProvider timeProvider,
+    BillSeriesExpansionService billSeriesExpansionService) : ControllerBase
 {
     private const string PendingStatus = "pending";
     private const string PaidStatus = "paid";
@@ -120,6 +124,11 @@ public sealed class DashboardController(FarolDbContext dbContext, TimeProvider t
         var periodEnd = periodStart.AddMonths(1);
         var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
 
+        await billSeriesExpansionService.ExpandForMonthAsync(
+            userId,
+            periodStart,
+            cancellationToken);
+
         var bills = await dbContext.Bills
             .AsNoTracking()
             .Where(bill =>
@@ -129,6 +138,7 @@ public sealed class DashboardController(FarolDbContext dbContext, TimeProvider t
             .OrderBy(bill => bill.DueOn)
             .ThenBy(bill => bill.CreatedAtUtc)
             .ToListAsync(cancellationToken);
+        var seriesKindsById = await ResolveSeriesKindsAsync(bills, cancellationToken);
 
         var pendingBills = bills
             .Where(bill => !bill.IsPaid && bill.DueOn >= today)
@@ -141,6 +151,21 @@ public sealed class DashboardController(FarolDbContext dbContext, TimeProvider t
         var paidBills = bills
             .Where(bill => bill.IsPaid)
             .ToList();
+        var predictableBills = bills
+            .Where(bill => !bill.IsPaid && bill.BillSeriesId.HasValue)
+            .ToList();
+        var recurringBills = predictableBills
+            .Where(bill =>
+                bill.BillSeriesId.HasValue &&
+                seriesKindsById.TryGetValue(bill.BillSeriesId.Value, out var kind) &&
+                kind == BillSeries.RecurringKind)
+            .ToList();
+        var installmentBills = predictableBills
+            .Where(bill =>
+                bill.BillSeriesId.HasValue &&
+                seriesKindsById.TryGetValue(bill.BillSeriesId.Value, out var kind) &&
+                kind == BillSeries.InstallmentKind)
+            .ToList();
 
         var upcoming = pendingBills
             .OrderBy(bill => bill.DueOn)
@@ -152,7 +177,13 @@ public sealed class DashboardController(FarolDbContext dbContext, TimeProvider t
                 Description = bill.Description,
                 Amount = bill.Amount,
                 DueOn = bill.DueOn,
-                Status = ResolveBillStatus(bill, today)
+                Status = ResolveBillStatus(bill, today),
+                SeriesKind = bill.BillSeriesId.HasValue &&
+                    seriesKindsById.TryGetValue(bill.BillSeriesId.Value, out var kind)
+                    ? kind
+                    : null,
+                OccurrenceNumber = bill.OccurrenceNumber,
+                TotalOccurrences = bill.TotalOccurrences
             })
             .ToList();
 
@@ -161,11 +192,38 @@ public sealed class DashboardController(FarolDbContext dbContext, TimeProvider t
             TotalPending = pendingBills.Sum(bill => bill.Amount),
             TotalOverdue = overdueBills.Sum(bill => bill.Amount),
             TotalPaid = paidBills.Sum(bill => bill.Amount),
+            PredictableTotal = predictableBills.Sum(bill => bill.Amount),
+            RecurringTotal = recurringBills.Sum(bill => bill.Amount),
+            InstallmentTotal = installmentBills.Sum(bill => bill.Amount),
             CountPending = pendingBills.Count,
             CountOverdue = overdueBills.Count,
             CountPaid = paidBills.Count,
+            CountPredictable = predictableBills.Count,
+            CountRecurring = recurringBills.Count,
+            CountInstallment = installmentBills.Count,
             Upcoming = upcoming
         });
+    }
+
+    private async Task<Dictionary<Guid, string>> ResolveSeriesKindsAsync(
+        IReadOnlyCollection<Bill> bills,
+        CancellationToken cancellationToken)
+    {
+        var seriesIds = bills
+            .Where(bill => bill.BillSeriesId.HasValue)
+            .Select(bill => bill.BillSeriesId!.Value)
+            .Distinct()
+            .ToArray();
+
+        if (seriesIds.Length == 0)
+        {
+            return new Dictionary<Guid, string>();
+        }
+
+        return await dbContext.BillSeries
+            .AsNoTracking()
+            .Where(series => seriesIds.Contains(series.Id))
+            .ToDictionaryAsync(series => series.Id, series => series.Kind, cancellationToken);
     }
 
     private static string ResolveBillStatus(Bill bill, DateOnly today)

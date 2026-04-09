@@ -44,16 +44,18 @@ public sealed class FinancialAnalysisTotalsRequest
 public sealed class FinancialAnalysisBillsRequest
 {
     public required decimal PendingAmount { get; init; }
-
     public required decimal OverdueAmount { get; init; }
-
     public required int PendingCount { get; init; }
-
     public required int OverdueCount { get; init; }
-
     public required decimal Upcoming7DaysAmount { get; init; }
-
     public required int Upcoming7DaysCount { get; init; }
+    public required int MaxOverdueDays { get; init; }
+    public required decimal PredictableAmount { get; init; }
+    public required int PredictableCount { get; init; }
+    public required decimal RecurringAmount { get; init; }
+    public required int RecurringCount { get; init; }
+    public required decimal InstallmentAmount { get; init; }
+    public required int InstallmentCount { get; init; }
 }
 
 public sealed class FinancialAnalysisCategoryRequest
