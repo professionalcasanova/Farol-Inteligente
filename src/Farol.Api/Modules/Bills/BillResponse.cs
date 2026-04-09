@@ -7,6 +7,7 @@ public sealed class BillResponse
     public required decimal Amount { get; init; }
     public required DateOnly DueOn { get; init; }
     public Guid? BillSeriesId { get; init; }
+    public string? SeriesKind { get; init; }
     public int? OccurrenceNumber { get; init; }
     public int? TotalOccurrences { get; init; }
     public required bool IsPaid { get; init; }

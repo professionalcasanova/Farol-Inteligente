@@ -12,6 +12,7 @@ public sealed class BillSeriesTests
             "Internet",
             99.90m,
             new DateOnly(2026, 1, 31),
+            BillSeries.RecurringKind,
             BillSeries.MonthlyFrequency,
             BillSeries.OpenEndedEndMode,
             null,
@@ -32,6 +33,7 @@ public sealed class BillSeriesTests
             "Academia",
             120m,
             new DateOnly(2026, 3, 10),
+            BillSeries.RecurringKind,
             BillSeries.MonthlyFrequency,
             BillSeries.OccurrenceCountEndMode,
             null,
@@ -70,6 +72,7 @@ public sealed class BillSeriesTests
             "Escola",
             450m,
             new DateOnly(2026, 3, 15),
+            BillSeries.RecurringKind,
             BillSeries.MonthlyFrequency,
             BillSeries.UntilDateEndMode,
             new DateOnly(2026, 5, 20),
@@ -91,5 +94,45 @@ public sealed class BillSeriesTests
         Assert.Equal(3, mayOccurrence);
         Assert.Equal(3, mayTotal);
         Assert.False(hasJune);
+    }
+
+    [Fact]
+    public void CreateInstallmentSeries_ShouldKeepProgressMetadata()
+    {
+        var series = new BillSeries(
+            Guid.NewGuid(),
+            "Notebook",
+            320m,
+            new DateOnly(2026, 3, 8),
+            BillSeries.InstallmentKind,
+            BillSeries.MonthlyFrequency,
+            BillSeries.OccurrenceCountEndMode,
+            null,
+            12);
+
+        var bill = series.CreateOccurrenceForMonth(new DateOnly(2026, 5, 1));
+
+        Assert.Equal(new DateOnly(2026, 5, 8), bill.DueOn);
+        Assert.Equal(3, bill.OccurrenceNumber);
+        Assert.Equal(12, bill.TotalOccurrences);
+    }
+
+    [Fact]
+    public void CreateInstallmentSeries_ShouldRequireAtLeastTwoInstallments()
+    {
+        var action = () => new BillSeries(
+            Guid.NewGuid(),
+            "Curso",
+            180m,
+            new DateOnly(2026, 3, 5),
+            BillSeries.InstallmentKind,
+            BillSeries.MonthlyFrequency,
+            BillSeries.OccurrenceCountEndMode,
+            null,
+            1);
+
+        var exception = Assert.Throws<ArgumentException>(action);
+
+        Assert.Contains("Installment count must be at least 2.", exception.Message);
     }
 }

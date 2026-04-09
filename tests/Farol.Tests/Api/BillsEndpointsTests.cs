@@ -79,6 +79,7 @@ public sealed class BillsEndpointsTests : IClassFixture<FarolApiFactory>
             DueOn = dueOn,
             Recurrence = new CreateRecurringBillRequest
             {
+                Kind = BillSeries.RecurringKind,
                 Frequency = BillSeries.MonthlyFrequency,
                 EndMode = BillSeries.OpenEndedEndMode
             }
@@ -91,6 +92,7 @@ public sealed class BillsEndpointsTests : IClassFixture<FarolApiFactory>
         Assert.NotNull(bill);
         Assert.Equal(dueOn, bill.DueOn);
         Assert.NotNull(bill.BillSeriesId);
+        Assert.Equal(BillSeries.RecurringKind, bill.SeriesKind);
         Assert.Equal(1, bill.OccurrenceNumber);
         Assert.Null(bill.TotalOccurrences);
 
@@ -400,6 +402,7 @@ public sealed class BillsEndpointsTests : IClassFixture<FarolApiFactory>
             DueOn = new DateOnly(2026, 3, 10),
             Recurrence = new CreateRecurringBillRequest
             {
+                Kind = BillSeries.RecurringKind,
                 Frequency = BillSeries.MonthlyFrequency,
                 EndMode = BillSeries.OccurrenceCountEndMode,
                 OccurrenceCount = 3
@@ -444,6 +447,7 @@ public sealed class BillsEndpointsTests : IClassFixture<FarolApiFactory>
             DueOn = new DateOnly(2026, 3, 5),
             Recurrence = new CreateRecurringBillRequest
             {
+                Kind = BillSeries.RecurringKind,
                 Frequency = BillSeries.MonthlyFrequency,
                 EndMode = BillSeries.UntilDateEndMode,
                 UntilDate = new DateOnly(2026, 5, 5)
@@ -466,6 +470,70 @@ public sealed class BillsEndpointsTests : IClassFixture<FarolApiFactory>
         Assert.False(aprilBills[0].IsPaid);
         Assert.Equal("pending", aprilBills[0].Status);
         Assert.Equal(2, aprilBills[0].OccurrenceNumber);
+    }
+
+    [Fact]
+    public async Task PostBills_ShouldCreateInstallmentSeriesWithProgress()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await client.PostAsJsonAsync("/api/bills", new CreateBillRequest
+        {
+            Description = "Notebook",
+            Amount = 320m,
+            DueOn = new DateOnly(2026, 3, 8),
+            Recurrence = new CreateRecurringBillRequest
+            {
+                Kind = BillSeries.InstallmentKind,
+                Frequency = BillSeries.MonthlyFrequency,
+                EndMode = BillSeries.OccurrenceCountEndMode,
+                OccurrenceCount = 12
+            }
+        });
+
+        response.EnsureSuccessStatusCode();
+
+        var bill = await response.Content.ReadFromJsonAsync<BillResponse>();
+
+        Assert.NotNull(bill);
+        Assert.Equal(BillSeries.InstallmentKind, bill.SeriesKind);
+        Assert.Equal(1, bill.OccurrenceNumber);
+        Assert.Equal(12, bill.TotalOccurrences);
+    }
+
+    [Fact]
+    public async Task PostBills_ShouldRejectInstallmentWithSingleOccurrence()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await client.PostAsJsonAsync("/api/bills", new CreateBillRequest
+        {
+            Description = "Curso",
+            Amount = 180m,
+            DueOn = new DateOnly(2026, 3, 5),
+            Recurrence = new CreateRecurringBillRequest
+            {
+                Kind = BillSeries.InstallmentKind,
+                Frequency = BillSeries.MonthlyFrequency,
+                EndMode = BillSeries.OccurrenceCountEndMode,
+                OccurrenceCount = 1
+            }
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+
+        Assert.NotNull(error);
+        Assert.Equal("Installment count must be at least 2.", error.Message);
     }
 
     private async Task<Guid> SeedBillAsync(

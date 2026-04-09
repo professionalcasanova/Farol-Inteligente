@@ -42,6 +42,7 @@ public sealed class BillsController(FarolDbContext dbContext, TimeProvider timeP
                     request.Description,
                     request.Amount,
                     request.DueOn,
+                    request.Recurrence.Kind,
                     request.Recurrence.Frequency,
                     request.Recurrence.EndMode,
                     request.Recurrence.UntilDate,
@@ -56,12 +57,15 @@ public sealed class BillsController(FarolDbContext dbContext, TimeProvider timeP
             exception is ArgumentException or
             ArgumentOutOfRangeException)
         {
-            return BadRequest(new ErrorResponse(exception.Message));
+            return BadRequest(new ErrorResponse(NormalizeDomainErrorMessage(exception.Message)));
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return Ok(ToResponse(bill, GetToday()));
+        return Ok(ToResponse(
+            bill,
+            GetToday(),
+            request.Recurrence?.Kind));
     }
 
     [HttpGet]
@@ -120,7 +124,14 @@ public sealed class BillsController(FarolDbContext dbContext, TimeProvider timeP
             .ThenBy(bill => bill.CreatedAtUtc)
             .ToListAsync(cancellationToken);
 
-        return Ok(bills.Select(bill => ToResponse(bill, today)).ToList());
+        var seriesKindById = await ResolveSeriesKindsAsync(bills, cancellationToken);
+
+        return Ok(bills.Select(bill => ToResponse(
+            bill,
+            today,
+            bill.BillSeriesId.HasValue && seriesKindById.TryGetValue(bill.BillSeriesId.Value, out var kind)
+                ? kind
+                : null)).ToList());
     }
 
     [HttpPatch("{id:guid}/pay")]
@@ -142,7 +153,10 @@ public sealed class BillsController(FarolDbContext dbContext, TimeProvider timeP
         bill.MarkAsPaid();
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return Ok(ToResponse(bill, GetToday()));
+        return Ok(ToResponse(
+            bill,
+            GetToday(),
+            await ResolveSeriesKindAsync(bill.BillSeriesId, cancellationToken)));
     }
 
     [HttpPatch("{id:guid}/unpay")]
@@ -164,10 +178,13 @@ public sealed class BillsController(FarolDbContext dbContext, TimeProvider timeP
         bill.MarkAsUnpaid();
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return Ok(ToResponse(bill, GetToday()));
+        return Ok(ToResponse(
+            bill,
+            GetToday(),
+            await ResolveSeriesKindAsync(bill.BillSeriesId, cancellationToken)));
     }
 
-    private static BillResponse ToResponse(Bill bill, DateOnly today)
+    private static BillResponse ToResponse(Bill bill, DateOnly today, string? seriesKind)
     {
         return new BillResponse
         {
@@ -176,6 +193,7 @@ public sealed class BillsController(FarolDbContext dbContext, TimeProvider timeP
             Amount = bill.Amount,
             DueOn = bill.DueOn,
             BillSeriesId = bill.BillSeriesId,
+            SeriesKind = seriesKind,
             OccurrenceNumber = bill.OccurrenceNumber,
             TotalOccurrences = bill.TotalOccurrences,
             IsPaid = bill.IsPaid,
@@ -212,6 +230,18 @@ public sealed class BillsController(FarolDbContext dbContext, TimeProvider timeP
     private DateOnly GetToday()
     {
         return DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+    }
+
+    private static string NormalizeDomainErrorMessage(string message)
+    {
+        var parameterSuffixIndex = message.IndexOf(" (Parameter '", StringComparison.Ordinal);
+
+        if (parameterSuffixIndex < 0)
+        {
+            return message;
+        }
+
+        return message[..parameterSuffixIndex];
     }
 
     private async Task ExpandRecurringSeriesAsync(
@@ -276,5 +306,39 @@ public sealed class BillsController(FarolDbContext dbContext, TimeProvider timeP
         {
             await dbContext.SaveChangesAsync(cancellationToken);
         }
+    }
+
+    private async Task<string?> ResolveSeriesKindAsync(Guid? billSeriesId, CancellationToken cancellationToken)
+    {
+        if (!billSeriesId.HasValue)
+        {
+            return null;
+        }
+
+        return await dbContext.BillSeries
+            .Where(series => series.Id == billSeriesId.Value)
+            .Select(series => series.Kind)
+            .SingleOrDefaultAsync(cancellationToken);
+    }
+
+    private async Task<Dictionary<Guid, string>> ResolveSeriesKindsAsync(
+        IReadOnlyCollection<Bill> bills,
+        CancellationToken cancellationToken)
+    {
+        var seriesIds = bills
+            .Where(bill => bill.BillSeriesId.HasValue)
+            .Select(bill => bill.BillSeriesId!.Value)
+            .Distinct()
+            .ToArray();
+
+        if (seriesIds.Length == 0)
+        {
+            return new Dictionary<Guid, string>();
+        }
+
+        return await dbContext.BillSeries
+            .AsNoTracking()
+            .Where(series => seriesIds.Contains(series.Id))
+            .ToDictionaryAsync(series => series.Id, series => series.Kind, cancellationToken);
     }
 }
