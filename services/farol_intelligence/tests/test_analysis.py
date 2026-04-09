@@ -118,6 +118,7 @@ class FinancialAnalysisTests(unittest.TestCase):
                 for reason in result["reasons"]
             )
         )
+        self.assertEqual("review_expenses", result["recommendedActions"][0]["id"])
 
     def test_analyze_should_return_critical_when_max_overdue_days_is_7_or_more(self) -> None:
         payload = make_payload()
@@ -129,6 +130,36 @@ class FinancialAnalysisTests(unittest.TestCase):
         self.assertEqual("critical", result["status"])
         self.assertEqual("overdue_bills_long", result["insights"][0]["type"])
         self.assertTrue(any("8 dias" in reason for reason in result["reasons"]))
+        self.assertEqual("review_overdue_bills", result["recommendedActions"][0]["id"])
+
+    def test_analyze_should_prioritize_expense_review_when_negative_cash_and_overdue_bills_overlap(self) -> None:
+        payload = make_payload()
+        payload["totals"]["income"] = 5000.0
+        payload["totals"]["expense"] = 4200.0
+        payload["totals"]["freeToSpend"] = -180.0
+        payload["bills"]["overdueCount"] = 1
+        payload["bills"]["overdueAmount"] = 220.0
+        payload["bills"]["maxOverdueDays"] = 8
+        payload["bills"]["upcoming7DaysCount"] = 0
+        payload["bills"]["upcoming7DaysAmount"] = 0.0
+        payload["categories"] = [
+            {"categoryId": "market", "name": "Mercado", "type": "expense", "amount": 2500.0},
+            {"categoryId": "delivery", "name": "Delivery", "type": "expense", "amount": 1500.0},
+        ]
+
+        result = analyze_financial_snapshot(payload)
+
+        self.assertEqual("critical", result["status"])
+        self.assertEqual(
+            [
+                "overdue_bills_long",
+                "negative_balance_high_variable_expense",
+                "overdue_bills",
+            ],
+            [item["type"] for item in result["insights"]],
+        )
+        self.assertEqual("review_expenses", result["recommendedActions"][0]["id"])
+        self.assertIn("review_overdue_bills", [item["id"] for item in result["recommendedActions"]])
 
     def test_analyze_should_return_critical_when_short_term_bills_exceed_free_money(self) -> None:
         payload = make_payload()
