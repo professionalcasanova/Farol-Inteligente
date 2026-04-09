@@ -332,7 +332,16 @@ describe("DashboardPage", () => {
             target: "/bills?status=overdue",
           },
         ],
-        insights: [],
+        insights: [
+          {
+            type: "negative_free_money",
+            severity: "high",
+            priority: 90,
+            message: "Seu dinheiro livre ficou negativo neste mes.",
+            cause: "Depois dos gastos e do que ainda esta reservado, faltou folga para fechar o mes.",
+            action: "Segure novos gastos e revise as maiores saidas para abrir espaco para o essencial.",
+          },
+        ],
       },
       alerts: {
         alerts: [
@@ -358,8 +367,21 @@ describe("DashboardPage", () => {
 
     expect(await screen.findByText("Risco financeiro crítico")).toBeInTheDocument();
     expect(screen.getByText("Saldo negativo e contas atrasadas.")).toBeInTheDocument();
-    expect(screen.getByText("O que puxou esse alerta")).toBeInTheDocument();
+    expect(screen.getByText("O que isso significa no mes")).toBeInTheDocument();
+    expect(screen.getByText("O que esta pesando agora")).toBeInTheDocument();
     expect(screen.getAllByText("Conta de energia vencida há 8 dias")).toHaveLength(2);
+    expect(screen.getByText("Comece por aqui")).toBeInTheDocument();
+    expect(screen.getByText("Por que comecar por isso")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Revisar as maiores saidas primeiro mostra o que pode ser cortado ou adiado antes de faltar para o essencial.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Voce nao precisa resolver tudo hoje. Comece pelo que protege sua rotina e seu caixa neste mes.",
+      ),
+    ).toBeInTheDocument();
     expect(screen.getByText("Alertas visíveis no mês")).toBeInTheDocument();
     expect(screen.getByText(/240,00/)).toBeInTheDocument();
     expect(screen.getByText(/Priorize o pagamento das contas fixas vencidas/)).toBeInTheDocument();

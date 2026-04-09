@@ -172,6 +172,39 @@ function getActivationMessage(data: DashboardData) {
   };
 }
 
+function getCriticalPriorityReason(monthHealth: MonthHealthResponse | null | undefined) {
+  if (!monthHealth) {
+    return "";
+  }
+
+  const insightTypes = new Set(monthHealth.insights.map((insight) => insight.type));
+
+  if (
+    insightTypes.has("negative_balance_high_variable_expense") ||
+    insightTypes.has("negative_free_money")
+  ) {
+    return "Revisar as maiores saidas primeiro mostra o que pode ser cortado ou adiado antes de faltar para o essencial.";
+  }
+
+  if (insightTypes.has("overdue_bills_long") || insightTypes.has("overdue_bills")) {
+    return "Comecar pelas contas vencidas reduz juros, evita mais pressao no caixa e protege o restante do mes.";
+  }
+
+  if (insightTypes.has("short_term_bills_pressure")) {
+    return "Organizar os proximos vencimentos agora evita que a pressao de poucos dias vire atraso em cadeia.";
+  }
+
+  return "O primeiro passo precisa proteger sua rotina e abrir espaco para o restante do mes.";
+}
+
+function getCriticalSupportMessage(monthHealth: MonthHealthResponse | null | undefined) {
+  if (!monthHealth || monthHealth.status !== "critical") {
+    return "";
+  }
+
+  return "Voce nao precisa resolver tudo hoje. Comece pelo que protege sua rotina e seu caixa neste mes.";
+}
+
 function getComparisonBarWidth(value: number, max: number) {
   if (value <= 0 || max <= 0) {
     return "0%";
@@ -273,6 +306,8 @@ export default function DashboardPage() {
     "Ver resumo do mes";
   const visibleAlertHighlights = data?.alerts.alerts.slice(0, 3) ?? [];
   const showFallbackAlertHighlights = !data?.monthHealth && visibleAlertHighlights.length > 0;
+  const criticalPriorityReason = getCriticalPriorityReason(data?.monthHealth);
+  const criticalSupportMessage = getCriticalSupportMessage(data?.monthHealth);
   const budgetFlowMax = data
     ? Math.max(1, data.budget.totalPlanned, data.budget.totalSpent)
     : 1;
@@ -1051,6 +1086,9 @@ export default function DashboardPage() {
 
                   <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.12fr)_minmax(280px,0.88fr)]">
                     <div className="min-w-0">
+                      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-red-700">
+                        O que isso significa no mes
+                      </div>
                       <p className="max-w-3xl text-sm leading-6 text-[var(--color-foreground)]">
                         {data.monthHealth.summary.cause}
                       </p>
@@ -1058,7 +1096,7 @@ export default function DashboardPage() {
                       {criticalReasons.length > 0 ? (
                         <div className="mt-5">
                           <div className="text-xs font-semibold uppercase tracking-[0.18em] text-red-700">
-                            O que puxou esse alerta
+                            O que esta pesando agora
                           </div>
                           <div className="mt-3 grid gap-3 md:grid-cols-2">
                             {criticalReasons.map((reason, index) => (
@@ -1076,11 +1114,21 @@ export default function DashboardPage() {
 
                     <div className="rounded-[24px] border border-[color:rgba(185,28,28,0.14)] bg-white/80 px-5 py-5">
                       <div className="text-xs font-semibold uppercase tracking-[0.18em] text-red-700">
-                        Próximo movimento
+                        Comece por aqui
                       </div>
                       <div className="mt-3 text-base font-semibold leading-7 text-[var(--color-foreground)]">
                         {data.monthHealth.summary.action}
                       </div>
+                      {criticalPriorityReason ? (
+                        <div className="mt-4 rounded-[18px] border border-[color:rgba(185,28,28,0.12)] bg-[color:rgba(254,242,242,0.9)] px-4 py-4">
+                          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-red-700">
+                            Por que comecar por isso
+                          </div>
+                          <p className="mt-2 text-sm leading-6 text-[var(--color-foreground)]">
+                            {criticalPriorityReason}
+                          </p>
+                        </div>
+                      ) : null}
                       {criticalActions.length > 0 ? (
                         <div className="mt-4 space-y-2 text-sm leading-6 text-[var(--color-muted)]">
                           {criticalActions.slice(0, 2).map((action, index) => (
@@ -1096,6 +1144,11 @@ export default function DashboardPage() {
                           {primaryRecommendedAction?.label ?? "Ver resumo do mes"}
                         </Link>
                       </div>
+                      {criticalSupportMessage ? (
+                        <p className="mt-4 text-sm leading-6 text-[var(--color-muted)]">
+                          {criticalSupportMessage}
+                        </p>
+                      ) : null}
                     </div>
                   </div>
 
