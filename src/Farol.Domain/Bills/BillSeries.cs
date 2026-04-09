@@ -6,12 +6,15 @@ public sealed class BillSeries
     public const string OpenEndedEndMode = "open_ended";
     public const string UntilDateEndMode = "until_date";
     public const string OccurrenceCountEndMode = "occurrence_count";
+    public const string RecurringKind = "recurring";
+    public const string InstallmentKind = "installment";
 
     private const int DescriptionMaxLength = 255;
 
     private BillSeries()
     {
         Description = string.Empty;
+        Kind = RecurringKind;
         Frequency = MonthlyFrequency;
         EndMode = OpenEndedEndMode;
     }
@@ -21,6 +24,7 @@ public sealed class BillSeries
     public string Description { get; private set; }
     public decimal Amount { get; private set; }
     public DateOnly FirstDueOn { get; private set; }
+    public string Kind { get; private set; }
     public string Frequency { get; private set; }
     public string EndMode { get; private set; }
     public DateOnly? UntilDate { get; private set; }
@@ -33,6 +37,7 @@ public sealed class BillSeries
         string description,
         decimal amount,
         DateOnly firstDueOn,
+        string kind,
         string frequency,
         string endMode,
         DateOnly? untilDate,
@@ -43,10 +48,12 @@ public sealed class BillSeries
         Description = NormalizeDescription(description);
         Amount = EnsureAmount(amount);
         FirstDueOn = EnsureDueOn(firstDueOn);
+        Kind = EnsureKind(kind);
         Frequency = EnsureFrequency(frequency);
         EndMode = EnsureEndMode(endMode);
         UntilDate = EnsureUntilDate(FirstDueOn, EndMode, untilDate);
         OccurrenceCount = EnsureOccurrenceCount(EndMode, occurrenceCount);
+        EnsureKindMatchesSchedule(Kind, EndMode, OccurrenceCount);
         IsActive = true;
         CreatedAtUtc = DateTimeOffset.UtcNow;
     }
@@ -210,6 +217,20 @@ public sealed class BillSeries
         return normalized;
     }
 
+    private static string EnsureKind(string value)
+    {
+        var normalized = value?.Trim().ToLowerInvariant();
+
+        if (normalized is not (RecurringKind or InstallmentKind))
+        {
+            throw new ArgumentException(
+                "Recurring bill kind is invalid. Use recurring or installment.",
+                nameof(value));
+        }
+
+        return normalized;
+    }
+
     private static string EnsureEndMode(string value)
     {
         var normalized = value?.Trim().ToLowerInvariant();
@@ -284,5 +305,23 @@ public sealed class BillSeries
         }
 
         return null;
+    }
+
+    private static void EnsureKindMatchesSchedule(string kind, string endMode, int? occurrenceCount)
+    {
+        if (kind != InstallmentKind)
+        {
+            return;
+        }
+
+        if (endMode != OccurrenceCountEndMode)
+        {
+            throw new ArgumentException("Installment bills must use occurrence_count end mode.");
+        }
+
+        if (!occurrenceCount.HasValue || occurrenceCount.Value < 2)
+        {
+            throw new ArgumentException("Installment count must be at least 2.");
+        }
     }
 }

@@ -4,6 +4,7 @@ export type TransactionType = 1 | 2;
 export type CategoryType = 1 | 2;
 export type FinancialAccountType = 1 | 2 | 3 | 4;
 export type BillStatus = "pending" | "paid" | "overdue";
+export type BillSeriesKind = "recurring" | "installment";
 
 export type AuthResponse = StoredSession;
 
@@ -111,6 +112,10 @@ export type BillResponse = {
   description: string;
   amount: number;
   dueOn: string;
+  billSeriesId?: string | null;
+  seriesKind?: BillSeriesKind | null;
+  occurrenceNumber?: number | null;
+  totalOccurrences?: number | null;
   isPaid: boolean;
   paidAtUtc: string | null;
   createdAtUtc: string;
@@ -559,6 +564,13 @@ export async function createBill(
     description: string;
     amount: number;
     dueOn: string;
+    recurrence?: {
+      kind: BillSeriesKind;
+      frequency: "monthly";
+      endMode: "open_ended" | "until_date" | "occurrence_count";
+      untilDate?: string | null;
+      occurrenceCount?: number | null;
+    };
   },
 ) {
   return apiRequest<BillResponse>("/api/bills", {

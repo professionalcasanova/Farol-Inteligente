@@ -32,6 +32,9 @@ namespace Farol.Infrastructure.Persistence.Migrations
                         .HasPrecision(14, 2)
                         .HasColumnType("numeric(14,2)");
 
+                    b.Property<Guid?>("BillSeriesId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -46,19 +49,82 @@ namespace Farol.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsPaid")
                         .HasColumnType("boolean");
 
+                    b.Property<int?>("OccurrenceNumber")
+                        .HasColumnType("integer");
+
                     b.Property<DateTimeOffset?>("PaidAtUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("TotalOccurrences")
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
+                    b.HasIndex("BillSeriesId", "DueOn");
+
                     b.HasIndex("UserId", "DueOn");
 
                     b.HasIndex("UserId", "IsPaid", "DueOn");
 
                     b.ToTable("bills", (string)null);
+                });
+
+            modelBuilder.Entity("Farol.Domain.Bills.BillSeries", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("EndMode")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateOnly>("FirstDueOn")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Frequency")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<int?>("OccurrenceCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly?>("UntilDate")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "IsActive", "FirstDueOn");
+
+                    b.ToTable("bill_series", (string)null);
                 });
 
             modelBuilder.Entity("Farol.Domain.Budgets.MonthlyBudget", b =>
@@ -248,6 +314,20 @@ namespace Farol.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("Farol.Domain.Bills.Bill", b =>
+                {
+                    b.HasOne("Farol.Domain.Bills.BillSeries", null)
+                        .WithMany()
+                        .HasForeignKey("BillSeriesId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Farol.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Farol.Domain.Bills.BillSeries", b =>
                 {
                     b.HasOne("Farol.Domain.Users.User", null)
                         .WithMany()

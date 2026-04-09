@@ -29,6 +29,10 @@ public sealed class BillSeriesConfiguration : IEntityTypeConfiguration<BillSerie
         builder.Property(series => series.FirstDueOn)
             .IsRequired();
 
+        builder.Property(series => series.Kind)
+            .IsRequired()
+            .HasMaxLength(32);
+
         builder.Property(series => series.Frequency)
             .IsRequired()
             .HasMaxLength(32);

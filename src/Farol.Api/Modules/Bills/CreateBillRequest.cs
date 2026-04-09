@@ -25,6 +25,9 @@ public sealed class CreateBillRequest
 public sealed class CreateRecurringBillRequest
 {
     [Required]
+    public string Kind { get; init; } = BillSeries.RecurringKind;
+
+    [Required]
     public string Frequency { get; init; } = BillSeries.MonthlyFrequency;
 
     [Required]
