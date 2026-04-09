@@ -374,6 +374,30 @@ def _resolve_recommended_actions(
     insights: list[InsightDefinition],
 ) -> list[dict[str, str]]:
     action_map = {
+        "overdue_bills_long": [
+            {
+                "id": "review_overdue_bills",
+                "label": "Ver contas vencidas",
+                "target": "/bills?status=overdue",
+            },
+            {
+                "id": "review_cash_flow",
+                "label": "Ver resumo do mes",
+                "target": "/dashboard",
+            },
+        ],
+        "negative_balance_high_variable_expense": [
+            {
+                "id": "review_expenses",
+                "label": "Ver saidas do mes",
+                "target": "/transactions",
+            },
+            {
+                "id": "review_budget",
+                "label": "Revisar planejamento",
+                "target": "/budget",
+            },
+        ],
         "overdue_bills": [
             {
                 "id": "review_overdue_bills",
@@ -455,10 +479,26 @@ def _resolve_recommended_actions(
         ],
     }
 
+    action_priority = {
+        "negative_balance_high_variable_expense": 0,
+        "negative_free_money": 1,
+        "short_term_bills_pressure": 2,
+        "budget_overspent": 3,
+        "high_non_essential_spending": 4,
+        "overdue_bills_long": 5,
+        "overdue_bills": 6,
+        "period_financial_pressure": 7,
+        "healthy_month": 99,
+    }
+
     actions: list[dict[str, str]] = []
     seen_ids: set[str] = set()
+    ordered_insights = sorted(
+        insights,
+        key=lambda item: (action_priority.get(item.type, 50), -item.priority),
+    )
 
-    for insight in insights:
+    for insight in ordered_insights:
         for action in action_map.get(insight.type, []):
             if action["id"] in seen_ids:
                 continue
