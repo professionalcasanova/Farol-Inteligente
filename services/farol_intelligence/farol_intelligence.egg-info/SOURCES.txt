@@ -10,3 +10,4 @@ farol_intelligence.egg-info/dependency_links.txt
 farol_intelligence.egg-info/requires.txt
 farol_intelligence.egg-info/top_level.txt
 tests/test_analysis.py
+tests/test_main.py

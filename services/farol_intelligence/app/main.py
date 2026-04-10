@@ -12,6 +12,14 @@ app = FastAPI(
 )
 
 
+@app.get("/health")
+def health() -> dict[str, str]:
+    return {
+        "status": "ok",
+        "service": "farol-intelligence",
+    }
+
+
 @app.post("/analyze/v1", response_model=FinancialAnalysisResponse)
 def analyze_v1(payload: FinancialAnalysisRequest) -> FinancialAnalysisResponse:
     result = analyze_financial_snapshot(payload.model_dump())

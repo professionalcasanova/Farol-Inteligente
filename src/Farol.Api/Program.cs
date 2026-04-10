@@ -7,6 +7,7 @@ using Farol.Infrastructure.Persistence;
 using Farol.Infrastructure.Seeding;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -124,6 +125,13 @@ var app = builder.Build();
 
 if (!app.Environment.IsEnvironment("Testing"))
 {
+    if (builder.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
+    {
+        using var migrationScope = app.Services.CreateScope();
+        var dbContext = migrationScope.ServiceProvider.GetRequiredService<FarolDbContext>();
+        await dbContext.Database.MigrateAsync(app.Lifetime.ApplicationStopping);
+    }
+
     await DatabaseSeeder.SeedSystemCategoriesAsync(app.Services, app.Lifetime.ApplicationStopping);
 
     if (app.Environment.IsDevelopment() &&
@@ -141,8 +149,18 @@ if (app.Environment.IsDevelopment())
 
 if (!app.Environment.IsEnvironment("Testing"))
 {
+    app.UseForwardedHeaders(new ForwardedHeadersOptions
+    {
+        ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+    });
     app.UseHttpsRedirection();
 }
+
+app.MapGet("/health", () => Results.Ok(new
+{
+    status = "ok",
+    service = "farol-api"
+}));
 
 app.UseCors("FarolWeb");
 app.UseAuthentication();
