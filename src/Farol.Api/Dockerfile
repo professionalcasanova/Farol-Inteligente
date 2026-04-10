@@ -7,7 +7,7 @@ COPY ["src/Farol.Api/Farol.Api.csproj", "src/Farol.Api/"]
 COPY ["src/Farol.Infrastructure/Farol.Infrastructure.csproj", "src/Farol.Infrastructure/"]
 COPY ["src/Farol.Domain/Farol.Domain.csproj", "src/Farol.Domain/"]
 
-RUN dotnet restore "Farol.sln"
+RUN dotnet restore "src/Farol.Api/Farol.Api.csproj"
 
 COPY . .
 
