@@ -298,7 +298,7 @@ export default function BudgetPage() {
     const categories = buildPayload(templateRows);
 
     if (hasDuplicateCategories(categories)) {
-      setTemplateError("Cada categoria pode aparecer apenas uma vez no template.");
+      setTemplateError("Cada categoria pode aparecer apenas uma vez no planejamento base.");
       setSuccess("");
       return;
     }
@@ -314,8 +314,8 @@ export default function BudgetPage() {
       resetTemplateRows(response);
       setSuccess(
         response.categories.length === 0
-          ? "Template recorrente limpo com sucesso."
-          : "Template recorrente salvo com sucesso.",
+          ? "Planejamento base limpo com sucesso."
+          : "Planejamento base salvo com sucesso.",
       );
     } catch (caughtError) {
       if (isUnauthorizedApiError(caughtError)) {
@@ -326,7 +326,7 @@ export default function BudgetPage() {
       setTemplateError(
         getFriendlyApiMessage(
           caughtError,
-          "Nao foi possivel salvar o template recorrente agora. Revise os dados e tente novamente.",
+          "Nao foi possivel salvar o planejamento base agora. Revise os dados e tente novamente.",
           { messageMap: budgetMessageMap },
         ),
       );
@@ -353,7 +353,7 @@ export default function BudgetPage() {
 
       setBudget(response);
       resetMonthlyRows(response);
-      setSuccess("Template aplicado ao mes com sucesso.");
+      setSuccess("Planejamento base aplicado ao mes com sucesso.");
     } catch (caughtError) {
       if (isUnauthorizedApiError(caughtError)) {
         logout("session-expired");
@@ -363,7 +363,7 @@ export default function BudgetPage() {
       setTemplateError(
         getFriendlyApiMessage(
           caughtError,
-          "Nao foi possivel aplicar o template ao mes agora. Tente novamente.",
+          "Nao foi possivel aplicar o planejamento base ao mes agora. Tente novamente.",
           { messageMap: budgetMessageMap },
         ),
       );
@@ -387,7 +387,7 @@ export default function BudgetPage() {
           />
         </div>
       }
-      description="Monte o orcamento do mes e mantenha um template recorrente para acelerar os meses seguintes."
+      description="Monte o orcamento do mes e mantenha uma base recorrente para acelerar os meses seguintes."
       onLogout={logout}
       session={session}
       title="Orcamento mensal"
@@ -472,30 +472,30 @@ export default function BudgetPage() {
             </section>
 
             <section className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
-              <div className="flex items-end justify-between gap-4">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                 <div>
                   <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
-                    Template recorrente
+                    Planejamento base
                   </div>
                   <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
                     Base para os proximos meses
                   </h2>
                   <p className="mt-3 text-sm leading-6 text-[var(--color-muted)]">
-                    Guarde aqui as categorias que se repetem. Depois aplique esse template ao mes quando quiser.
+                    Guarde aqui as categorias que se repetem. Depois aplique essa base ao mes quando quiser.
                   </p>
                 </div>
                 <button
-                  className="rounded-full border border-[var(--color-line)] px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-70"
+                  className="self-start rounded-full border border-[var(--color-line)] px-5 py-3 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-70"
                   disabled={isApplyingTemplate}
                   onClick={handleApplyTemplate}
                   type="button"
                 >
-                  {isApplyingTemplate ? "Aplicando..." : "Aplicar ao mes"}
+                  {isApplyingTemplate ? "Aplicando..." : "Aplicar base ao mes"}
                 </button>
               </div>
 
               <div className="mt-6 rounded-[24px] border border-[var(--color-line)] bg-white p-5">
-                <div className="flex items-center justify-between gap-4">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="text-sm text-[var(--color-muted)]">
                     Total recorrente:{" "}
                     <span className="font-semibold text-[var(--color-foreground)]">
@@ -514,11 +514,11 @@ export default function BudgetPage() {
                 <form className="mt-5 space-y-4" onSubmit={handleSaveTemplate}>
                   {templateRows.map((row, index) => (
                     <div
-                      className="grid gap-3 rounded-[24px] border border-[var(--color-line)] bg-[var(--color-panel)] p-4 md:grid-cols-[1fr_0.8fr_auto]"
+                      className="grid gap-3 rounded-[24px] border border-[var(--color-line)] bg-[var(--color-panel)] p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)]"
                       key={row.id}
                     >
                       <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
-                        <span>Categoria base {index + 1}</span>
+                        <span>Categoria da base {index + 1}</span>
                         <select
                           className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3 text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)]"
                           onChange={(event) =>
@@ -562,7 +562,7 @@ export default function BudgetPage() {
                         />
                       </label>
 
-                      <div className="flex items-end">
+                      <div className="flex items-end lg:col-span-2 lg:justify-end">
                         <button
                           className="rounded-2xl border border-[var(--color-line)] px-4 py-3 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-[var(--color-accent-soft)]"
                           onClick={() => removeTemplateRow(row.id)}
@@ -579,7 +579,7 @@ export default function BudgetPage() {
                     disabled={isSavingTemplate}
                     type="submit"
                   >
-                    {isSavingTemplate ? "Salvando template..." : "Salvar template recorrente"}
+                    {isSavingTemplate ? "Salvando planejamento..." : "Salvar planejamento base"}
                   </button>
                 </form>
               </div>
@@ -596,7 +596,7 @@ export default function BudgetPage() {
                   Criar, substituir ou limpar orcamento
                 </h2>
                 <p className="mt-3 text-sm leading-6 text-[var(--color-muted)]">
-                  O template recorrente nao substitui este mes automaticamente. Ajuste o snapshot do mes quando precisar.
+                  A base recorrente nao substitui este mes automaticamente. Ajuste o snapshot do mes quando precisar.
                 </p>
               </div>
               <button

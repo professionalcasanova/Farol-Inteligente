@@ -172,6 +172,7 @@ describe("BudgetPage", () => {
     const templateHeading = await screen.findByText("Base para os proximos meses");
     const templateSection = templateHeading.closest("section");
     expect(templateSection).not.toBeNull();
+    expect(screen.getByText("Planejamento base")).toBeInTheDocument();
 
     const withinTemplate = templateSection!;
     const templateSelect = withinTemplate.querySelectorAll("select")[0] as HTMLSelectElement;
@@ -181,7 +182,7 @@ describe("BudgetPage", () => {
     await user.clear(templateAmount);
     await user.type(templateAmount, "900");
     await user.click(
-      screen.getByRole("button", { name: /salvar template recorrente/i }),
+      screen.getByRole("button", { name: /salvar planejamento base/i }),
     );
 
     await waitFor(() => {
@@ -241,7 +242,7 @@ describe("BudgetPage", () => {
 
     render(<BudgetPage />);
 
-    await user.click(await screen.findByRole("button", { name: /aplicar ao mes/i }));
+    await user.click(await screen.findByRole("button", { name: /aplicar base ao mes/i }));
 
     await waitFor(() => {
       expect(mockedApplyBudgetTemplate).toHaveBeenCalledWith("token", {
@@ -251,7 +252,7 @@ describe("BudgetPage", () => {
     });
 
     expect(
-      await screen.findByText(/template aplicado ao mes com sucesso/i),
+      await screen.findByText(/planejamento base aplicado ao mes com sucesso/i),
     ).toBeInTheDocument();
   });
 });

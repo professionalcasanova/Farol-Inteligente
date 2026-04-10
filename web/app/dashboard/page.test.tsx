@@ -387,6 +387,7 @@ describe("DashboardPage", () => {
     });
 
     render(<DashboardPage />);
+    const user = userEvent.setup();
 
     expect(await screen.findByText("Risco financeiro crítico")).toBeInTheDocument();
     expect(screen.getByText("Saldo negativo e contas atrasadas.")).toBeInTheDocument();
@@ -413,8 +414,17 @@ describe("DashboardPage", () => {
       "/transactions",
     );
     expect(screen.getAllByRole("link", { name: "Abrir alerta" })).toHaveLength(2);
+
+    await user.click(
+      screen.getByRole("button", {
+        name: /Abrir focos do mes \(3\)/i,
+      }),
+    );
+
     expect(
-      screen.getByRole("link", { name: /Abrir foco do mes: Ver saídas do mês/i }),
+      screen.getByRole("link", {
+        name: /Abrir foco do mes: Saldo do mês está em -R\$ 1.200,00/i,
+      }),
     ).toHaveAttribute("href", "/transactions");
   });
 
@@ -1322,6 +1332,8 @@ describe("DashboardPage", () => {
   });
 
   it("Dashboard_WhenMonthHealthIsUnavailable_UsesAlertActionAsNotificationFallback", async () => {
+    const user = userEvent.setup();
+
     mockedUseProtectedSession.mockReturnValue({
       session,
       isLoading: false,
@@ -1365,6 +1377,14 @@ describe("DashboardPage", () => {
     render(<DashboardPage />);
 
     expect(await screen.findByText("Resumo financeiro")).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", {
+        name: /Abrir focos do mes \(1\)/i,
+      }),
+    );
+
+    expect(screen.getByRole("dialog", { name: "Focos do mes" })).toBeInTheDocument();
     expect(
       screen.getByRole("link", {
         name: /Abrir foco do mes: Seu dinheiro livre para o mes esta baixo\./i,
