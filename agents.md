@@ -66,6 +66,8 @@ Rules:
 - Commit messages must follow conventional commits
 - Never commit broken builds
 - Tests must pass before committing
+- Every pull request must include closing keywords for its issues in the body, for example `Closes #123`
+- When a pull request covers more than one issue, include one closing line per issue
 
 Before committing:
 1. Run build
