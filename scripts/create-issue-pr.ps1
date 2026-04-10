@@ -1,6 +1,7 @@
 param(
-    [Parameter(Mandatory = $true)]
-    [int]$IssueNumber,
+    [int[]]$IssueNumbers = @(),
+
+    [int]$IssueNumber = 0,
 
     [string]$Base = "master",
     [string]$Head = "",
@@ -91,12 +92,26 @@ Need-Cmd git
 Need-Cmd gh
 Ensure-GhAuth
 
+if ($IssueNumbers.Count -eq 0) {
+    if ($IssueNumber -le 0) {
+        throw "Informe -IssueNumber ou -IssueNumbers."
+    }
+
+    $IssueNumbers = @($IssueNumber)
+}
+
 $repo = Get-RepoSlug
 $resolvedHead = Resolve-HeadBranch
 $resolvedTitle = Resolve-PrTitle -ResolvedHead $resolvedHead
 
 $bodyLines = [System.Collections.Generic.List[string]]::new()
-$bodyLines.Add("Closes #$IssueNumber")
+foreach ($resolvedIssueNumber in $IssueNumbers) {
+    if ($resolvedIssueNumber -le 0) {
+        throw "Os numeros de issue devem ser maiores que zero."
+    }
+
+    $bodyLines.Add("Closes #$resolvedIssueNumber")
+}
 $bodyLines.Add("")
 $bodyLines.Add("## Summary")
 Add-Bullets -Lines $bodyLines -Items $Summary -Fallback "update implementation"

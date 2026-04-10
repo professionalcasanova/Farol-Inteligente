@@ -70,6 +70,14 @@ type QuickEntryFormState = {
   categoryId: string;
 };
 
+type NotificationItem = {
+  id: string;
+  href: string;
+  title: string;
+  message: string;
+  severity: "high" | "medium";
+};
+
 const defaultAccountForm: AccountFormState = {
   name: "",
   type: 2,
@@ -229,6 +237,58 @@ function getPredictableBillLabel(bill: BillsSummaryResponse["upcoming"][number])
   return "";
 }
 
+function buildNotificationItems(
+  monthHealth: MonthHealthResponse | null | undefined,
+  alerts: AlertsResponse["alerts"],
+  fallbackHref: string,
+) {
+  const items: NotificationItem[] = [];
+  const seen = new Set<string>();
+
+  const addItem = (item: NotificationItem) => {
+    const normalizedHref = isActionNavigableFromDashboard(item.href) ? item.href : fallbackHref;
+    const dedupeKey = `${normalizedHref}::${item.message}`;
+
+    if (seen.has(dedupeKey)) {
+      return;
+    }
+
+    seen.add(dedupeKey);
+    items.push({
+      ...item,
+      href: normalizedHref,
+    });
+  };
+
+  if (monthHealth && monthHealth.status !== "healthy") {
+    const summaryMessage = monthHealth.message ?? monthHealth.summary.message;
+    const summaryHref =
+      monthHealth.recommendedActions?.find((action) =>
+        isActionNavigableFromDashboard(action.target),
+      )?.target ?? fallbackHref;
+
+    addItem({
+      id: "month-health-summary",
+      href: summaryHref,
+      title: monthHealth.status === "critical" ? "Foco principal" : "Leitura do mes",
+      message: summaryMessage,
+      severity: monthHealth.status === "critical" ? "high" : "medium",
+    });
+  }
+
+  alerts.forEach((alert, index) => {
+    addItem({
+      id: `${alert.type}-${index}`,
+      href: alert.actionUrl ?? fallbackHref,
+      title: "Alerta do mes",
+      message: alert.message,
+      severity: alert.severity,
+    });
+  });
+
+  return items.slice(0, 5);
+}
+
 export default function DashboardPage() {
   const { session, isLoading, logout } = useProtectedSession();
   const [monthValue, setMonthValue] = useState(getCurrentMonthInputValue());
@@ -245,6 +305,7 @@ export default function DashboardPage() {
   const [quickEntryForm, setQuickEntryForm] =
     useState<QuickEntryFormState>(defaultQuickEntryForm);
   const [showQuickEntryDetails, setShowQuickEntryDetails] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
 
   const monthAndYear = useMemo(
@@ -264,9 +325,6 @@ export default function DashboardPage() {
   );
   const quickEntrySubmitLabel =
     quickEntryForm.type === 1 ? "Registrar entrada" : "Registrar saída";
-  const visibleInsightCount = data?.monthHealth?.insights.length ?? 0;
-  const fallbackAlertCount = data?.alerts.alerts.length ?? 0;
-  const notificationCount = visibleInsightCount || fallbackAlertCount;
   const monthlyFlowMax = data
     ? Math.max(1, data.freeMoney.totalIncome, data.freeMoney.totalExpense)
     : 1;
@@ -306,22 +364,21 @@ export default function DashboardPage() {
     prioritizedRecommendedActions.find((action) =>
       isActionNavigableFromDashboard(action.target),
     ) ?? prioritizedRecommendedActions[0] ?? null;
-  const primaryAlertAction =
-    data?.alerts.alerts.find((alert) => isActionNavigableFromDashboard(alert.actionUrl)) ??
-    data?.alerts.alerts[0] ??
-    null;
-  const primaryNotificationHref =
-    primaryRecommendedAction?.target ??
-    primaryAlertAction?.actionUrl ??
-    "/dashboard";
-  const primaryNotificationLabel =
-    primaryRecommendedAction?.label ??
-    primaryAlertAction?.message ??
-    "Ver resumo do mes";
   const visibleAlertHighlights = data?.alerts.alerts.slice(0, 3) ?? [];
   const showFallbackAlertHighlights = !data?.monthHealth && visibleAlertHighlights.length > 0;
   const criticalPriorityReason = getCriticalPriorityReason(data?.monthHealth);
   const criticalSupportMessage = getCriticalSupportMessage(data?.monthHealth);
+  const dashboardFocusHref = isCriticalHealth
+    ? "#foco-do-mes"
+    : showFallbackAlertHighlights
+      ? "#alertas-do-mes"
+      : "#resumo-financeiro";
+  const notificationItems = buildNotificationItems(
+    data?.monthHealth,
+    data?.alerts.alerts ?? [],
+    dashboardFocusHref,
+  );
+  const notificationCount = notificationItems.length;
   const budgetFlowMax = data
     ? Math.max(1, data.budget.totalPlanned, data.budget.totalSpent)
     : 1;
@@ -482,6 +539,10 @@ export default function DashboardPage() {
       isCancelled = true;
     };
   }, [logout, monthAndYear.month, monthAndYear.year, reloadKey, session]);
+
+  useEffect(() => {
+    setIsNotificationsOpen(false);
+  }, [monthValue, reloadKey]);
 
   async function handleCreateAccount(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -674,11 +735,18 @@ export default function DashboardPage() {
         </div>
       }
       utilityActions={
-        <div className="flex items-center">
-          <Link
-            aria-label={`Abrir foco do mes: ${primaryNotificationLabel}`}
+        <div className="relative flex items-center">
+          <button
+            aria-expanded={isNotificationsOpen}
+            aria-haspopup="dialog"
+            aria-label={
+              notificationCount > 0
+                ? `Abrir focos do mes (${notificationCount})`
+                : "Abrir focos do mes"
+            }
             className="relative inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-[var(--color-line)] bg-white px-3 py-2 text-[var(--color-foreground)] transition hover:bg-[var(--color-accent-soft)]"
-            href={primaryNotificationHref}
+            onClick={() => setIsNotificationsOpen((current) => !current)}
+            type="button"
           >
             <svg
               aria-hidden="true"
@@ -698,7 +766,66 @@ export default function DashboardPage() {
                 {notificationCount > 9 ? "9+" : notificationCount}
               </span>
             ) : null}
-          </Link>
+          </button>
+
+          {isNotificationsOpen ? (
+            <div
+              aria-label="Focos do mes"
+              className="absolute right-0 top-14 z-20 w-[min(26rem,calc(100vw-2rem))] rounded-[24px] border border-[var(--color-line)] bg-white p-4 shadow-[0_24px_60px_rgba(17,37,51,0.12)]"
+              role="dialog"
+            >
+              <div className="flex items-center justify-between gap-3 border-b border-[var(--color-line)] pb-3">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-accent)]">
+                    Focos do mes
+                  </div>
+                  <div className="mt-1 text-sm text-[var(--color-muted)]">
+                    Veja o que pede atencao e siga para a acao certa.
+                  </div>
+                </div>
+                <button
+                  aria-label="Fechar focos do mes"
+                  className="rounded-full border border-[var(--color-line)] px-3 py-2 text-xs font-semibold text-[var(--color-foreground)] transition hover:bg-[var(--color-panel)]"
+                  onClick={() => setIsNotificationsOpen(false)}
+                  type="button"
+                >
+                  Fechar
+                </button>
+              </div>
+
+              {notificationItems.length === 0 ? (
+                <div className="mt-4 rounded-[20px] border border-dashed border-[var(--color-line)] px-4 py-5 text-sm text-[var(--color-muted)]">
+                  Nenhum foco ativo no momento.
+                </div>
+              ) : (
+                <div className="mt-4 space-y-3">
+                  {notificationItems.map((item) => (
+                    <Link
+                      aria-label={`Abrir foco do mes: ${item.message}`}
+                      className="block rounded-[20px] border border-[var(--color-line)] bg-[var(--color-panel)] px-4 py-4 transition hover:border-[var(--color-accent)] hover:bg-white"
+                      href={item.href}
+                      key={item.id}
+                      onClick={() => setIsNotificationsOpen(false)}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span
+                          className={`rounded-full border px-3 py-1 text-xs font-semibold ${alertSeverityStyles[item.severity]}`}
+                        >
+                          {item.title}
+                        </span>
+                        <span className="text-xs font-medium text-[var(--color-muted)]">
+                          Abrir
+                        </span>
+                      </div>
+                      <div className="mt-3 text-sm font-semibold leading-6 text-[var(--color-foreground)]">
+                        {item.message}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : null}
         </div>
       }
       description="Acompanhe o mês, veja o que pede atenção e registre o que entrou ou saiu sem sair da página."
@@ -1018,7 +1145,10 @@ export default function DashboardPage() {
           </section>
 
           {showFallbackAlertHighlights ? (
-            <section className="rounded-[28px] border border-[color:rgba(217,119,6,0.18)] bg-[color:rgba(255,247,237,0.92)] p-6">
+            <section
+              className="rounded-[28px] border border-[color:rgba(217,119,6,0.18)] bg-[color:rgba(255,247,237,0.92)] p-6"
+              id="alertas-do-mes"
+            >
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="min-w-0">
                   <div className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--color-warm)]">
@@ -1079,7 +1209,10 @@ export default function DashboardPage() {
           {data.monthHealth ? (
             <>
               {isCriticalHealth ? (
-                <section className="rounded-[28px] border border-[color:rgba(185,28,28,0.3)] bg-[color:rgba(254,226,226,0.82)] p-6">
+                <section
+                  className="rounded-[28px] border border-[color:rgba(185,28,28,0.3)] bg-[color:rgba(254,226,226,0.82)] p-6"
+                  id="foco-do-mes"
+                >
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div className="min-w-0">
                       <div className="text-sm font-semibold uppercase tracking-[0.18em] text-red-700">
@@ -1152,7 +1285,7 @@ export default function DashboardPage() {
                       ) : null}
                       <div className="mt-5">
                         <Link
-                          href={primaryRecommendedAction?.target ?? "/dashboard"}
+                          href={primaryRecommendedAction?.target ?? dashboardFocusHref}
                           className="inline-flex rounded-xl bg-red-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-800"
                         >
                           {primaryRecommendedAction?.label ?? "Ver resumo do mes"}
@@ -1167,7 +1300,7 @@ export default function DashboardPage() {
                   </div>
 
                   {visibleAlertHighlights.length > 0 ? (
-                    <div className="mt-5">
+                    <div className="mt-5" id="alertas-do-mes">
                       <div className="text-xs font-semibold uppercase tracking-[0.18em] text-red-700">
                         Alertas visíveis no mês
                       </div>
@@ -1332,7 +1465,10 @@ export default function DashboardPage() {
           {showSecondarySections ? (
             <>
               <section className="space-y-8">
-            <article className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
+            <article
+              className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6"
+              id="resumo-financeiro"
+            >
               <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
                 Resumo financeiro
               </div>
