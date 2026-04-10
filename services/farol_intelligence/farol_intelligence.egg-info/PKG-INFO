@@ -7,6 +7,7 @@ Description-Content-Type: text/markdown
 Requires-Dist: fastapi<1.0,>=0.115
 Requires-Dist: uvicorn[standard]<1.0,>=0.32
 Requires-Dist: pydantic<3.0,>=2.9
+Requires-Dist: httpx<1.0,>=0.27
 
 # Farol Intelligence Service
 

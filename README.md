@@ -32,6 +32,17 @@ Sprint 1 a Sprint 10 concluidas, com MVP fechado para demonstracao local:
 
 O MVP esta fechado para demonstracao local.
 
+## Deploy beta fechado
+
+Para publicar o Farol para testers com o menor atrito operacional hoje:
+
+- `web` no Vercel
+- `api`, `farol-intelligence` e PostgreSQL no Render
+
+Tutorial passo a passo:
+
+- [docs/deployment/vercel-render-beta.md](docs/deployment/vercel-render-beta.md)
+
 ## Stack atual
 
 - .NET 10
@@ -96,6 +107,10 @@ Swagger:
 
 - `http://localhost:5258/swagger`
 
+Health:
+
+- `http://localhost:5258/health`
+
 ### 5. Rodar testes
 
 ```powershell
@@ -121,6 +136,18 @@ npm run dev
 Aplicacao web:
 
 - `http://localhost:3000`
+
+### 7. Rodar o servico de inteligencia
+
+```powershell
+Set-Location services/farol_intelligence
+python -m pip install -e .
+python -m uvicorn app.main:app --reload --port 8000
+```
+
+Health:
+
+- `http://127.0.0.1:8000/health`
 
 Observacao:
 

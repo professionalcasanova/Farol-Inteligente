@@ -1,0 +1,40 @@
+databases:
+  - name: farol-postgres
+    databaseName: farol
+    user: farol
+
+services:
+  - type: web
+    name: farol-intelligence
+    runtime: docker
+    dockerContext: .
+    dockerfilePath: ./services/farol_intelligence/Dockerfile
+    autoDeploy: true
+    healthCheckPath: /health
+
+  - type: web
+    name: farol-api
+    runtime: docker
+    dockerContext: .
+    dockerfilePath: ./src/Farol.Api/Dockerfile
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: Database__MigrateOnStartup
+        value: "true"
+      - key: Jwt__Issuer
+        value: Farol.Api
+      - key: Jwt__Audience
+        value: Farol.Client
+      - key: Jwt__SigningKey
+        generateValue: true
+      - key: ConnectionStrings__DefaultConnection
+        fromDatabase:
+          name: farol-postgres
+          property: connectionString
+      - key: FinancialIntelligence__BaseUrl
+        sync: false
+      - key: Cors__AllowedOrigins__0
+        sync: false
