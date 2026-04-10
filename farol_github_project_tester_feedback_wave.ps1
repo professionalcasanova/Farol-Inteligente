@@ -65,10 +65,16 @@ function Get-Issue-Url-By-Exact-Title {
 function Add-Issue-To-Project {
     param([string]$IssueUrl)
 
-    gh project item-add $PROJECT_NUMBER --owner $OWNER --url $IssueUrl 2>$null | Out-Null
+    try {
+        gh project item-add $PROJECT_NUMBER --owner $OWNER --url $IssueUrl 2>$null | Out-Null
 
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "Adicionada ao Project #$PROJECT_NUMBER"
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "Adicionada ao Project #$PROJECT_NUMBER"
+            return
+        }
+    }
+    catch {
+        Write-Host "Nao foi possivel adicionar ao Project automaticamente. Verifique se a issue ja esta no board: $IssueUrl"
         return
     }
 
