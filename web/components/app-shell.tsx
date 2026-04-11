@@ -35,13 +35,13 @@ export function AppShell({
   const pathname = usePathname();
 
   return (
-    <div className="min-h-screen px-6 py-5 sm:px-8 xl:px-10">
-      <div className="mx-auto flex min-h-[calc(100vh-2.5rem)] w-full max-w-[1360px] flex-col rounded-[32px] border border-[var(--color-line)] bg-[color:rgba(255,250,242,0.9)] shadow-[0_40px_120px_rgba(20,37,51,0.12)] backdrop-blur">
-        <header className="border-b border-[var(--color-line)] px-7 py-6 sm:px-8 lg:px-10">
+    <div className="min-h-screen px-3 py-3 sm:px-8 sm:py-5 xl:px-10">
+      <div className="mx-auto flex min-h-[calc(100vh-1.5rem)] w-full max-w-[1360px] flex-col rounded-[24px] border border-[var(--color-line)] bg-[color:rgba(255,250,242,0.9)] shadow-[0_24px_60px_rgba(20,37,51,0.1)] backdrop-blur sm:min-h-[calc(100vh-2.5rem)] sm:rounded-[32px] sm:shadow-[0_40px_120px_rgba(20,37,51,0.12)]">
+        <header className="border-b border-[var(--color-line)] px-4 py-5 sm:px-8 sm:py-6 lg:px-10">
           <div className="flex flex-col gap-6">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
               <div className="space-y-3">
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <div className="rounded-full bg-[var(--color-accent)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.28em] text-white">
                     Farol
                   </div>
@@ -50,7 +50,7 @@ export function AppShell({
                   </span>
                 </div>
                 <div>
-                  <h1 className="text-3xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
+                  <h1 className="text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)] sm:text-3xl">
                     {title}
                   </h1>
                   <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--color-muted)]">
@@ -60,7 +60,7 @@ export function AppShell({
               </div>
 
               <nav aria-label="Navegação principal" className="min-w-0 lg:max-w-full">
-                <div className="flex items-center gap-2 overflow-x-auto pb-1 md:overflow-visible lg:justify-end">
+                <div className="-mx-1 flex items-center gap-2 overflow-x-auto px-1 pb-1 md:overflow-visible lg:justify-end">
                   {navItems.map((item) => {
                     const isActive = pathname === item.href;
 
@@ -84,10 +84,10 @@ export function AppShell({
             </div>
 
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-              <div className="min-w-0">{actions}</div>
-              <div className="flex flex-wrap items-center gap-3 lg:justify-end">
-                {utilityActions}
-                <div className="min-w-0 rounded-[24px] border border-[var(--color-line)] bg-white px-4 py-3 text-right">
+              <div className="min-w-0 w-full lg:w-auto">{actions}</div>
+              <div className="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end lg:w-auto">
+                {utilityActions ? <div className="shrink-0 self-start">{utilityActions}</div> : null}
+                <div className="min-w-0 rounded-[24px] border border-[var(--color-line)] bg-white px-4 py-3 text-left sm:max-w-[280px] sm:text-right">
                   <div className="truncate text-sm font-semibold text-[var(--color-foreground)]">
                     {session.name}
                   </div>
@@ -96,7 +96,7 @@ export function AppShell({
                   </div>
                 </div>
                 <button
-                  className="inline-flex min-h-11 items-center whitespace-nowrap rounded-full border border-[var(--color-line)] px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-white"
+                  className="inline-flex min-h-11 w-full items-center justify-center whitespace-nowrap rounded-full border border-[var(--color-line)] px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-white sm:w-auto"
                   onClick={onLogout}
                   type="button"
                 >
@@ -107,7 +107,7 @@ export function AppShell({
           </div>
         </header>
 
-        <main className="flex-1 px-7 py-7 sm:px-8 lg:px-10">{children}</main>
+        <main className="flex-1 px-4 py-5 sm:px-8 sm:py-7 lg:px-10">{children}</main>
       </div>
     </div>
   );

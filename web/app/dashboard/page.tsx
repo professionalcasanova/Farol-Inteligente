@@ -739,7 +739,7 @@ export default function DashboardPage() {
   return (
     <AppShell
       actions={
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex w-full flex-wrap items-center gap-3">
           <MonthPicker
             label="Mês de referência"
             onChange={setMonthValue}
@@ -784,7 +784,7 @@ export default function DashboardPage() {
           {isNotificationsOpen ? (
             <div
               aria-label="Focos do mes"
-              className="absolute right-0 top-14 z-20 w-[min(26rem,calc(100vw-2rem))] rounded-[24px] border border-[var(--color-line)] bg-white p-4 shadow-[0_24px_60px_rgba(17,37,51,0.12)]"
+              className="fixed left-3 right-3 top-24 z-20 max-h-[min(70vh,32rem)] overflow-y-auto rounded-[24px] border border-[var(--color-line)] bg-white p-4 shadow-[0_24px_60px_rgba(17,37,51,0.12)] sm:absolute sm:left-auto sm:right-0 sm:top-14 sm:w-[min(26rem,calc(100vw-2rem))]"
               role="dialog"
             >
               <div className="flex items-center justify-between gap-3 border-b border-[var(--color-line)] pb-3">

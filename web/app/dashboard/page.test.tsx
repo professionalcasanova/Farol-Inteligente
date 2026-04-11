@@ -1465,6 +1465,52 @@ describe("DashboardPage", () => {
     ).toHaveAttribute("href", "/transactions");
   });
 
+  it("Dashboard_NotificationDialog_UsesViewportSafeMobilePositioning", async () => {
+    const user = userEvent.setup();
+
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+    mockDashboardApi({
+      accounts: [
+        {
+          id: "account-1",
+          name: "Conta principal",
+          type: 2,
+          isActive: true,
+          createdAtUtc: "2026-03-01T00:00:00Z",
+        },
+      ],
+      alerts: {
+        alerts: [
+          {
+            type: "overdue_bills",
+            severity: "high",
+            message: "Conta de energia vencida há 8 dias",
+            amount: 240,
+            actionUrl: "/bills?status=overdue",
+          },
+        ],
+      },
+    });
+
+    render(<DashboardPage />);
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: /Abrir focos do mes \(1\)/i,
+      }),
+    );
+
+    const dialog = screen.getByRole("dialog", { name: "Focos do mes" });
+    expect(dialog.className).toContain("fixed");
+    expect(dialog.className).toContain("left-3");
+    expect(dialog.className).toContain("right-3");
+    expect(dialog.className).toContain("sm:absolute");
+  });
+
   it("Dashboard_WhenSessionExpires_TriggersConsistentLogout", async () => {
     const logout = vi.fn();
 

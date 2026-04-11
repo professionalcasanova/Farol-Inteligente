@@ -70,4 +70,27 @@ describe("AppShell", () => {
       screen.getByRole("link", { name: "Contas a pagar" }),
     ).toHaveAttribute("aria-current", "page");
   });
+
+  it("AppShell_MobileLayout_KeepsSessionBlockAndLogoutInsideUsefulWidth", () => {
+    mockedUsePathname.mockReturnValue("/dashboard");
+
+    render(
+      <AppShell
+        actions={<div>MÃªs de referÃªncia</div>}
+        utilityActions={<button type="button">Alertas</button>}
+        description="DescriÃ§Ã£o"
+        onLogout={vi.fn()}
+        session={session}
+        title="VisÃ£o do mÃªs"
+      >
+        <div>ConteÃºdo</div>
+      </AppShell>,
+    );
+
+    expect(screen.getByRole("button", { name: "Sair" }).className).toContain("w-full");
+    expect(screen.getByText("Marco Antonio").parentElement?.className).toContain(
+      "text-left",
+    );
+    expect(screen.getByText("MÃªs de referÃªncia")).toBeInTheDocument();
+  });
 });
