@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import DashboardPage from "@/app/dashboard/page";
 import {
   ApiError,
+  createAccount,
   createTransaction,
   getAlerts,
   getBillsSummary,
@@ -66,6 +67,7 @@ vi.mock("@/lib/api", async () => {
 
   return {
     ...actual,
+    createAccount: vi.fn(),
     createTransaction: vi.fn(),
     getAlerts: vi.fn(),
     getBillsSummary: vi.fn(),
@@ -81,6 +83,7 @@ vi.mock("@/lib/api", async () => {
 });
 
 const mockedUseProtectedSession = vi.mocked(useProtectedSession);
+const mockedCreateAccount = vi.mocked(createAccount);
 const mockedCreateTransaction = vi.mocked(createTransaction);
 const mockedGetAlerts = vi.mocked(getAlerts);
 const mockedGetBillsSummary = vi.mocked(getBillsSummary);
@@ -259,6 +262,7 @@ function mockDashboardApi(overrides?: {
 describe("DashboardPage", () => {
   beforeEach(() => {
     mockedUseProtectedSession.mockReset();
+    mockedCreateAccount.mockReset();
     mockedCreateTransaction.mockReset();
     mockedGetAlerts.mockReset();
     mockedGetBillsSummary.mockReset();
@@ -460,9 +464,71 @@ describe("DashboardPage", () => {
     expect(
       screen.getAllByRole("link", { name: /importar (dados de )?arquivo/i }),
     ).not.toHaveLength(0);
+    expect(screen.getByText("Suas contas financeiras")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^adicionar conta$/i }),
+    ).toBeInTheDocument();
     expect(screen.queryByText("Resumo financeiro")).not.toBeInTheDocument();
     expect(screen.queryByText("Contas a pagar do mês")).not.toBeInTheDocument();
     expect(screen.queryByText("Leitura por categoria")).not.toBeInTheDocument();
+  });
+
+  it("Dashboard_WithExistingAccount_AllowsCreatingAdditionalAccount", async () => {
+    const user = userEvent.setup();
+
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+
+    const primaryAccount = {
+      id: "account-1",
+      name: "Conta principal",
+      type: 2 as const,
+      isActive: true,
+      createdAtUtc: "2026-03-01T00:00:00Z",
+    };
+    const secondaryAccount = {
+      id: "account-2",
+      name: "Cartão do dia a dia",
+      type: 3 as const,
+      isActive: true,
+      createdAtUtc: "2026-03-02T00:00:00Z",
+    };
+
+    mockDashboardApi({
+      accounts: [primaryAccount],
+    });
+    mockedListAccounts.mockResolvedValueOnce([primaryAccount]).mockResolvedValue([
+      primaryAccount,
+      secondaryAccount,
+    ]);
+    mockedCreateAccount.mockResolvedValue(secondaryAccount);
+
+    render(<DashboardPage />);
+
+    expect(await screen.findByText("Suas contas financeiras")).toBeInTheDocument();
+    expect(screen.getAllByText("Conta principal").length).toBeGreaterThan(0);
+
+    await user.type(screen.getByLabelText(/nome da conta/i), "Cartão do dia a dia");
+    await user.selectOptions(screen.getByLabelText(/tipo da conta/i), "3");
+    await user.click(screen.getByRole("button", { name: /^adicionar conta$/i }));
+
+    await waitFor(() => {
+      expect(mockedCreateAccount).toHaveBeenCalledWith("token", {
+        name: "Cartão do dia a dia",
+        type: 3,
+      });
+    });
+
+    expect(
+      await screen.findByText(
+        "Conta adicionada com sucesso. Agora escolha em qual conta deseja registrar a próxima movimentação ou importação.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText("Cartão do dia a dia").length).toBeGreaterThan(0);
+    expect(screen.getByLabelText(/conta financeira/i)).not.toBeDisabled();
   });
 
   it("Dashboard_RegisterNow_SubmitSuccess_RefreshesDataAndClearsForm", async () => {

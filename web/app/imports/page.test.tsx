@@ -136,4 +136,59 @@ describe("ImportsPage", () => {
       expect(mockedImportTransactionsCsv).toHaveBeenCalledTimes(1);
     });
   });
+
+  it("Imports_WithMultipleAccounts_AllowsChoosingDestinationAccount", async () => {
+    const user = userEvent.setup();
+
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+
+    mockedListAccounts.mockResolvedValue([
+      {
+        id: "account-1",
+        name: "Conta principal",
+        type: 2,
+        isActive: true,
+        createdAtUtc: "2026-03-01T00:00:00Z",
+      },
+      {
+        id: "account-2",
+        name: "Cartão do dia a dia",
+        type: 3,
+        isActive: true,
+        createdAtUtc: "2026-03-02T00:00:00Z",
+      },
+    ]);
+
+    mockedImportTransactionsCsv.mockResolvedValue({
+      totalRows: 2,
+      importedRows: 2,
+      skippedRows: 0,
+      errors: [],
+    });
+
+    render(<ImportsPage />);
+
+    const fileInput = (await screen.findByLabelText(/arquivo csv/i)) as HTMLInputElement;
+    const accountSelect = screen.getByLabelText(/conta de destino/i);
+    const file = new File(
+      ["occurredOn,description,amount,type,categoryName\n2026-03-01,Salario,3000.00,Income,Salario\n"],
+      "transactions.csv",
+      { type: "text/csv" },
+    );
+
+    await user.selectOptions(accountSelect, "account-2");
+    await user.upload(fileInput, file);
+    await user.click(screen.getByRole("button", { name: /enviar csv/i }));
+
+    await waitFor(() => {
+      expect(mockedImportTransactionsCsv).toHaveBeenCalledWith("token", {
+        financialAccountId: "account-2",
+        file,
+      });
+    });
+  });
 });
