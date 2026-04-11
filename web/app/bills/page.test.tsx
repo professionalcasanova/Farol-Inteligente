@@ -5,9 +5,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import BillsPage from "@/app/bills/page";
 import {
   createBill,
+  deleteBill,
   listBills,
   payBill,
   unpayBill,
+  updateBill,
 } from "@/lib/api";
 import { useProtectedSession } from "@/lib/use-protected-session";
 
@@ -54,17 +56,21 @@ vi.mock("@/lib/api", async () => {
   return {
     ...actual,
     createBill: vi.fn(),
+    deleteBill: vi.fn(),
     listBills: vi.fn(),
     payBill: vi.fn(),
     unpayBill: vi.fn(),
+    updateBill: vi.fn(),
   };
 });
 
 const mockedUseProtectedSession = vi.mocked(useProtectedSession);
 const mockedCreateBill = vi.mocked(createBill);
+const mockedDeleteBill = vi.mocked(deleteBill);
 const mockedListBills = vi.mocked(listBills);
 const mockedPayBill = vi.mocked(payBill);
 const mockedUnpayBill = vi.mocked(unpayBill);
+const mockedUpdateBill = vi.mocked(updateBill);
 
 const session = {
   accessToken: "token",
@@ -77,9 +83,11 @@ describe("BillsPage", () => {
   beforeEach(() => {
     mockedUseProtectedSession.mockReset();
     mockedCreateBill.mockReset();
+    mockedDeleteBill.mockReset();
     mockedListBills.mockReset();
     mockedPayBill.mockReset();
     mockedUnpayBill.mockReset();
+    mockedUpdateBill.mockReset();
   });
 
   it("Bills_CreateInstallment_SendsInstallmentPayload", async () => {
@@ -201,5 +209,106 @@ describe("BillsPage", () => {
 
     expect(scoped.getByText("Parcelada")).toBeInTheDocument();
     expect(scoped.getByText("Parcela 3/12")).toBeInTheDocument();
+  });
+
+  it("Bills_EditSingleBill_UsesUpdateFlow", async () => {
+    const user = userEvent.setup();
+
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+
+    mockedListBills.mockResolvedValue([
+      {
+        id: "bill-1",
+        description: "Internet",
+        amount: 99.9,
+        dueOn: "2026-03-10",
+        billSeriesId: null,
+        seriesKind: null,
+        occurrenceNumber: null,
+        totalOccurrences: null,
+        isPaid: false,
+        paidAtUtc: null,
+        createdAtUtc: "2026-03-01T00:00:00Z",
+        status: "pending",
+      },
+    ]);
+    mockedUpdateBill.mockResolvedValue({
+      id: "bill-1",
+      description: "Internet fibra",
+      amount: 119.9,
+      dueOn: "2026-03-12",
+      billSeriesId: null,
+      seriesKind: null,
+      occurrenceNumber: null,
+      totalOccurrences: null,
+      isPaid: false,
+      paidAtUtc: null,
+      createdAtUtc: "2026-03-01T00:00:00Z",
+      status: "pending",
+    });
+
+    render(<BillsPage />);
+
+    await user.click(await screen.findByRole("button", { name: /^editar$/i }));
+
+    const descriptionInput = screen.getByLabelText("Descricao");
+    const amountInput = screen.getByLabelText("Valor");
+    const dueOnInput = screen.getByLabelText("Vencimento");
+
+    await user.clear(descriptionInput);
+    await user.type(descriptionInput, "Internet fibra");
+    await user.clear(amountInput);
+    await user.type(amountInput, "119.9");
+    await user.clear(dueOnInput);
+    await user.type(dueOnInput, "2026-03-12");
+    await user.click(screen.getByRole("button", { name: /salvar alteracao/i }));
+
+    await waitFor(() => {
+      expect(mockedUpdateBill).toHaveBeenCalledWith("token", "bill-1", {
+        description: "Internet fibra",
+        amount: 119.9,
+        dueOn: "2026-03-12",
+      });
+    });
+  });
+
+  it("Bills_DeleteSeries_UsesSeriesScope", async () => {
+    const user = userEvent.setup();
+
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+
+    mockedListBills.mockResolvedValue([
+      {
+        id: "bill-3",
+        description: "Notebook",
+        amount: 320,
+        dueOn: "2026-03-08",
+        billSeriesId: "series-3",
+        seriesKind: "installment",
+        occurrenceNumber: 3,
+        totalOccurrences: 12,
+        isPaid: false,
+        paidAtUtc: null,
+        createdAtUtc: "2026-03-01T00:00:00Z",
+        status: "pending",
+      },
+    ]);
+    mockedDeleteBill.mockResolvedValue(undefined);
+
+    render(<BillsPage />);
+
+    await user.click(await screen.findByRole("button", { name: /encerrar série/i }));
+
+    await waitFor(() => {
+      expect(mockedDeleteBill).toHaveBeenCalledWith("token", "bill-3", "series");
+    });
   });
 });

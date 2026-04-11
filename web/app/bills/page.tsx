@@ -8,6 +8,7 @@ import { LoadingScreen } from "@/components/loading-screen";
 import { MonthPicker } from "@/components/month-picker";
 import {
   createBill,
+  deleteBill,
   getFriendlyApiMessage,
   isUnauthorizedApiError,
   listBills,
@@ -16,6 +17,7 @@ import {
   type BillSeriesKind,
   type BillStatus,
   unpayBill,
+  updateBill,
 } from "@/lib/api";
 import {
   formatCurrency,
@@ -46,6 +48,8 @@ const billMessageMap = {
     "Parcelamentos precisam informar a quantidade total de parcelas.",
   "Installment count must be at least 2.":
     "Informe pelo menos 2 parcelas para criar um parcelamento.",
+  "Recurring and installment bills must be ended with scope=series.":
+    "Contas recorrentes e parceladas precisam ser encerradas como serie.",
 } as const;
 
 type BillFormKind = "single" | "recurring" | "installment";
@@ -142,6 +146,19 @@ function getBillCadenceLabel(bill: BillResponse) {
   return "Lancamento unico";
 }
 
+function buildEditFormState(bill: BillResponse): BillFormState {
+  return {
+    description: bill.description,
+    amount: String(bill.amount),
+    dueOn: bill.dueOn,
+    kind: getBillKind(bill),
+    recurrenceEndMode: "open_ended",
+    recurrenceUntilDate: "",
+    recurrenceCount: "",
+    installmentCount: bill.totalOccurrences ? String(bill.totalOccurrences) : "12",
+  };
+}
+
 export default function BillsPage() {
   const { session, isLoading, logout } = useProtectedSession();
   const [monthValue, setMonthValue] = useState(getCurrentMonthInputValue());
@@ -150,6 +167,7 @@ export default function BillsPage() {
   const [form, setForm] = useState<BillFormState>(() =>
     createEmptyForm(getCurrentMonthInputValue()),
   );
+  const [editingBillId, setEditingBillId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState("");
   const [formError, setFormError] = useState("");
   const [success, setSuccess] = useState("");
@@ -162,6 +180,9 @@ export default function BillsPage() {
     () => parseMonthInputValue(monthValue),
     [monthValue],
   );
+  const editingBill =
+    bills.find((bill) => bill.id === editingBillId) ?? null;
+  const isEditing = editingBillId !== null;
 
   useEffect(() => {
     if (form.description || form.amount) {
@@ -241,7 +262,25 @@ export default function BillsPage() {
     setBills(response);
   }
 
-  async function handleCreateBill(event: FormEvent<HTMLFormElement>) {
+  function resetForm(currentKind?: BillFormKind) {
+    setEditingBillId(null);
+    setForm(createEmptyForm(monthValue, currentKind));
+  }
+
+  function startEditing(bill: BillResponse) {
+    setEditingBillId(bill.id);
+    setFormError("");
+    setSuccess("");
+    setForm(buildEditFormState(bill));
+  }
+
+  function cancelEditing() {
+    setFormError("");
+    setSuccess("");
+    resetForm(form.kind);
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!session) {
@@ -263,7 +302,7 @@ export default function BillsPage() {
           }
         | undefined;
 
-      if (form.kind === "recurring") {
+      if (!isEditing && form.kind === "recurring") {
         if (
           form.recurrenceEndMode === "until_date" &&
           !form.recurrenceUntilDate.trim()
@@ -299,7 +338,7 @@ export default function BillsPage() {
         }
       }
 
-      if (form.kind === "installment") {
+      if (!isEditing && form.kind === "installment") {
         const installmentCount = Number(form.installmentCount);
 
         if (!Number.isInteger(installmentCount) || installmentCount < 2) {
@@ -315,16 +354,28 @@ export default function BillsPage() {
         };
       }
 
-      await createBill(session.accessToken, {
-        description: form.description,
-        amount: Number(form.amount),
-        dueOn: form.dueOn,
-        recurrence,
-      });
+      if (editingBillId) {
+        await updateBill(session.accessToken, editingBillId, {
+          description: form.description,
+          amount: Number(form.amount),
+          dueOn: form.dueOn,
+        });
+      } else {
+        await createBill(session.accessToken, {
+          description: form.description,
+          amount: Number(form.amount),
+          dueOn: form.dueOn,
+          recurrence,
+        });
+      }
 
       await refreshBills();
-      setForm(createEmptyForm(monthValue, form.kind));
-      setSuccess("Conta a pagar criada com sucesso.");
+      setSuccess(
+        editingBillId
+          ? "Conta a pagar atualizada com sucesso."
+          : "Conta a pagar criada com sucesso.",
+      );
+      resetForm(form.kind);
     } catch (caughtError) {
       if (isUnauthorizedApiError(caughtError)) {
         logout("session-expired");
@@ -334,7 +385,9 @@ export default function BillsPage() {
       setFormError(
         getFriendlyApiMessage(
           caughtError,
-          "Nao foi possivel registrar a conta a pagar agora. Revise os dados e tente novamente.",
+          editingBillId
+            ? "Nao foi possivel atualizar a conta a pagar agora. Revise os dados e tente novamente."
+            : "Nao foi possivel registrar a conta a pagar agora. Revise os dados e tente novamente.",
           { messageMap: billMessageMap },
         ),
       );
@@ -372,6 +425,50 @@ export default function BillsPage() {
         getFriendlyApiMessage(
           caughtError,
           "Nao foi possivel atualizar a conta a pagar agora. Tente novamente.",
+          { messageMap: billMessageMap },
+        ),
+      );
+    } finally {
+      setActionBillId(null);
+    }
+  }
+
+  async function handleDelete(bill: BillResponse) {
+    if (!session) {
+      return;
+    }
+
+    setActionBillId(bill.id);
+    setFormError("");
+    setSuccess("");
+
+    try {
+      await deleteBill(
+        session.accessToken,
+        bill.id,
+        bill.billSeriesId ? "series" : "single",
+      );
+
+      if (editingBillId === bill.id) {
+        resetForm(form.kind);
+      }
+
+      await refreshBills();
+      setSuccess(
+        bill.billSeriesId
+          ? "Serie encerrada com sucesso. As proximas ocorrencias deixaram de aparecer."
+          : "Conta a pagar excluida com sucesso.",
+      );
+    } catch (caughtError) {
+      if (isUnauthorizedApiError(caughtError)) {
+        logout("session-expired");
+        return;
+      }
+
+      setFormError(
+        getFriendlyApiMessage(
+          caughtError,
+          "Nao foi possivel remover a conta a pagar agora. Tente novamente.",
           { messageMap: billMessageMap },
         ),
       );
@@ -448,18 +545,36 @@ export default function BillsPage() {
         <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,0.94fr)_minmax(0,1.06fr)]">
           <section className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
             <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
-              Nova conta
+              {isEditing ? "Editando conta" : "Nova conta"}
             </div>
             <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
-              Registrar vencimento
+              {isEditing ? "Corrigir vencimento" : "Registrar vencimento"}
             </h2>
 
-            <form className="mt-6 space-y-4" onSubmit={handleCreateBill}>
+            <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
+              {isEditing ? (
+                <div className="rounded-[24px] border border-[color:rgba(15,118,110,0.14)] bg-[var(--color-accent-soft)] px-4 py-4 text-sm text-[var(--color-foreground)]">
+                  <div className="font-medium">
+                    Você está editando{" "}
+                    <span className="font-semibold">
+                      {editingBill?.description ?? "esta conta"}
+                    </span>
+                    .
+                  </div>
+                  <div className="mt-1 text-[var(--color-muted)]">
+                    {editingBill?.billSeriesId
+                      ? "A edição corrige só esta ocorrência já criada. Para parar as próximas, use Encerrar série na agenda."
+                      : "Ajuste descrição, valor ou vencimento e salve quando terminar."}
+                  </div>
+                </div>
+              ) : null}
+
               <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
                 <span>Tipo de conta</span>
                 <select
                   aria-label="Tipo de conta"
                   className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3 text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)]"
+                  disabled={isEditing}
                   onChange={(event) =>
                     setForm((current) => ({
                       ...current,
@@ -524,7 +639,7 @@ export default function BillsPage() {
                 </label>
               </div>
 
-              {form.kind === "recurring" ? (
+              {!isEditing && form.kind === "recurring" ? (
                 <div className="space-y-4 rounded-[24px] border border-[var(--color-line)] bg-white/70 p-4">
                   <div className="text-sm text-[var(--color-muted)]">
                     Essa conta se repete todo mes e continua aparecendo na agenda ate voce encerrar.
@@ -586,7 +701,7 @@ export default function BillsPage() {
                 </div>
               ) : null}
 
-              {form.kind === "installment" ? (
+              {!isEditing && form.kind === "installment" ? (
                 <div className="space-y-4 rounded-[24px] border border-[var(--color-line)] bg-white/70 p-4">
                   <div className="text-sm text-[var(--color-muted)]">
                     Use parcelamento para compromissos com fim conhecido, como 3/12 ou 10/24.
@@ -616,8 +731,23 @@ export default function BillsPage() {
                 disabled={isSubmitting}
                 type="submit"
               >
-                {isSubmitting ? "Salvando conta..." : "Criar conta a pagar"}
+                {isSubmitting
+                  ? "Salvando conta..."
+                  : isEditing
+                    ? "Salvar alteracao"
+                    : "Criar conta a pagar"}
               </button>
+
+              {isEditing ? (
+                <button
+                  className="w-full rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3 text-sm font-semibold text-[var(--color-foreground)] transition hover:bg-[var(--color-accent-soft)] disabled:cursor-not-allowed disabled:opacity-70"
+                  disabled={isSubmitting}
+                  onClick={cancelEditing}
+                  type="button"
+                >
+                  Cancelar edição
+                </button>
+              ) : null}
             </form>
           </section>
 
@@ -687,18 +817,40 @@ export default function BillsPage() {
                           <div className="text-lg font-semibold text-[var(--color-foreground)]">
                             {formatCurrency(bill.amount)}
                           </div>
-                          <button
-                            className="rounded-2xl border border-[var(--color-line)] px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-[var(--color-accent-soft)] disabled:cursor-not-allowed disabled:opacity-70"
-                            disabled={actionBillId === bill.id}
-                            onClick={() => handleTogglePayment(bill)}
-                            type="button"
-                          >
-                            {actionBillId === bill.id
-                              ? "Atualizando..."
-                              : bill.isPaid
-                                ? "Desmarcar pagamento"
-                                : "Marcar como paga"}
-                          </button>
+                          <div className="flex flex-wrap gap-2 md:justify-end">
+                            <button
+                              className="rounded-2xl border border-[var(--color-line)] px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-[var(--color-accent-soft)]"
+                              disabled={actionBillId === bill.id || isSubmitting}
+                              onClick={() => startEditing(bill)}
+                              type="button"
+                            >
+                              {editingBillId === bill.id ? "Editando" : "Editar"}
+                            </button>
+                            <button
+                              className="rounded-2xl border border-[var(--color-line)] px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-[var(--color-accent-soft)] disabled:cursor-not-allowed disabled:opacity-70"
+                              disabled={actionBillId === bill.id}
+                              onClick={() => handleTogglePayment(bill)}
+                              type="button"
+                            >
+                              {actionBillId === bill.id
+                                ? "Atualizando..."
+                                : bill.isPaid
+                                  ? "Desmarcar pagamento"
+                                  : "Marcar como paga"}
+                            </button>
+                            <button
+                              className="rounded-2xl border border-[color:rgba(185,28,28,0.14)] px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-[color:rgba(254,226,226,0.7)] disabled:cursor-not-allowed disabled:opacity-70"
+                              disabled={actionBillId === bill.id}
+                              onClick={() => handleDelete(bill)}
+                              type="button"
+                            >
+                              {actionBillId === bill.id
+                                ? "Atualizando..."
+                                : bill.billSeriesId
+                                  ? "Encerrar série"
+                                  : "Excluir"}
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </article>

@@ -536,6 +536,146 @@ public sealed class BillsEndpointsTests : IClassFixture<FarolApiFactory>
         Assert.Equal("Installment count must be at least 2.", error.Message);
     }
 
+    [Fact]
+    public async Task PutBills_ShouldUpdateOwnedSingleBill()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var billId = await SeedBillAsync("maria@email.com", "Internet", 99.90m, new DateOnly(2026, 3, 25));
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await client.PutAsJsonAsync($"/api/bills/{billId}", new UpdateBillRequest
+        {
+            Description = "Internet fibra",
+            Amount = 119.90m,
+            DueOn = new DateOnly(2026, 3, 28)
+        });
+
+        response.EnsureSuccessStatusCode();
+
+        var bill = await response.Content.ReadFromJsonAsync<BillResponse>();
+
+        Assert.NotNull(bill);
+        Assert.Equal("Internet fibra", bill.Description);
+        Assert.Equal(119.90m, bill.Amount);
+        Assert.Equal(new DateOnly(2026, 3, 28), bill.DueOn);
+    }
+
+    [Fact]
+    public async Task PutBills_ShouldUpdateOnlySelectedRecurringOccurrence()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var createResponse = await client.PostAsJsonAsync("/api/bills", new CreateBillRequest
+        {
+            Description = "Academia",
+            Amount = 120m,
+            DueOn = new DateOnly(2026, 3, 10),
+            Recurrence = new CreateRecurringBillRequest
+            {
+                Kind = BillSeries.RecurringKind,
+                Frequency = BillSeries.MonthlyFrequency,
+                EndMode = BillSeries.OccurrenceCountEndMode,
+                OccurrenceCount = 3
+            }
+        });
+
+        createResponse.EnsureSuccessStatusCode();
+        var firstBill = await createResponse.Content.ReadFromJsonAsync<BillResponse>();
+
+        var updateResponse = await client.PutAsJsonAsync($"/api/bills/{firstBill!.Id}", new UpdateBillRequest
+        {
+            Description = "Academia premium",
+            Amount = 150m,
+            DueOn = new DateOnly(2026, 3, 12)
+        });
+
+        updateResponse.EnsureSuccessStatusCode();
+
+        var updatedBill = await updateResponse.Content.ReadFromJsonAsync<BillResponse>();
+        var aprilBills = await client.GetFromJsonAsync<List<BillResponse>>("/api/bills?month=4&year=2026");
+
+        Assert.NotNull(updatedBill);
+        Assert.Equal("Academia premium", updatedBill.Description);
+        Assert.Equal(150m, updatedBill.Amount);
+        Assert.Equal(new DateOnly(2026, 3, 12), updatedBill.DueOn);
+
+        Assert.NotNull(aprilBills);
+        Assert.Single(aprilBills);
+        Assert.Equal("Academia", aprilBills[0].Description);
+        Assert.Equal(120m, aprilBills[0].Amount);
+        Assert.Equal(new DateOnly(2026, 4, 10), aprilBills[0].DueOn);
+    }
+
+    [Fact]
+    public async Task DeleteBills_ShouldRemoveOwnedSingleBill()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var billId = await SeedBillAsync("maria@email.com", "Internet", 99.90m, new DateOnly(2026, 3, 25));
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await client.DeleteAsync($"/api/bills/{billId}");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<FarolDbContext>();
+        Assert.DoesNotContain(dbContext.Bills, bill => bill.Id == billId);
+    }
+
+    [Fact]
+    public async Task DeleteBills_WithSeriesScope_ShouldEndRemainingRecurringSeries()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var createResponse = await client.PostAsJsonAsync("/api/bills", new CreateBillRequest
+        {
+            Description = "Curso",
+            Amount = 180m,
+            DueOn = new DateOnly(2026, 3, 5),
+            Recurrence = new CreateRecurringBillRequest
+            {
+                Kind = BillSeries.RecurringKind,
+                Frequency = BillSeries.MonthlyFrequency,
+                EndMode = BillSeries.UntilDateEndMode,
+                UntilDate = new DateOnly(2026, 5, 5)
+            }
+        });
+
+        createResponse.EnsureSuccessStatusCode();
+        var firstBill = await createResponse.Content.ReadFromJsonAsync<BillResponse>();
+
+        var deleteResponse = await client.DeleteAsync($"/api/bills/{firstBill!.Id}?scope=series");
+
+        Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
+
+        var aprilBills = await client.GetFromJsonAsync<List<BillResponse>>("/api/bills?month=4&year=2026");
+        var mayBills = await client.GetFromJsonAsync<List<BillResponse>>("/api/bills?month=5&year=2026");
+
+        Assert.NotNull(aprilBills);
+        Assert.NotNull(mayBills);
+        Assert.Empty(aprilBills);
+        Assert.Empty(mayBills);
+
+        using var scope = _factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<FarolDbContext>();
+        var series = dbContext.BillSeries.Single();
+        Assert.False(series.IsActive);
+    }
+
     private async Task<Guid> SeedBillAsync(
         string email,
         string description,

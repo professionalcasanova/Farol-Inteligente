@@ -63,6 +63,11 @@ public sealed class BillSeries
         return CreateOccurrenceForMonth(new DateOnly(FirstDueOn.Year, FirstDueOn.Month, 1));
     }
 
+    public void Deactivate()
+    {
+        IsActive = false;
+    }
+
     public Bill CreateOccurrenceForMonth(DateOnly periodStart)
     {
         if (!TryResolveOccurrenceForMonth(periodStart, out var dueOn, out var occurrenceNumber, out var totalOccurrences))

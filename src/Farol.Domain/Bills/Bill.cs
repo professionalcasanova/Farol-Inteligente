@@ -65,6 +65,13 @@ public sealed class Bill
         PaidAtUtc = null;
     }
 
+    public void UpdateDetails(string description, decimal amount, DateOnly dueOn)
+    {
+        Description = NormalizeDescription(description);
+        Amount = EnsureAmount(amount);
+        DueOn = EnsureDueOn(dueOn);
+    }
+
     private static Guid EnsureUserId(Guid userId)
     {
         if (userId == Guid.Empty)

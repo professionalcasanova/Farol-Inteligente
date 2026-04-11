@@ -18,6 +18,7 @@ public sealed class BillsController(
     private const string PendingStatus = "pending";
     private const string PaidStatus = "paid";
     private const string OverdueStatus = "overdue";
+    private const string SeriesDeleteScope = "series";
 
     [HttpPost]
     public async Task<ActionResult<BillResponse>> Create(
@@ -188,6 +189,103 @@ public sealed class BillsController(
             bill,
             GetToday(),
             await ResolveSeriesKindAsync(bill.BillSeriesId, cancellationToken)));
+    }
+
+    [HttpPut("{id:guid}")]
+    public async Task<ActionResult<BillResponse>> Update(
+        Guid id,
+        UpdateBillRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!AuthenticatedUser.TryGetUserId(User, out var userId))
+        {
+            return Unauthorized(new ErrorResponse("Invalid access token."));
+        }
+
+        var bill = await dbContext.Bills
+            .SingleOrDefaultAsync(candidate => candidate.Id == id && candidate.UserId == userId, cancellationToken);
+
+        if (bill is null)
+        {
+            return NotFound(new ErrorResponse("Bill was not found."));
+        }
+
+        try
+        {
+            bill.UpdateDetails(request.Description, request.Amount, request.DueOn);
+        }
+        catch (Exception exception) when (
+            exception is ArgumentException or
+            ArgumentOutOfRangeException)
+        {
+            return BadRequest(new ErrorResponse(NormalizeDomainErrorMessage(exception.Message)));
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(ToResponse(
+            bill,
+            GetToday(),
+            await ResolveSeriesKindAsync(bill.BillSeriesId, cancellationToken)));
+    }
+
+    [HttpDelete("{id:guid}")]
+    public async Task<ActionResult> Delete(
+        Guid id,
+        [FromQuery] string? scope,
+        CancellationToken cancellationToken)
+    {
+        if (!AuthenticatedUser.TryGetUserId(User, out var userId))
+        {
+            return Unauthorized(new ErrorResponse("Invalid access token."));
+        }
+
+        var bill = await dbContext.Bills
+            .SingleOrDefaultAsync(candidate => candidate.Id == id && candidate.UserId == userId, cancellationToken);
+
+        if (bill is null)
+        {
+            return NotFound(new ErrorResponse("Bill was not found."));
+        }
+
+        if (!bill.BillSeriesId.HasValue)
+        {
+            dbContext.Bills.Remove(bill);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return NoContent();
+        }
+
+        var normalizedScope = scope?.Trim().ToLowerInvariant();
+
+        if (normalizedScope != SeriesDeleteScope)
+        {
+            return BadRequest(new ErrorResponse("Recurring and installment bills must be ended with scope=series."));
+        }
+
+        var series = await dbContext.BillSeries
+            .SingleOrDefaultAsync(
+                candidate => candidate.Id == bill.BillSeriesId.Value && candidate.UserId == userId,
+                cancellationToken);
+
+        if (series is null)
+        {
+            return NotFound(new ErrorResponse("Bill was not found."));
+        }
+
+        series.Deactivate();
+
+        var remainingOccurrences = await dbContext.Bills
+            .Where(candidate =>
+                candidate.UserId == userId &&
+                candidate.BillSeriesId == series.Id &&
+                !candidate.IsPaid &&
+                candidate.DueOn >= bill.DueOn)
+            .ToListAsync(cancellationToken);
+
+        dbContext.Bills.RemoveRange(remainingOccurrences);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return NoContent();
     }
 
     private static BillResponse ToResponse(Bill bill, DateOnly today, string? seriesKind)

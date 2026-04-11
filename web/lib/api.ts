@@ -246,6 +246,8 @@ const defaultMessageMap: Record<string, string> = {
   "Budget categories cannot be duplicated in the same payload.":
     "Cada categoria pode aparecer apenas uma vez no orcamento.",
   "Bill was not found.": "A conta a pagar nao foi encontrada.",
+  "Recurring and installment bills must be ended with scope=series.":
+    "Contas recorrentes e parceladas precisam ser encerradas como serie.",
 };
 
 const technicalMessagePatterns = [
@@ -635,6 +637,35 @@ export async function createBill(
     method: "POST",
     token,
     body: payload,
+  });
+}
+
+export async function updateBill(
+  token: string,
+  billId: string,
+  payload: {
+    description: string;
+    amount: number;
+    dueOn: string;
+  },
+) {
+  return apiRequest<BillResponse>(`/api/bills/${billId}`, {
+    method: "PUT",
+    token,
+    body: payload,
+  });
+}
+
+export async function deleteBill(
+  token: string,
+  billId: string,
+  scope?: "single" | "series",
+) {
+  const query = scope ? `?scope=${scope}` : "";
+
+  return apiRequest<void>(`/api/bills/${billId}${query}`, {
+    method: "DELETE",
+    token,
   });
 }
 
