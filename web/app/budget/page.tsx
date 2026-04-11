@@ -66,6 +66,16 @@ function createRowsFromBudget(
   );
 }
 
+const monthReferenceFormatter = new Intl.DateTimeFormat("pt-BR", {
+  month: "long",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
+function formatMonthReference(month: number, year: number) {
+  return monthReferenceFormatter.format(new Date(Date.UTC(year, month - 1, 1)));
+}
+
 export default function BudgetPage() {
   const { session, isLoading, logout } = useProtectedSession();
   const [monthValue, setMonthValue] = useState(getCurrentMonthInputValue());
@@ -91,6 +101,10 @@ export default function BudgetPage() {
   const monthAndYear = useMemo(
     () => parseMonthInputValue(monthValue),
     [monthValue],
+  );
+  const monthReference = useMemo(
+    () => formatMonthReference(monthAndYear.month, monthAndYear.year),
+    [monthAndYear.month, monthAndYear.year],
   );
 
   useEffect(() => {
@@ -414,6 +428,12 @@ export default function BudgetPage() {
             >
               Voltar ao dashboard
             </Link>
+            <Link
+              className="rounded-full border border-[color:rgba(29,130,93,0.18)] px-4 py-2 text-sm font-medium text-green-700 transition hover:bg-white"
+              href="/transactions"
+            >
+              Revisar movimentacoes
+            </Link>
           </div>
         </div>
       ) : null}
@@ -586,7 +606,10 @@ export default function BudgetPage() {
             </section>
           </div>
 
-          <section className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
+          <section
+            className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6"
+            id="monthly-budget-editor"
+          >
             <div className="flex items-end justify-between gap-4">
               <div>
                 <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
@@ -606,6 +629,22 @@ export default function BudgetPage() {
               >
                 Adicionar categoria
               </button>
+            </div>
+
+            <div className="mt-6 rounded-[24px] border border-[color:rgba(15,118,110,0.14)] bg-[var(--color-accent-soft)] px-5 py-4 text-sm text-[var(--color-foreground)]">
+              <div className="font-medium">
+                Voce esta editando o snapshot de {monthReference}.
+              </div>
+              <div className="mt-1 text-[var(--color-muted)]">
+                Salvar aqui substitui apenas este mes. Para corrigir lancamentos individuais, use{" "}
+                <Link
+                  className="font-semibold text-[var(--color-foreground)] underline-offset-2 hover:underline"
+                  href="/transactions"
+                >
+                  Movimentacoes
+                </Link>
+                .
+              </div>
             </div>
 
             {expenseCategories.length === 0 ? (

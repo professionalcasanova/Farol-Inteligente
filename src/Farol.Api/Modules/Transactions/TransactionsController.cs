@@ -149,6 +149,30 @@ public sealed class TransactionsController(FarolDbContext dbContext) : Controlle
         return Ok(ToResponse(transaction));
     }
 
+    [HttpDelete("{id:guid}")]
+    public async Task<ActionResult> Delete(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        if (!AuthenticatedUser.TryGetUserId(User, out var userId))
+        {
+            return Unauthorized(new ErrorResponse("Invalid access token."));
+        }
+
+        var transaction = await dbContext.Transactions
+            .SingleOrDefaultAsync(candidate => candidate.Id == id && candidate.UserId == userId, cancellationToken);
+
+        if (transaction is null)
+        {
+            return NotFound(new ErrorResponse("Transaction was not found."));
+        }
+
+        dbContext.Transactions.Remove(transaction);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return NoContent();
+    }
+
     private async Task<Category?> FindVisibleCategoryAsync(
         Guid userId,
         Guid? categoryId,

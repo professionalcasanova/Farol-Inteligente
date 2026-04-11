@@ -302,6 +302,9 @@ export default function DashboardPage() {
   const [accountSuccess, setAccountSuccess] = useState("");
   const [quickEntryError, setQuickEntryError] = useState("");
   const [quickEntrySuccess, setQuickEntrySuccess] = useState("");
+  const [quickEntryCreatedTransactionId, setQuickEntryCreatedTransactionId] = useState<
+    string | null
+  >(null);
   const [isFetching, setIsFetching] = useState(true);
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
   const [isRegisteringNow, setIsRegisteringNow] = useState(false);
@@ -646,9 +649,10 @@ export default function DashboardPage() {
     setIsRegisteringNow(true);
     setQuickEntryError("");
     setQuickEntrySuccess("");
+    setQuickEntryCreatedTransactionId(null);
 
     try {
-      await createTransaction(accessToken, {
+      const createdTransaction = await createTransaction(accessToken, {
         financialAccountId: quickEntryForm.financialAccountId,
         categoryId: quickEntryForm.categoryId || undefined,
         type: quickEntryForm.type,
@@ -706,7 +710,10 @@ export default function DashboardPage() {
         financialAccountId: current.financialAccountId,
       }));
       setShowQuickEntryDetails(false);
-      setQuickEntrySuccess("Registrado.");
+      setQuickEntryCreatedTransactionId(createdTransaction.id);
+      setQuickEntrySuccess(
+        "Lançamento registrado. Se precisar corrigir conta, valor, data, categoria ou excluir, abra esta movimentação.",
+      );
     } catch (caughtError) {
       if (isUnauthorizedApiError(caughtError)) {
         logout("session-expired");
@@ -917,7 +924,17 @@ export default function DashboardPage() {
 
             {quickEntrySuccess ? (
               <div className="mt-5 rounded-[24px] border border-[color:rgba(29,130,93,0.16)] bg-[color:rgba(220,252,231,0.8)] px-5 py-4 text-sm text-green-700">
-                {quickEntrySuccess}
+                <div>{quickEntrySuccess}</div>
+                {quickEntryCreatedTransactionId ? (
+                  <div className="mt-3 flex flex-wrap gap-3">
+                    <Link
+                      className="rounded-full border border-[color:rgba(29,130,93,0.18)] px-4 py-2 text-sm font-medium text-green-700 transition hover:bg-white"
+                      href={`/transactions?edit=${quickEntryCreatedTransactionId}`}
+                    >
+                      Revisar ou corrigir lançamento
+                    </Link>
+                  </div>
+                ) : null}
               </div>
             ) : null}
 

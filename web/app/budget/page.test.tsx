@@ -255,4 +255,20 @@ describe("BudgetPage", () => {
       await screen.findByText(/planejamento base aplicado ao mes com sucesso/i),
     ).toBeInTheDocument();
   });
+
+  it("Budget_MonthEditor_ClarifiesSnapshotEditingAndCorrectionPath", async () => {
+    mockBudgetApi();
+
+    render(<BudgetPage />);
+
+    expect(
+      await screen.findByText(/Voce esta editando o snapshot de/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Salvar aqui substitui apenas este mes/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /movimentacoes/i }),
+    ).toHaveAttribute("href", "/transactions");
+  });
 });

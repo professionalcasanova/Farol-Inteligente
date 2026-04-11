@@ -7,6 +7,7 @@ import { LoadErrorState } from "@/components/load-error-state";
 import { LoadingScreen } from "@/components/loading-screen";
 import {
   createTransaction,
+  deleteTransaction,
   getFriendlyApiMessage,
   isUnauthorizedApiError,
   listAccounts,
@@ -81,6 +82,10 @@ export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<TransactionResponse[]>([]);
   const [form, setForm] = useState<TransactionFormState>(defaultFormState);
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
+  const [handledRequestedEditId, setHandledRequestedEditId] = useState<string | null>(null);
+  const [requestedEditTransactionId, setRequestedEditTransactionId] = useState<string | null>(
+    null,
+  );
   const [loadError, setLoadError] = useState("");
   const [formError, setFormError] = useState("");
   const [success, setSuccess] = useState("");
@@ -95,6 +100,19 @@ export default function TransactionsPage() {
   const editingTransaction =
     transactions.find((transaction) => transaction.id === editingTransactionId) ?? null;
   const isEditing = editingTransactionId !== null;
+  const isDashboardCorrectionFlow =
+    Boolean(requestedEditTransactionId) &&
+    requestedEditTransactionId === editingTransactionId;
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    setRequestedEditTransactionId(
+      new URLSearchParams(window.location.search).get("edit"),
+    );
+  }, []);
 
   useEffect(() => {
     if (!session) {
@@ -193,6 +211,27 @@ export default function TransactionsPage() {
     }
   }, [form.categoryId, visibleCategories]);
 
+  useEffect(() => {
+    if (
+      !requestedEditTransactionId ||
+      editingTransactionId === requestedEditTransactionId ||
+      handledRequestedEditId === requestedEditTransactionId
+    ) {
+      return;
+    }
+
+    const transactionToEdit = transactions.find(
+      (transaction) => transaction.id === requestedEditTransactionId,
+    );
+
+    if (!transactionToEdit) {
+      return;
+    }
+
+    setHandledRequestedEditId(requestedEditTransactionId);
+    startEditing(transactionToEdit);
+  }, [editingTransactionId, handledRequestedEditId, requestedEditTransactionId, transactions]);
+
   function resetForm(financialAccountId = accounts.length === 1 ? accounts[0].id : "") {
     setEditingTransactionId(null);
     setForm(buildCreateFormState(financialAccountId));
@@ -209,6 +248,49 @@ export default function TransactionsPage() {
     setFormError("");
     setSuccess("");
     resetForm(form.financialAccountId);
+  }
+
+  async function handleDeleteEditing() {
+    if (!session || !editingTransactionId || !editingTransaction) {
+      return;
+    }
+
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(
+        `Excluir "${editingTransaction.description}"? Esta ação remove a transação manual em definitivo.`,
+      )
+    ) {
+      return;
+    }
+
+    const accessToken = session.accessToken;
+    setIsSubmitting(true);
+    setFormError("");
+    setSuccess("");
+
+    try {
+      await deleteTransaction(accessToken, editingTransactionId);
+      const transactionsResponse = await listTransactions(accessToken);
+      setTransactions(transactionsResponse);
+      setSuccess("Transação excluída com sucesso.");
+      resetForm(form.financialAccountId);
+    } catch (caughtError) {
+      if (isUnauthorizedApiError(caughtError)) {
+        logout("session-expired");
+        return;
+      }
+
+      setFormError(
+        getFriendlyApiMessage(
+          caughtError,
+          "Não foi possível excluir a transação agora. Tente novamente em instantes.",
+          { messageMap: transactionMessageMap },
+        ),
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -349,6 +431,11 @@ export default function TransactionsPage() {
                     <div className="mt-1 text-[var(--color-muted)]">
                       Ajuste conta, tipo, valor, data ou categoria e salve quando terminar.
                     </div>
+                    {isDashboardCorrectionFlow ? (
+                      <div className="mt-2 text-[var(--color-muted)]">
+                        Este lanÃ§amento veio do dashboard. Corrija aqui ou exclua se foi um engano.
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
 
@@ -489,6 +576,17 @@ export default function TransactionsPage() {
                       type="button"
                     >
                       Cancelar edição
+                    </button>
+                  ) : null}
+
+                  {isEditing ? (
+                    <button
+                      className="w-full rounded-2xl border border-[color:rgba(185,28,28,0.14)] bg-white px-4 py-3 text-sm font-semibold text-red-700 transition hover:bg-[color:rgba(254,226,226,0.45)] disabled:cursor-not-allowed disabled:opacity-70"
+                      disabled={isSubmitting}
+                      onClick={handleDeleteEditing}
+                      type="button"
+                    >
+                      Excluir transaÃ§Ã£o
                     </button>
                   ) : null}
                 </div>

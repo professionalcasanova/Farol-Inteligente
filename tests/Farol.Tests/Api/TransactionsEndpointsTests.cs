@@ -437,6 +437,81 @@ public sealed class TransactionsEndpointsTests : IClassFixture<FarolApiFactory>
         Assert.Equal("Transaction was not found.", error.Message);
     }
 
+    [Fact]
+    public async Task DeleteTransactions_ShouldDeleteOwnedTransaction()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var seed = await SeedOwnedAccountAndSystemCategoryAsync("maria@email.com", "Conta Corrente", "Moradia", CategoryType.Expense);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var createResponse = await client.PostAsJsonAsync("/api/transactions", new CreateTransactionRequest
+        {
+            FinancialAccountId = seed.AccountId,
+            CategoryId = seed.CategoryId,
+            Type = TransactionType.Expense,
+            Amount = 80m,
+            Description = "Mercado",
+            OccurredOn = new DateOnly(2026, 3, 14)
+        });
+
+        createResponse.EnsureSuccessStatusCode();
+
+        var createdTransaction = await createResponse.Content.ReadFromJsonAsync<TransactionResponse>();
+
+        Assert.NotNull(createdTransaction);
+
+        var deleteResponse = await client.DeleteAsync($"/api/transactions/{createdTransaction.Id}");
+
+        Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
+
+        var transactions = await client.GetFromJsonAsync<List<TransactionResponse>>("/api/transactions");
+
+        Assert.NotNull(transactions);
+        Assert.Empty(transactions);
+    }
+
+    [Fact]
+    public async Task DeleteTransactions_FromAnotherUser_ReturnsNotFound()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var joaoToken = await RegisterAndGetTokenAsync(client, "joao@email.com");
+        var mariaToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var joaoSeed = await SeedOwnedAccountAndSystemCategoryAsync("joao@email.com", "Conta Joao", "Moradia", CategoryType.Expense);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", joaoToken);
+
+        var createResponse = await client.PostAsJsonAsync("/api/transactions", new CreateTransactionRequest
+        {
+            FinancialAccountId = joaoSeed.AccountId,
+            CategoryId = joaoSeed.CategoryId,
+            Type = TransactionType.Expense,
+            Amount = 80m,
+            Description = "Mercado",
+            OccurredOn = new DateOnly(2026, 3, 14)
+        });
+
+        createResponse.EnsureSuccessStatusCode();
+
+        var createdTransaction = await createResponse.Content.ReadFromJsonAsync<TransactionResponse>();
+
+        Assert.NotNull(createdTransaction);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", mariaToken);
+
+        var response = await client.DeleteAsync($"/api/transactions/{createdTransaction.Id}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+
+        Assert.NotNull(error);
+        Assert.Equal("Transaction was not found.", error.Message);
+    }
+
     private async Task<(Guid AccountId, Guid CategoryId)> SeedOwnedAccountAndSystemCategoryAsync(
         string email,
         string accountName,

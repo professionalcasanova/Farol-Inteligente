@@ -6,6 +6,7 @@ import TransactionsPage from "@/app/transactions/page";
 import {
   ApiError,
   createTransaction,
+  deleteTransaction,
   listAccounts,
   listCategories,
   listTransactions,
@@ -49,6 +50,7 @@ vi.mock("@/lib/api", async () => {
   return {
     ...actual,
     createTransaction: vi.fn(),
+    deleteTransaction: vi.fn(),
     listAccounts: vi.fn(),
     listCategories: vi.fn(),
     listTransactions: vi.fn(),
@@ -58,6 +60,7 @@ vi.mock("@/lib/api", async () => {
 
 const mockedUseProtectedSession = vi.mocked(useProtectedSession);
 const mockedCreateTransaction = vi.mocked(createTransaction);
+const mockedDeleteTransaction = vi.mocked(deleteTransaction);
 const mockedListAccounts = vi.mocked(listAccounts);
 const mockedListCategories = vi.mocked(listCategories);
 const mockedListTransactions = vi.mocked(listTransactions);
@@ -144,10 +147,12 @@ describe("TransactionsPage", () => {
   beforeEach(() => {
     mockedUseProtectedSession.mockReset();
     mockedCreateTransaction.mockReset();
+    mockedDeleteTransaction.mockReset();
     mockedListAccounts.mockReset();
     mockedListCategories.mockReset();
     mockedListTransactions.mockReset();
     mockedUpdateTransaction.mockReset();
+    window.history.replaceState({}, "", "/transactions");
   });
 
   it("Transactions_EditTransaction_PopulatesFormAndSavesUpdate", async () => {
@@ -285,6 +290,68 @@ describe("TransactionsPage", () => {
       screen.queryByRole("button", { name: /cancelar edi/i }),
     ).not.toBeInTheDocument();
     expect(mockedUpdateTransaction).not.toHaveBeenCalled();
+  });
+
+  it("Transactions_QueryEdit_OpensRequestedTransactionForCorrection", async () => {
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+    window.history.replaceState({}, "", "/transactions?edit=transaction-1");
+
+    mockTransactionsApi();
+
+    render(<TransactionsPage />);
+
+    expect(await screen.findByText(/Editando transa/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Este lan.* veio do dashboard\. Corrija aqui ou exclua/i),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/descri/i)).toHaveValue("Mercado");
+  });
+
+  it("Transactions_DeleteTransaction_RemovesManualEntryWithConfirmation", async () => {
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+
+    mockedDeleteTransaction.mockResolvedValue(undefined);
+    window.history.replaceState({}, "", "/transactions?edit=transaction-1");
+    mockTransactionsApi();
+    mockedListTransactions
+      .mockResolvedValueOnce([
+        {
+          id: "transaction-1",
+          financialAccountId: "account-1",
+          categoryId: "category-1",
+          type: 2,
+          amount: 85,
+          description: "Mercado",
+          occurredOn: "2026-03-21",
+          createdAtUtc: "2026-03-21T00:00:00Z",
+        },
+      ])
+      .mockResolvedValue([]);
+
+    render(<TransactionsPage />);
+
+    await screen.findByText(/Editando transa/i);
+    await user.click(screen.getByRole("button", { name: /excluir transa/i }));
+
+    await waitFor(() => {
+      expect(mockedDeleteTransaction).toHaveBeenCalledWith("token", "transaction-1");
+    });
+
+    expect(await screen.findByText(/exclu.* com sucesso/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /criar transa/i })).toBeInTheDocument();
+
+    confirmSpy.mockRestore();
   });
 
   it("Transactions_EditTransaction_WhenUpdateFails_ShowsFriendlyError", async () => {

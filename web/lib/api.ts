@@ -462,6 +462,13 @@ export async function updateTransaction(
   });
 }
 
+export async function deleteTransaction(token: string, transactionId: string) {
+  return apiRequest<void>(`/api/transactions/${transactionId}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
 export async function getMonthlySummary(
   token: string,
   month: number,

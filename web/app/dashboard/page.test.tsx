@@ -656,7 +656,14 @@ describe("DashboardPage", () => {
       });
     });
 
-    expect(await screen.findByText("Registrado.")).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        /Se precisar corrigir conta, valor, data, categoria ou excluir/i,
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /revisar ou corrigir lançamento/i }),
+    ).toHaveAttribute("href", "/transactions?edit=transaction-2");
     expect(screen.getByLabelText(/quanto foi/i)).toHaveValue(null);
     expect(
       screen.queryByLabelText(/descrição \(se quiser\)/i),
