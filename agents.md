@@ -75,6 +75,36 @@ Before committing:
 3. Confirm success
 4. Then commit
 
+## Branch strategy and deploy safety
+
+This repository uses the following branch model:
+
+- `master`: published/stable branch
+- `dev`: local integration branch for combined validation before publish
+- `codex/issue-*`: issue branches created from `dev`
+
+Rules:
+
+- New issue work must branch from `dev`, not from `master`
+- Completed issue branches must be merged into `dev` first for local end-to-end testing
+- `master` must only receive changes that already passed local validation in `dev`
+- The repository must not rely on branch-specific hacks for environment behavior
+- Local development must keep pointing to local services by default
+- Published environments must use platform environment variables and deployment settings, not ad-hoc code changes in `dev`
+- Merging `dev` into `master` must not carry "dev-only" runtime targets, localhost overrides, or temporary local deployment values
+- If a deploy setting differs between local and published environments, it must be controlled by environment-specific configuration, never by changing business logic or hardcoding published URLs into `dev`
+- Do not introduce or recreate a `main` branch in this repository unless explicitly requested
+
+Operational expectations:
+
+1. Create or update the issue branch from `dev`
+2. Implement the change
+3. Run build and tests
+4. Commit to the issue branch
+5. Merge the issue branch into `dev`
+6. User validates locally from `dev`
+7. Only after approval, merge `dev` into `master`
+
 ## Architecture Overview
 
 This is a multi-stack personal finance assistant with the following components:
