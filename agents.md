@@ -49,6 +49,26 @@ When proposing changes:
 - Avoid unnecessary test infrastructure in early stages
 - A feature is not considered complete unless build and tests pass
 
+## Testing workflow policy
+
+We do not require rigid TDD for every task.
+
+Current rule:
+
+- Keep the current pragmatic workflow when it is the fastest safe path
+- Every meaningful product change must leave the codebase with better test coverage than before
+- Bugs found by testers or users should gain a regression test in the same delivery cycle whenever technically feasible
+- New business rules should preferably be covered close to the rule itself, usually with unit or API tests
+- UI, responsive, and integration work must still receive automated coverage for the main path, even when strict red-green-refactor is not practical
+- When a change is high-risk, user-facing, or affects money flows, increase test depth before considering it done
+
+Quality bar:
+
+1. If a rule is clear and easily isolatable, writing the failing test first is preferred
+2. If the work is exploratory or heavily UI-driven, implementation may come first, but tests must be added in the same cycle before completion
+3. If a production or beta issue is fixed without automated coverage, that is an exception and should be treated as technical debt to close immediately after
+4. Before merging `dev` into `master`, prioritize regression coverage for the paths touched by the tested wave
+
 ## Definition of done
 For each completed step:
 1. Build passes
