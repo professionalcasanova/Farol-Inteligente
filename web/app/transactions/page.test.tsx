@@ -1,4 +1,4 @@
-import type { ComponentProps, ReactNode } from "react";
+﻿import type { ComponentProps, ReactNode } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -306,7 +306,7 @@ describe("TransactionsPage", () => {
 
     expect(await screen.findByText(/Editando transa/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/Este lan.* veio do dashboard\. Corrija aqui ou exclua/i),
+      screen.getByText("Este lançamento veio do dashboard. Corrija aqui ou exclua se foi um engano."),
     ).toBeInTheDocument();
     expect(screen.getByLabelText(/descri/i)).toHaveValue("Mercado");
   });
@@ -425,3 +425,5 @@ describe("TransactionsPage", () => {
     expect(mockedUpdateTransaction).not.toHaveBeenCalled();
   });
 });
+
+

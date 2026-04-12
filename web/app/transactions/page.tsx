@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
@@ -433,7 +433,7 @@ export default function TransactionsPage() {
                     </div>
                     {isDashboardCorrectionFlow ? (
                       <div className="mt-2 text-[var(--color-muted)]">
-                        Este lanÃ§amento veio do dashboard. Corrija aqui ou exclua se foi um engano.
+                        Este lançamento veio do dashboard. Corrija aqui ou exclua se foi um engano.
                       </div>
                     ) : null}
                   </div>
@@ -558,9 +558,9 @@ export default function TransactionsPage() {
                   </label>
                 </div>
 
-                <div className="flex flex-col gap-3 sm:flex-row">
+                <div className="flex flex-col gap-3 xl:flex-row">
                   <button
-                    className="w-full rounded-2xl bg-[var(--color-foreground)] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-70"
+                    className="w-full rounded-2xl bg-[var(--color-foreground)] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-70 xl:flex-1"
                     disabled={isSubmitting}
                     type="submit"
                   >
@@ -573,7 +573,7 @@ export default function TransactionsPage() {
 
                   {isEditing ? (
                     <button
-                      className="w-full rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3 text-sm font-semibold text-[var(--color-foreground)] transition hover:bg-[var(--color-panel)] disabled:cursor-not-allowed disabled:opacity-70"
+                      className="w-full rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3 text-sm font-semibold text-[var(--color-foreground)] transition hover:bg-[var(--color-panel)] disabled:cursor-not-allowed disabled:opacity-70 xl:flex-1"
                       disabled={isSubmitting}
                       onClick={handleCancelEditing}
                       type="button"
@@ -584,12 +584,12 @@ export default function TransactionsPage() {
 
                   {isEditing ? (
                     <button
-                      className="w-full rounded-2xl border border-[color:rgba(185,28,28,0.14)] bg-white px-4 py-3 text-sm font-semibold text-red-700 transition hover:bg-[color:rgba(254,226,226,0.45)] disabled:cursor-not-allowed disabled:opacity-70"
+                      className="w-full rounded-2xl border border-[color:rgba(185,28,28,0.14)] bg-white px-4 py-3 text-sm font-semibold text-red-700 transition hover:bg-[color:rgba(254,226,226,0.45)] disabled:cursor-not-allowed disabled:opacity-70 xl:flex-1"
                       disabled={isSubmitting}
                       onClick={handleDeleteEditing}
                       type="button"
                     >
-                      Excluir transaÃ§Ã£o
+                      Excluir transação
                     </button>
                   ) : null}
                 </div>
@@ -685,3 +685,6 @@ export default function TransactionsPage() {
     </AppShell>
   );
 }
+
+
+

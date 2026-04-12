@@ -83,8 +83,8 @@ public sealed class CategoriesEndpointsTests : IClassFixture<FarolApiFactory>
 
         Assert.NotNull(categories);
         Assert.Contains(categories, category => category.Name == "Mercado" && category.IsSystem);
-        Assert.Contains(categories, category => category.Name == "Contas e servicos" && category.IsSystem);
-        Assert.Contains(categories, category => category.Name == "Beneficios" && category.IsSystem);
+        Assert.Contains(categories, category => category.Name == "Contas e serviços" && category.IsSystem);
+        Assert.Contains(categories, category => category.Name == "Benefícios" && category.IsSystem);
         Assert.Contains(categories, category => category.Name == "Rendimento" && category.IsSystem);
         Assert.DoesNotContain(categories, category => string.Equals(category.Name, "PIX", StringComparison.OrdinalIgnoreCase));
     }

@@ -46,6 +46,16 @@ public sealed class Category
         Name = NormalizeName(name);
     }
 
+    public void CorrectSystemName(string name)
+    {
+        if (!IsSystem)
+        {
+            throw new InvalidOperationException("Only system categories can be corrected by seed maintenance.");
+        }
+
+        Name = NormalizeName(name);
+    }
+
     public bool CanBeAssignedTo(TransactionType transactionType)
     {
         return Type == ToCategoryType(transactionType);

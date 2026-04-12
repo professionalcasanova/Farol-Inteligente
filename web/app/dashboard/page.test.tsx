@@ -531,6 +531,32 @@ describe("DashboardPage", () => {
     expect(screen.getByLabelText(/conta financeira/i)).not.toBeDisabled();
   });
 
+  it("Dashboard_ManyAccounts_ConstrainsAccountListInsideScrollablePanel", async () => {
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+
+    mockDashboardApi({
+      accounts: Array.from({ length: 6 }, (_, index) => ({
+        id: `account-${index + 1}`,
+        name: `Conta ${index + 1}`,
+        type: 2 as const,
+        isActive: true,
+        createdAtUtc: "2026-03-01T00:00:00Z",
+      })),
+    });
+
+    render(<DashboardPage />);
+
+    const accountsList = await screen.findByLabelText("Lista de contas financeiras");
+
+    expect(accountsList.className).toContain("max-h-[22rem]");
+    expect(accountsList.className).toContain("overflow-y-auto");
+    expect(accountsList).toHaveTextContent("Conta 6");
+  });
+
   it("Dashboard_RegisterNow_SubmitSuccess_RefreshesDataAndClearsForm", async () => {
     const user = userEvent.setup();
 

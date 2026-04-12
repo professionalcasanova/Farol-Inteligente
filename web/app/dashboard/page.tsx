@@ -1185,7 +1185,10 @@ export default function DashboardPage() {
                       </div>
                     </div>
 
-                    <div className="mt-4 space-y-3">
+                    <div
+                      aria-label="Lista de contas financeiras"
+                      className="mt-4 max-h-[22rem] space-y-3 overflow-y-auto pr-1"
+                    >
                       {data.accounts.map((account) => (
                         <div
                           className="rounded-[20px] border border-[var(--color-line)] bg-[var(--color-panel)] px-4 py-4"
