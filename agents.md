@@ -114,6 +114,8 @@ Rules:
 - Merging `dev` into `master` must not carry "dev-only" runtime targets, localhost overrides, or temporary local deployment values
 - If a deploy setting differs between local and published environments, it must be controlled by environment-specific configuration, never by changing business logic or hardcoding published URLs into `dev`
 - Do not introduce or recreate a `main` branch in this repository unless explicitly requested
+- Data corrections for homologation or published environments must use an explicit migration script or runbook, not an ad-hoc manual edit during deploy
+- Before any homologation or published data correction, take a database backup or snapshot first
 
 Operational expectations:
 
