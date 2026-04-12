@@ -874,6 +874,9 @@ describe("DashboardPage", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /sem categoria/i })).toBeInTheDocument();
     expect(
+      screen.getByText(/PIX, boleto e cartão ficam para um campo futuro de meio de pagamento/i),
+    ).toBeInTheDocument();
+    expect(
       screen.queryByLabelText(/descrição \(se quiser\)/i),
     ).not.toBeInTheDocument();
 

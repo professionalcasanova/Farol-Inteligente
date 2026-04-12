@@ -1098,6 +1098,9 @@ export default function DashboardPage() {
                         As opções mudam quando você troca entre entrada e saída.
                       </div>
                     </div>
+                    <div className="text-xs leading-5 text-[var(--color-muted)]">
+                      Categoria responde ao motivo da movimentação. PIX, boleto e cartão ficam para um campo futuro de meio de pagamento.
+                    </div>
                     <div className="flex gap-2 overflow-x-auto pb-2">
                       <button
                         className={`shrink-0 rounded-full border px-4 py-2 text-sm font-medium transition ${quickEntryForm.categoryId === "" ? "border-[var(--color-foreground)] bg-[var(--color-foreground)] text-white" : "border-[var(--color-line)] bg-white text-[var(--color-foreground)] hover:bg-[var(--color-accent-soft)]"}`}

@@ -552,6 +552,9 @@ export default function TransactionsPage() {
                         </option>
                       ))}
                     </select>
+                    <span className="text-xs leading-5 text-[var(--color-muted)]">
+                      Categoria responde ao motivo da movimentação. PIX, boleto e cartão ficam para um campo futuro de meio de pagamento.
+                    </span>
                   </label>
                 </div>
 

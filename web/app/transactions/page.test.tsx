@@ -410,6 +410,9 @@ describe("TransactionsPage", () => {
     const accountSelect = await screen.findByLabelText(/conta financeira/i);
 
     expect(accountSelect).toHaveValue("");
+    expect(
+      screen.getByText(/PIX, boleto e cartão ficam para um campo futuro de meio de pagamento/i),
+    ).toBeInTheDocument();
 
     await user.type(screen.getByLabelText(/valor/i), "90");
     await user.type(screen.getByLabelText(/descri/i), "Mercado");

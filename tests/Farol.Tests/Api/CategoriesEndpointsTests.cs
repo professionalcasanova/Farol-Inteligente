@@ -5,6 +5,7 @@ using Farol.Api.Modules.Auth;
 using Farol.Api.Modules.Categories;
 using Farol.Domain.Categories;
 using Farol.Infrastructure.Persistence;
+using Farol.Infrastructure.Seeding;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Farol.Tests.Api;
@@ -55,6 +56,37 @@ public sealed class CategoriesEndpointsTests : IClassFixture<FarolApiFactory>
         Assert.Equal(2, categories.Count);
         Assert.Contains(categories, category => category.Name == "Moradia" && category.IsSystem);
         Assert.Contains(categories, category => category.Name == "Pets" && !category.IsSystem);
+    }
+
+    [Fact]
+    public async Task GetCategories_ShouldExposeExpandedBrazilianSystemTaxonomyWithoutPixCategory()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<FarolDbContext>();
+
+            foreach (var (type, name) in CategorySeed.SystemCategories)
+            {
+                dbContext.Categories.Add(Category.CreateSystem(name, type));
+            }
+
+            await dbContext.SaveChangesAsync();
+        }
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var categories = await client.GetFromJsonAsync<List<CategoryResponse>>("/api/categories");
+
+        Assert.NotNull(categories);
+        Assert.Contains(categories, category => category.Name == "Mercado" && category.IsSystem);
+        Assert.Contains(categories, category => category.Name == "Contas e servicos" && category.IsSystem);
+        Assert.Contains(categories, category => category.Name == "Beneficios" && category.IsSystem);
+        Assert.Contains(categories, category => category.Name == "Rendimento" && category.IsSystem);
+        Assert.DoesNotContain(categories, category => string.Equals(category.Name, "PIX", StringComparison.OrdinalIgnoreCase));
     }
 
     private static async Task<string> RegisterAndGetTokenAsync(HttpClient client, string email)
