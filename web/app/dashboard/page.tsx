@@ -1172,8 +1172,11 @@ export default function DashboardPage() {
                   ) : null}
                 </form>
 
-                <div className="self-start space-y-4">
-                  <div className="rounded-[24px] border border-[var(--color-line)] bg-white p-5">
+                <div
+                  className="self-start space-y-4 xl:grid xl:max-h-[34rem] xl:grid-rows-[minmax(0,1fr)_auto] xl:gap-4 xl:space-y-0"
+                  data-testid="accounts-rail"
+                >
+                  <div className="min-h-0 rounded-[24px] border border-[var(--color-line)] bg-white p-5 xl:flex xl:flex-col">
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <div className="text-sm font-semibold text-[var(--color-foreground)]">
@@ -1190,7 +1193,7 @@ export default function DashboardPage() {
 
                     <div
                       aria-label="Lista de contas financeiras"
-                      className="mt-4 max-h-[22rem] space-y-3 overflow-y-auto pr-1"
+                      className="mt-4 max-h-[22rem] space-y-3 overflow-y-auto pr-1 xl:min-h-0 xl:max-h-none xl:flex-1"
                     >
                       {data.accounts.map((account) => (
                         <div

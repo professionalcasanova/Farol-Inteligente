@@ -552,9 +552,13 @@ describe("DashboardPage", () => {
 
     const accountsList = await screen.findByLabelText("Lista de contas financeiras");
     const quickEntryLayout = screen.getByTestId("quick-entry-layout");
+    const accountsRail = screen.getByTestId("accounts-rail");
 
     expect(quickEntryLayout.className).toContain("items-start");
+    expect(accountsRail.className).toContain("xl:max-h-[34rem]");
+    expect(accountsRail.className).toContain("xl:grid-rows-[minmax(0,1fr)_auto]");
     expect(accountsList.className).toContain("max-h-[22rem]");
+    expect(accountsList.className).toContain("xl:flex-1");
     expect(accountsList.className).toContain("overflow-y-auto");
     expect(accountsList).toHaveTextContent("Conta 6");
   });
