@@ -551,7 +551,9 @@ describe("DashboardPage", () => {
     render(<DashboardPage />);
 
     const accountsList = await screen.findByLabelText("Lista de contas financeiras");
+    const quickEntryLayout = screen.getByTestId("quick-entry-layout");
 
+    expect(quickEntryLayout.className).toContain("items-start");
     expect(accountsList.className).toContain("max-h-[22rem]");
     expect(accountsList.className).toContain("overflow-y-auto");
     expect(accountsList).toHaveTextContent("Conta 6");

@@ -939,7 +939,7 @@ export default function DashboardPage() {
             ) : null}
 
             {data.accounts.length === 0 ? (
-              <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.76fr)]">
+              <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.76fr)]">
                 <div className="rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm leading-6 text-[var(--color-muted)]">
                   Você ainda não tem uma conta cadastrada. Crie a primeira aqui
                   para começar a registrar o que entrou ou saiu sem sair da
@@ -996,8 +996,11 @@ export default function DashboardPage() {
                 </form>
               </div>
             ) : (
-              <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.28fr)_minmax(320px,0.92fr)]">
-                <form className="space-y-5 rounded-[24px] border border-[var(--color-line)] bg-white p-5" onSubmit={handleQuickEntrySubmit}>
+              <div
+                className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1.28fr)_minmax(320px,0.92fr)]"
+                data-testid="quick-entry-layout"
+              >
+                <form className="self-start space-y-5 rounded-[24px] border border-[var(--color-line)] bg-white p-5" onSubmit={handleQuickEntrySubmit}>
                   <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
                     <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
                       <span>Conta financeira</span>
@@ -1169,7 +1172,7 @@ export default function DashboardPage() {
                   ) : null}
                 </form>
 
-                <div className="space-y-4">
+                <div className="self-start space-y-4">
                   <div className="rounded-[24px] border border-[var(--color-line)] bg-white p-5">
                     <div className="flex items-start justify-between gap-4">
                       <div>
