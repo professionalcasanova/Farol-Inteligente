@@ -237,6 +237,10 @@ const defaultMessageMap: Record<string, string> = {
     "E-mail ou senha invalidos. Confira os dados e tente novamente.",
   "Email and password are required.": "Informe e-mail e senha para entrar.",
   "Financial account was not found.": "A conta selecionada nao foi encontrada.",
+  "Financial account name is required.": "Informe o nome da conta para continuar.",
+  "Financial account name cannot exceed 120 characters.":
+    "O nome da conta ficou longo demais. Tente um nome menor.",
+  "Financial account type is invalid.": "Selecione um tipo de conta valido.",
   "Category was not found.": "A categoria selecionada nao foi encontrada.",
   "Transaction was not found.": "A transacao nao foi encontrada.",
   "One or more categories were not found.":
@@ -398,6 +402,22 @@ export async function createAccount(
 ) {
   return apiRequest<AccountResponse>("/api/accounts", {
     method: "POST",
+    token,
+    body: payload,
+  });
+}
+
+export async function updateAccount(
+  token: string,
+  accountId: string,
+  payload: {
+    name: string;
+    type: FinancialAccountType;
+    isActive: boolean;
+  },
+) {
+  return apiRequest<AccountResponse>(`/api/accounts/${accountId}`, {
+    method: "PUT",
     token,
     body: payload,
   });

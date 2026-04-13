@@ -26,6 +26,7 @@ export default function ImportsPage() {
   const [isFetching, setIsFetching] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const activeAccounts = accounts.filter((account) => account.isActive);
 
   useEffect(() => {
     if (!session) {
@@ -47,7 +48,7 @@ export default function ImportsPage() {
         }
 
         setAccounts(response);
-        setAccountId(response[0]?.id ?? "");
+        setAccountId(response.find((account) => account.isActive)?.id ?? "");
       } catch (caughtError) {
         if (isUnauthorizedApiError(caughtError)) {
           logout("session-expired");
@@ -164,8 +165,26 @@ export default function ImportsPage() {
                 </Link>
                 .
               </div>
+            ) : activeAccounts.length === 0 ? (
+              <div className="mt-6 rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
+                Todas as suas contas estao inativas. Reative ao menos uma em{" "}
+                <Link
+                  className="font-semibold text-[var(--color-accent)]"
+                  href="/accounts"
+                >
+                  Contas
+                </Link>{" "}
+                para importar novas transações.
+              </div>
             ) : (
               <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
+                <div className="rounded-[24px] border border-[var(--color-line)] bg-white px-4 py-4 text-sm leading-6 text-[var(--color-muted)]">
+                  Apenas contas ativas aparecem aqui. Se uma conta ficou inativa, reative em{" "}
+                  <Link className="font-semibold text-[var(--color-accent)]" href="/accounts">
+                    Contas
+                  </Link>
+                  .
+                </div>
                 <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
                   <span>Conta de destino</span>
                   <select
@@ -173,7 +192,7 @@ export default function ImportsPage() {
                     onChange={(event) => setAccountId(event.target.value)}
                     value={accountId}
                   >
-                    {accounts.map((account) => (
+                    {activeAccounts.map((account) => (
                       <option key={account.id} value={account.id}>
                         {account.name}
                       </option>

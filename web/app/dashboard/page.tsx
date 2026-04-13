@@ -319,6 +319,10 @@ export default function DashboardPage() {
     () => parseMonthInputValue(monthValue),
     [monthValue],
   );
+  const activeAccounts = useMemo(
+    () => data?.accounts.filter((account) => account.isActive) ?? [],
+    [data?.accounts],
+  );
   const firstUseState = data ? isFirstUseState(data) : false;
   const showSecondarySections = data ? !firstUseState || !data.monthHealth : false;
   const activationMessage = data ? getActivationMessage(data) : null;
@@ -391,7 +395,7 @@ export default function DashboardPage() {
     : 1;
 
   useEffect(() => {
-    const accounts = data?.accounts ?? [];
+    const accounts = activeAccounts;
 
     setQuickEntryForm((current) => {
       const hasSelectedAccount = accounts.some(
@@ -419,7 +423,7 @@ export default function DashboardPage() {
         ? { ...current, financialAccountId: "" }
         : current;
     });
-  }, [data?.accounts]);
+  }, [activeAccounts]);
 
   useEffect(() => {
     if (
@@ -627,6 +631,13 @@ export default function DashboardPage() {
     if (data.accounts.length === 0) {
       setQuickEntryError(
         "Crie sua primeira conta abaixo para começar a registrar movimentações.",
+      );
+      return;
+    }
+
+    if (activeAccounts.length === 0) {
+      setQuickEntryError(
+        "Reative ao menos uma conta em Contas para registrar novas movimentações.",
       );
       return;
     }
@@ -1000,177 +1011,187 @@ export default function DashboardPage() {
                 className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1.28fr)_minmax(320px,0.92fr)]"
                 data-testid="quick-entry-layout"
               >
-                <form className="self-start space-y-5 rounded-[24px] border border-[var(--color-line)] bg-white p-5" onSubmit={handleQuickEntrySubmit}>
-                  <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
-                    <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
-                      <span>Conta financeira</span>
-                      <select
-                        className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-4 text-base font-medium text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)] disabled:cursor-not-allowed disabled:bg-[var(--color-panel)]"
-                        disabled={data.accounts.length === 1}
-                        onChange={(event) =>
-                          setQuickEntryForm((current) => ({
-                            ...current,
-                            financialAccountId: event.target.value,
-                          }))
-                        }
-                        value={quickEntryForm.financialAccountId}
-                      >
-                        {data.accounts.length > 1 ? (
-                          <option value="">Escolha a conta para registrar</option>
-                        ) : null}
-                        {data.accounts.map((account) => (
-                          <option key={account.id} value={account.id}>
-                            {account.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <div className="rounded-[24px] border border-[var(--color-line)] bg-[var(--color-panel)] px-5 py-4 text-sm leading-6 text-[var(--color-muted)]">
-                      {data.accounts.length === 1
-                        ? "Essa movimentação será registrada na sua conta disponível."
-                        : "Escolha explicitamente a conta para evitar lançar a movimentação no lugar errado."}
-                    </div>
+                {activeAccounts.length === 0 ? (
+                  <div className="self-start rounded-[24px] border border-dashed border-[var(--color-line)] bg-white px-5 py-6 text-sm leading-6 text-[var(--color-muted)]">
+                    Todas as suas contas estao inativas. Reative ao menos uma em{" "}
+                    <Link className="font-semibold text-[var(--color-accent)]" href="/accounts">
+                      Contas
+                    </Link>{" "}
+                    para registrar novas movimentacoes ou importar dados.
                   </div>
+                ) : (
+                  <form className="self-start space-y-5 rounded-[24px] border border-[var(--color-line)] bg-white p-5" onSubmit={handleQuickEntrySubmit}>
+                    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
+                      <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
+                        <span>Conta financeira</span>
+                        <select
+                          className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-4 text-base font-medium text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)] disabled:cursor-not-allowed disabled:bg-[var(--color-panel)]"
+                          disabled={activeAccounts.length === 1}
+                          onChange={(event) =>
+                            setQuickEntryForm((current) => ({
+                              ...current,
+                              financialAccountId: event.target.value,
+                            }))
+                          }
+                          value={quickEntryForm.financialAccountId}
+                        >
+                          {activeAccounts.length > 1 ? (
+                            <option value="">Escolha a conta para registrar</option>
+                          ) : null}
+                          {activeAccounts.map((account) => (
+                            <option key={account.id} value={account.id}>
+                              {account.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
 
-                  <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_auto] xl:items-end">
-                    <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
-                      <span>Quanto foi?</span>
-                      <input
-                        autoFocus
-                        className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-4 text-2xl font-semibold text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)]"
-                        inputMode="decimal"
-                        min="0.01"
-                        onChange={(event) =>
-                          setQuickEntryForm((current) => ({
-                            ...current,
-                            amount: event.target.value,
-                          }))
-                        }
-                        placeholder="120"
-                        step="0.01"
-                        type="number"
-                        value={quickEntryForm.amount}
-                      />
-                    </label>
+                      <div className="rounded-[24px] border border-[var(--color-line)] bg-[var(--color-panel)] px-5 py-4 text-sm leading-6 text-[var(--color-muted)]">
+                        {activeAccounts.length === 1
+                          ? "Essa movimentação será registrada na sua conta ativa disponível."
+                          : "Escolha explicitamente a conta ativa para evitar lançar a movimentação no lugar errado."}
+                      </div>
+                    </div>
 
-                    <div className="grid gap-3 sm:grid-cols-[auto_auto] xl:self-end">
-                      <div
-                        aria-label="Tipo da movimentação"
-                        className="inline-flex rounded-2xl border border-[var(--color-line)] bg-white p-1"
-                        role="group"
-                      >
-                        {quickEntryTypeOptions.map((option) => {
-                          const isSelected = quickEntryForm.type === option.value;
+                    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_auto] xl:items-end">
+                      <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
+                        <span>Quanto foi?</span>
+                        <input
+                          autoFocus
+                          className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-4 text-2xl font-semibold text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)]"
+                          inputMode="decimal"
+                          min="0.01"
+                          onChange={(event) =>
+                            setQuickEntryForm((current) => ({
+                              ...current,
+                              amount: event.target.value,
+                            }))
+                          }
+                          placeholder="120"
+                          step="0.01"
+                          type="number"
+                          value={quickEntryForm.amount}
+                        />
+                      </label>
+
+                      <div className="grid gap-3 sm:grid-cols-[auto_auto] xl:self-end">
+                        <div
+                          aria-label="Tipo da movimentação"
+                          className="inline-flex rounded-2xl border border-[var(--color-line)] bg-white p-1"
+                          role="group"
+                        >
+                          {quickEntryTypeOptions.map((option) => {
+                            const isSelected = quickEntryForm.type === option.value;
+
+                            return (
+                              <button
+                                aria-pressed={isSelected}
+                                className={`rounded-[18px] px-4 py-3 text-sm font-semibold transition ${isSelected ? "bg-[var(--color-foreground)] text-white" : "text-[var(--color-muted)] hover:text-[var(--color-foreground)]"}`}
+                                key={option.value}
+                                onClick={() =>
+                                  setQuickEntryForm((current) => ({
+                                    ...current,
+                                    type: option.value,
+                                  }))
+                                }
+                                type="button"
+                              >
+                                {option.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        <button
+                          className="w-full rounded-2xl bg-[var(--color-foreground)] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-70"
+                          disabled={isRegisteringNow}
+                          type="submit"
+                        >
+                          {isRegisteringNow ? "Registrando..." : quickEntrySubmitLabel}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="text-sm font-medium text-[var(--color-foreground)]">
+                          Categoria
+                        </div>
+                        <div className="text-xs text-[var(--color-muted)]">
+                          As opções mudam quando você troca entre entrada e saída.
+                        </div>
+                      </div>
+                      <div className="text-xs leading-5 text-[var(--color-muted)]">
+                        Categoria responde ao motivo da movimentação. PIX, boleto e cartão ficam para um campo futuro de meio de pagamento.
+                      </div>
+                      <div className="flex gap-2 overflow-x-auto pb-2">
+                        <button
+                          className={`shrink-0 rounded-full border px-4 py-2 text-sm font-medium transition ${quickEntryForm.categoryId === "" ? "border-[var(--color-foreground)] bg-[var(--color-foreground)] text-white" : "border-[var(--color-line)] bg-white text-[var(--color-foreground)] hover:bg-[var(--color-accent-soft)]"}`}
+                          onClick={() =>
+                            setQuickEntryForm((current) => ({
+                              ...current,
+                              categoryId: "",
+                            }))
+                          }
+                          type="button"
+                        >
+                          Sem categoria
+                        </button>
+                        {visibleQuickEntryCategories.map((category) => {
+                          const isSelected = quickEntryForm.categoryId === category.id;
 
                           return (
                             <button
-                              aria-pressed={isSelected}
-                              className={`rounded-[18px] px-4 py-3 text-sm font-semibold transition ${isSelected ? "bg-[var(--color-foreground)] text-white" : "text-[var(--color-muted)] hover:text-[var(--color-foreground)]"}`}
-                              key={option.value}
+                              className={`shrink-0 rounded-full border px-4 py-2 text-sm font-medium transition ${isSelected ? "border-[var(--color-foreground)] bg-[var(--color-foreground)] text-white" : "border-[var(--color-line)] bg-white text-[var(--color-foreground)] hover:bg-[var(--color-accent-soft)]"}`}
+                              key={category.id}
                               onClick={() =>
                                 setQuickEntryForm((current) => ({
                                   ...current,
-                                  type: option.value,
+                                  categoryId: category.id,
                                 }))
                               }
                               type="button"
                             >
-                              {option.label}
+                              {category.name}
                             </button>
                           );
                         })}
                       </div>
+                    </div>
 
+                    <div>
                       <button
-                        className="w-full rounded-2xl bg-[var(--color-foreground)] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-70"
-                        disabled={isRegisteringNow}
-                        type="submit"
-                      >
-                        {isRegisteringNow ? "Registrando..." : quickEntrySubmitLabel}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="text-sm font-medium text-[var(--color-foreground)]">
-                        Categoria
-                      </div>
-                      <div className="text-xs text-[var(--color-muted)]">
-                        As opções mudam quando você troca entre entrada e saída.
-                      </div>
-                    </div>
-                    <div className="text-xs leading-5 text-[var(--color-muted)]">
-                      Categoria responde ao motivo da movimentação. PIX, boleto e cartão ficam para um campo futuro de meio de pagamento.
-                    </div>
-                    <div className="flex gap-2 overflow-x-auto pb-2">
-                      <button
-                        className={`shrink-0 rounded-full border px-4 py-2 text-sm font-medium transition ${quickEntryForm.categoryId === "" ? "border-[var(--color-foreground)] bg-[var(--color-foreground)] text-white" : "border-[var(--color-line)] bg-white text-[var(--color-foreground)] hover:bg-[var(--color-accent-soft)]"}`}
-                        onClick={() =>
-                          setQuickEntryForm((current) => ({
-                            ...current,
-                            categoryId: "",
-                          }))
-                        }
+                        aria-expanded={showQuickEntryDetails}
+                        className="text-sm font-medium text-[var(--color-muted)] transition hover:text-[var(--color-foreground)]"
+                        onClick={() => setShowQuickEntryDetails((current) => !current)}
                         type="button"
                       >
-                        Sem categoria
+                        {showQuickEntryDetails
+                          ? "Esconder descrição"
+                          : "Adicionar descrição"}
                       </button>
-                      {visibleQuickEntryCategories.map((category) => {
-                        const isSelected = quickEntryForm.categoryId === category.id;
+                    </div>
 
-                        return (
-                          <button
-                            className={`shrink-0 rounded-full border px-4 py-2 text-sm font-medium transition ${isSelected ? "border-[var(--color-foreground)] bg-[var(--color-foreground)] text-white" : "border-[var(--color-line)] bg-white text-[var(--color-foreground)] hover:bg-[var(--color-accent-soft)]"}`}
-                            key={category.id}
-                            onClick={() =>
+                    {showQuickEntryDetails ? (
+                      <div className="rounded-[24px] border border-[var(--color-line)] bg-[color:rgba(255,255,255,0.68)] p-4">
+                        <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
+                          <span>Descrição (se quiser)</span>
+                          <input
+                            className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3 text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)]"
+                            onChange={(event) =>
                               setQuickEntryForm((current) => ({
                                 ...current,
-                                categoryId: category.id,
+                                description: event.target.value,
                               }))
                             }
-                            type="button"
-                          >
-                            {category.name}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div>
-                    <button
-                      aria-expanded={showQuickEntryDetails}
-                      className="text-sm font-medium text-[var(--color-muted)] transition hover:text-[var(--color-foreground)]"
-                      onClick={() => setShowQuickEntryDetails((current) => !current)}
-                      type="button"
-                    >
-                      {showQuickEntryDetails
-                        ? "Esconder descrição"
-                        : "Adicionar descrição"}
-                    </button>
-                  </div>
-
-                  {showQuickEntryDetails ? (
-                    <div className="rounded-[24px] border border-[var(--color-line)] bg-[color:rgba(255,255,255,0.68)] p-4">
-                      <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
-                        <span>Descrição (se quiser)</span>
-                        <input
-                          className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3 text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)]"
-                          onChange={(event) =>
-                            setQuickEntryForm((current) => ({
-                              ...current,
-                              description: event.target.value,
-                            }))
-                          }
-                          placeholder="Mercado, salário, almoço..."
-                          value={quickEntryForm.description}
-                        />
-                      </label>
-                    </div>
-                  ) : null}
-                </form>
+                            placeholder="Mercado, salário, almoço..."
+                            value={quickEntryForm.description}
+                          />
+                        </label>
+                      </div>
+                    ) : null}
+                  </form>
+                )}
 
                 <div className="self-start space-y-4">
                   <div className="rounded-[24px] border border-[var(--color-line)] bg-white p-5">
@@ -1186,6 +1207,15 @@ export default function DashboardPage() {
                       <div className="rounded-full border border-[var(--color-line)] bg-[var(--color-panel)] px-3 py-1 text-xs font-semibold text-[var(--color-foreground)]">
                         {data.accounts.length} {data.accounts.length === 1 ? "conta" : "contas"}
                       </div>
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      <Link
+                        className="rounded-full border border-[var(--color-line)] px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-[var(--color-panel)]"
+                        href="/accounts"
+                      >
+                        Gerenciar contas
+                      </Link>
                     </div>
 
                     <div

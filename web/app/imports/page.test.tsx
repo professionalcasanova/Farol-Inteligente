@@ -191,4 +191,60 @@ describe("ImportsPage", () => {
       });
     });
   });
+
+  it("Imports_OnlyActiveAccounts_AppearAsDestinations", async () => {
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+
+    mockedListAccounts.mockResolvedValue([
+      {
+        id: "account-1",
+        name: "Conta principal",
+        type: 2,
+        isActive: true,
+        createdAtUtc: "2026-03-01T00:00:00Z",
+      },
+      {
+        id: "account-2",
+        name: "Cartao antigo",
+        type: 3,
+        isActive: false,
+        createdAtUtc: "2026-03-02T00:00:00Z",
+      },
+    ]);
+
+    render(<ImportsPage />);
+
+    const accountSelect = await screen.findByLabelText(/conta de destino/i);
+
+    expect(accountSelect).toHaveValue("account-1");
+    expect(screen.getByRole("option", { name: "Conta principal" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Cartao antigo" })).not.toBeInTheDocument();
+  });
+
+  it("Imports_WhenAllAccountsInactive_ShowsManagementGuidance", async () => {
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+
+    mockedListAccounts.mockResolvedValue([
+      {
+        id: "account-2",
+        name: "Cartao antigo",
+        type: 3,
+        isActive: false,
+        createdAtUtc: "2026-03-02T00:00:00Z",
+      },
+    ]);
+
+    render(<ImportsPage />);
+
+    expect(await screen.findByText(/Todas as suas contas estao inativas/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Contas" })).toHaveAttribute("href", "/accounts");
+  });
 });
