@@ -12,6 +12,15 @@ internal sealed record ParsedTransactionCsvRow(
     TransactionType Type,
     string CategoryName);
 
+internal sealed record TransactionCsvLayout(
+    char Delimiter,
+    int HeaderColumnCount,
+    int OccurredOnIndex,
+    int DescriptionIndex,
+    int AmountIndex,
+    int TypeIndex,
+    int? CategoryNameIndex);
+
 internal sealed class TransactionImportCategoryResolver
 {
     private static readonly (TransactionType Type, string Keyword, string CategoryName)[] Rules =
@@ -132,37 +141,112 @@ internal sealed class TransactionImportCategoryResolver
 
 internal static class TransactionCsvParser
 {
-    private static readonly string[] ExpectedHeader =
+    private const string InvalidHeaderMessage =
+        "O cabecalho do CSV e invalido. Informe colunas para data, descricao, valor e tipo. Categoria e opcional.";
+
+    private static readonly string[] DateFormats =
     [
-        "occurredOn",
-        "description",
-        "amount",
-        "type",
-        "categoryName"
+        "yyyy-MM-dd",
+        "dd/MM/yyyy",
+        "dd-MM-yyyy",
+        "yyyy/MM/dd"
     ];
 
-    public static bool IsExpectedHeader(string headerLine)
+    private static readonly Dictionary<string, string> HeaderAliases = new(StringComparer.Ordinal)
     {
-        var headerColumns = ParseColumns(headerLine, out _);
+        ["occurredon"] = "occurredOn",
+        ["date"] = "occurredOn",
+        ["data"] = "occurredOn",
+        ["transactiondate"] = "occurredOn",
+        ["postedon"] = "occurredOn",
+        ["dataocorrencia"] = "occurredOn",
+        ["description"] = "description",
+        ["descricao"] = "description",
+        ["details"] = "description",
+        ["detail"] = "description",
+        ["detalhe"] = "description",
+        ["historico"] = "description",
+        ["memo"] = "description",
+        ["amount"] = "amount",
+        ["valor"] = "amount",
+        ["value"] = "amount",
+        ["total"] = "amount",
+        ["type"] = "type",
+        ["tipo"] = "type",
+        ["transactiontype"] = "type",
+        ["nature"] = "type",
+        ["natureza"] = "type",
+        ["categoryname"] = "categoryName",
+        ["category"] = "categoryName",
+        ["categoria"] = "categoryName",
+        ["categorianome"] = "categoryName"
+    };
 
-        if (headerColumns is null || headerColumns.Count != ExpectedHeader.Length)
+    public static bool TryParseHeader(
+        string headerLine,
+        out TransactionCsvLayout layout,
+        out string error)
+    {
+        layout = null!;
+        error = InvalidHeaderMessage;
+
+        var delimiter = DetectDelimiter(headerLine);
+        var headerColumns = ParseColumns(headerLine, delimiter, out _);
+
+        if (headerColumns is null || headerColumns.Count < 4)
         {
             return false;
         }
 
-        for (var index = 0; index < ExpectedHeader.Length; index++)
+        var canonicalIndexes = new Dictionary<string, int>(StringComparer.Ordinal);
+
+        for (var index = 0; index < headerColumns.Count; index++)
         {
-            if (!string.Equals(headerColumns[index].Trim(), ExpectedHeader[index], StringComparison.OrdinalIgnoreCase))
+            var normalizedColumn = NormalizeToken(headerColumns[index]);
+
+            if (string.IsNullOrWhiteSpace(normalizedColumn))
             {
+                continue;
+            }
+
+            if (!HeaderAliases.TryGetValue(normalizedColumn, out var canonicalName))
+            {
+                continue;
+            }
+
+            if (!canonicalIndexes.TryAdd(canonicalName, index))
+            {
+                error = "O cabecalho do CSV contem colunas duplicadas para o mesmo campo.";
                 return false;
             }
         }
 
+        if (!canonicalIndexes.TryGetValue("occurredOn", out var occurredOnIndex) ||
+            !canonicalIndexes.TryGetValue("description", out var descriptionIndex) ||
+            !canonicalIndexes.TryGetValue("amount", out var amountIndex) ||
+            !canonicalIndexes.TryGetValue("type", out var typeIndex))
+        {
+            return false;
+        }
+
+        canonicalIndexes.TryGetValue("categoryName", out var categoryNameIndex);
+
+        layout = new TransactionCsvLayout(
+            delimiter,
+            headerColumns.Count,
+            occurredOnIndex,
+            descriptionIndex,
+            amountIndex,
+            typeIndex,
+            canonicalIndexes.ContainsKey("categoryName") ? categoryNameIndex : null);
+
+        error = string.Empty;
         return true;
     }
 
     public static bool TryParseRow(
         string line,
+        TransactionCsvLayout layout,
         int rowNumber,
         out ParsedTransactionCsvRow row,
         out string error)
@@ -170,51 +254,50 @@ internal static class TransactionCsvParser
         row = null!;
         error = string.Empty;
 
-        var columns = ParseColumns(line, out error);
+        var columns = ParseColumns(line, layout.Delimiter, out error);
 
         if (columns is null)
         {
             return false;
         }
 
-        if (columns.Count != ExpectedHeader.Length)
+        if (columns.Count > layout.HeaderColumnCount)
         {
-            error = $"A linha precisa ter exatamente {ExpectedHeader.Length} colunas.";
+            error = "A linha contem mais colunas do que o cabecalho informado.";
             return false;
         }
 
-        if (!DateOnly.TryParseExact(
-                columns[0].Trim(),
-                "yyyy-MM-dd",
-                CultureInfo.InvariantCulture,
-                DateTimeStyles.None,
-                out var occurredOn))
+        var occurredOnValue = GetColumnValue(columns, layout.OccurredOnIndex);
+        var descriptionValue = GetColumnValue(columns, layout.DescriptionIndex);
+        var amountValue = GetColumnValue(columns, layout.AmountIndex);
+        var typeValue = GetColumnValue(columns, layout.TypeIndex);
+        var categoryNameValue = layout.CategoryNameIndex.HasValue
+            ? GetColumnValue(columns, layout.CategoryNameIndex.Value)
+            : string.Empty;
+
+        if (!TryParseOccurredOn(occurredOnValue, out var occurredOn))
         {
-            error = "A data em occurredOn está inválida.";
+            error = "A data da transacao esta invalida.";
             return false;
         }
 
-        var description = columns[1].Trim();
+        var description = descriptionValue.Trim();
 
         if (string.IsNullOrWhiteSpace(description))
         {
-            error = "A descrição é obrigatória.";
+            error = "A descricao e obrigatoria.";
             return false;
         }
 
-        if (!decimal.TryParse(
-                columns[2].Trim(),
-                NumberStyles.Number,
-                CultureInfo.InvariantCulture,
-                out var amount))
+        if (!TryParseAmount(amountValue, out var amount))
         {
-            error = "O valor em amount está inválido.";
+            error = "O valor em amount esta invalido.";
             return false;
         }
 
-        if (!TryParseTransactionType(columns[3].Trim(), out var type))
+        if (!TryParseTransactionType(typeValue, out var type))
         {
-            error = "O tipo de transação está inválido.";
+            error = "O tipo de transacao esta invalido.";
             return false;
         }
 
@@ -223,12 +306,92 @@ internal static class TransactionCsvParser
             description,
             amount,
             type,
-            columns[4].Trim());
+            categoryNameValue.Trim());
 
         return true;
     }
 
-    private static List<string>? ParseColumns(string line, out string error)
+    private static string GetColumnValue(IReadOnlyList<string> columns, int index)
+    {
+        return index >= 0 && index < columns.Count ? columns[index] : string.Empty;
+    }
+
+    private static bool TryParseOccurredOn(string value, out DateOnly occurredOn)
+    {
+        return DateOnly.TryParseExact(
+                   value.Trim(),
+                   DateFormats,
+                   CultureInfo.InvariantCulture,
+                   DateTimeStyles.None,
+                   out occurredOn)
+               || DateOnly.TryParseExact(
+                   value.Trim(),
+                   DateFormats,
+                   new CultureInfo("pt-BR"),
+                   DateTimeStyles.None,
+                   out occurredOn);
+    }
+
+    private static bool TryParseAmount(string value, out decimal amount)
+    {
+        var trimmed = value.Trim();
+        var ptBrCulture = new CultureInfo("pt-BR");
+        var lastComma = trimmed.LastIndexOf(',');
+        var lastDot = trimmed.LastIndexOf('.');
+
+        if (lastComma >= 0 && (lastDot < 0 || lastComma > lastDot))
+        {
+            if (decimal.TryParse(
+                    trimmed,
+                    NumberStyles.Number,
+                    ptBrCulture,
+                    out amount))
+            {
+                return true;
+            }
+        }
+
+        if (decimal.TryParse(
+                trimmed,
+                NumberStyles.Number,
+                CultureInfo.InvariantCulture,
+                out amount))
+        {
+            return true;
+        }
+
+        if (decimal.TryParse(
+                trimmed,
+                NumberStyles.Number,
+                ptBrCulture,
+                out amount))
+        {
+            return true;
+        }
+
+        var normalized = trimmed.Replace(" ", string.Empty, StringComparison.Ordinal);
+        lastComma = normalized.LastIndexOf(',');
+        lastDot = normalized.LastIndexOf('.');
+
+        if (lastComma >= 0 && lastDot >= 0)
+        {
+            normalized = lastComma > lastDot
+                ? normalized.Replace(".", string.Empty, StringComparison.Ordinal).Replace(',', '.')
+                : normalized.Replace(",", string.Empty, StringComparison.Ordinal);
+        }
+        else if (lastComma >= 0)
+        {
+            normalized = normalized.Replace(',', '.');
+        }
+
+        return decimal.TryParse(
+            normalized,
+            NumberStyles.Number,
+            CultureInfo.InvariantCulture,
+            out amount);
+    }
+
+    private static List<string>? ParseColumns(string line, char delimiter, out string error)
     {
         error = string.Empty;
         var columns = new List<string>();
@@ -252,7 +415,7 @@ internal static class TransactionCsvParser
                 continue;
             }
 
-            if (character == ',' && !isInsideQuotes)
+            if (character == delimiter && !isInsideQuotes)
             {
                 columns.Add(current.ToString());
                 current.Clear();
@@ -264,7 +427,7 @@ internal static class TransactionCsvParser
 
         if (isInsideQuotes)
         {
-            error = "O CSV contém aspas abertas sem fechamento.";
+            error = "O CSV contem aspas abertas sem fechamento.";
             return null;
         }
 
@@ -272,21 +435,62 @@ internal static class TransactionCsvParser
         return columns;
     }
 
+    private static char DetectDelimiter(string line)
+    {
+        var commas = CountDelimiterOccurrences(line, ',');
+        var semicolons = CountDelimiterOccurrences(line, ';');
+
+        return semicolons > commas ? ';' : ',';
+    }
+
+    private static int CountDelimiterOccurrences(string line, char delimiter)
+    {
+        var count = 0;
+        var isInsideQuotes = false;
+
+        foreach (var character in line)
+        {
+            if (character == '"')
+            {
+                isInsideQuotes = !isInsideQuotes;
+                continue;
+            }
+
+            if (character == delimiter && !isInsideQuotes)
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private static string NormalizeToken(string value)
+    {
+        return TransactionImportCategoryResolver.NormalizeText(value);
+    }
+
     private static bool TryParseTransactionType(string value, out TransactionType type)
     {
-        if (string.Equals(value, "Income", StringComparison.OrdinalIgnoreCase))
+        switch (NormalizeToken(value))
         {
-            type = TransactionType.Income;
-            return true;
+            case "income":
+            case "receita":
+            case "entrada":
+            case "credit":
+            case "credito":
+                type = TransactionType.Income;
+                return true;
+            case "expense":
+            case "despesa":
+            case "saida":
+            case "debit":
+            case "debito":
+                type = TransactionType.Expense;
+                return true;
+            default:
+                type = default;
+                return false;
         }
-
-        if (string.Equals(value, "Expense", StringComparison.OrdinalIgnoreCase))
-        {
-            type = TransactionType.Expense;
-            return true;
-        }
-
-        type = default;
-        return false;
     }
 }
