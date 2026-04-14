@@ -209,6 +209,10 @@ describe("BillsPage", () => {
 
     expect(scoped.getByText("Parcelada")).toBeInTheDocument();
     expect(scoped.getByText("Parcela 3/12")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /editar ocorrencia/i })).toHaveLength(2);
+    expect(
+      screen.getByText(/editar e pagar atuam na ocorrencia atual/i),
+    ).toBeInTheDocument();
   });
 
   it("Bills_EditSingleBill_UsesUpdateFlow", async () => {
@@ -305,10 +309,87 @@ describe("BillsPage", () => {
 
     render(<BillsPage />);
 
-    await user.click(await screen.findByRole("button", { name: /encerrar série/i }));
+    await user.click(await screen.findByRole("button", { name: /encerrar serie/i }));
 
     await waitFor(() => {
       expect(mockedDeleteBill).toHaveBeenCalledWith("token", "bill-3", "series");
+    });
+  });
+
+  it("Bills_EditRecurringOccurrence_ShowsOccurrenceOnlyContract", async () => {
+    const user = userEvent.setup();
+
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+
+    mockedListBills.mockResolvedValue([
+      {
+        id: "bill-2",
+        description: "Academia",
+        amount: 120,
+        dueOn: "2026-03-12",
+        billSeriesId: "series-2",
+        seriesKind: "recurring",
+        occurrenceNumber: 2,
+        totalOccurrences: 6,
+        isPaid: false,
+        paidAtUtc: null,
+        createdAtUtc: "2026-03-01T00:00:00Z",
+        status: "pending",
+      },
+    ]);
+    mockedUpdateBill.mockResolvedValue({
+      id: "bill-2",
+      description: "Academia premium",
+      amount: 150,
+      dueOn: "2026-03-14",
+      billSeriesId: "series-2",
+      seriesKind: "recurring",
+      occurrenceNumber: 2,
+      totalOccurrences: 6,
+      isPaid: false,
+      paidAtUtc: null,
+      createdAtUtc: "2026-03-01T00:00:00Z",
+      status: "pending",
+    });
+
+    render(<BillsPage />);
+
+    await user.click(
+      await screen.findByRole("button", { name: /editar ocorrencia/i }),
+    );
+
+    expect(
+      await screen.findByText(/contrato de edicao da serie/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/corrige apenas esta ocorrencia ja criada/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/desmarcar pagamento altera so o status desta ocorrencia/i),
+    ).toBeInTheDocument();
+
+    const descriptionInput = screen.getByLabelText("Descricao");
+    const amountInput = screen.getByLabelText("Valor");
+    const dueOnInput = screen.getByLabelText("Vencimento");
+
+    await user.clear(descriptionInput);
+    await user.type(descriptionInput, "Academia premium");
+    await user.clear(amountInput);
+    await user.type(amountInput, "150");
+    await user.clear(dueOnInput);
+    await user.type(dueOnInput, "2026-03-14");
+    await user.click(screen.getByRole("button", { name: /salvar alteracao/i }));
+
+    await waitFor(() => {
+      expect(mockedUpdateBill).toHaveBeenCalledWith("token", "bill-2", {
+        description: "Academia premium",
+        amount: 150,
+        dueOn: "2026-03-14",
+      });
     });
   });
 });
