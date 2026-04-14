@@ -44,6 +44,22 @@ type BudgetRow = {
   planned: string;
 };
 
+type SnapshotComparisonStatus =
+  | "matching-base"
+  | "adjusted-from-base"
+  | "month-only"
+  | "base-only";
+
+type SnapshotComparisonRow = {
+  categoryId: string;
+  categoryName: string;
+  monthPlanned: number | null;
+  templatePlanned: number | null;
+  spent: number;
+  remaining: number | null;
+  status: SnapshotComparisonStatus;
+};
+
 function createBudgetRow(id: number, categoryId = "", planned = ""): BudgetRow {
   return {
     id,
@@ -76,6 +92,94 @@ function formatMonthReference(month: number, year: number) {
   return monthReferenceFormatter.format(new Date(Date.UTC(year, month - 1, 1)));
 }
 
+function buildSnapshotComparison(
+  budget: MonthlyBudgetResponse,
+  template: BudgetTemplateResponse,
+) {
+  const templateByCategoryId = new Map(
+    template.categories.map((item) => [item.categoryId, item]),
+  );
+  const snapshotCategoryIds = new Set(budget.categories.map((item) => item.categoryId));
+
+  const snapshotRows: SnapshotComparisonRow[] = budget.categories.map((item) => {
+    const templateItem = templateByCategoryId.get(item.categoryId);
+
+    if (!templateItem) {
+      return {
+        categoryId: item.categoryId,
+        categoryName: item.categoryName,
+        monthPlanned: item.planned,
+        templatePlanned: null,
+        spent: item.spent,
+        remaining: item.remaining,
+        status: "month-only",
+      };
+    }
+
+    return {
+      categoryId: item.categoryId,
+      categoryName: item.categoryName,
+      monthPlanned: item.planned,
+      templatePlanned: templateItem.planned,
+      spent: item.spent,
+      remaining: item.remaining,
+      status:
+        templateItem.planned === item.planned ? "matching-base" : "adjusted-from-base",
+    };
+  });
+
+  const baseOnlyRows: SnapshotComparisonRow[] = template.categories
+    .filter((item) => !snapshotCategoryIds.has(item.categoryId))
+    .map((item) => ({
+      categoryId: item.categoryId,
+      categoryName: item.categoryName,
+      monthPlanned: null,
+      templatePlanned: item.planned,
+      spent: 0,
+      remaining: null,
+      status: "base-only",
+    }));
+
+  return {
+    snapshotRows,
+    baseOnlyRows,
+    matchingCount: snapshotRows.filter((item) => item.status === "matching-base").length,
+    adjustedCount: snapshotRows.filter((item) => item.status === "adjusted-from-base")
+      .length,
+    monthOnlyCount: snapshotRows.filter((item) => item.status === "month-only").length,
+    baseOnlyCount: baseOnlyRows.length,
+  };
+}
+
+function getSnapshotStatusCopy(status: SnapshotComparisonStatus) {
+  switch (status) {
+    case "matching-base":
+      return {
+        label: "Igual a base",
+        className:
+          "border-[color:rgba(29,130,93,0.16)] bg-[color:rgba(220,252,231,0.8)] text-green-700",
+      };
+    case "adjusted-from-base":
+      return {
+        label: "Ajustada no mes",
+        className:
+          "border-[color:rgba(37,99,235,0.16)] bg-[color:rgba(219,234,254,0.9)] text-blue-700",
+      };
+    case "month-only":
+      return {
+        label: "Somente neste mes",
+        className:
+          "border-[color:rgba(124,58,237,0.16)] bg-[color:rgba(243,232,255,0.9)] text-violet-700",
+      };
+    case "base-only":
+      return {
+        label: "Ficou fora do snapshot",
+        className:
+          "border-[color:rgba(217,119,6,0.18)] bg-[color:rgba(255,247,237,0.95)] text-[var(--color-warm)]",
+      };
+  }
+}
+
 export default function BudgetPage() {
   const { session, isLoading, logout } = useProtectedSession();
   const [monthValue, setMonthValue] = useState(getCurrentMonthInputValue());
@@ -106,6 +210,13 @@ export default function BudgetPage() {
     () => formatMonthReference(monthAndYear.month, monthAndYear.year),
     [monthAndYear.month, monthAndYear.year],
   );
+  const snapshotComparison = useMemo(() => {
+    if (!budget || !template) {
+      return null;
+    }
+
+    return buildSnapshotComparison(budget, template);
+  }, [budget, template]);
 
   useEffect(() => {
     if (!session) {
@@ -281,8 +392,8 @@ export default function BudgetPage() {
       resetMonthlyRows(response);
       setSuccess(
         response.categories.length === 0
-          ? "Orcamento do mes limpo com sucesso. Voce pode montar um novo planejamento quando quiser."
-          : "Orcamento salvo com sucesso.",
+          ? "Snapshot do mes limpo com sucesso. Voce pode montar um novo planejamento quando quiser."
+          : "Snapshot do mes salvo com sucesso.",
       );
     } catch (caughtError) {
       if (isUnauthorizedApiError(caughtError)) {
@@ -367,7 +478,7 @@ export default function BudgetPage() {
 
       setBudget(response);
       resetMonthlyRows(response);
-      setSuccess("Planejamento base aplicado ao mes com sucesso.");
+      setSuccess("Planejamento base aplicado ao snapshot do mes com sucesso.");
     } catch (caughtError) {
       if (isUnauthorizedApiError(caughtError)) {
         logout("session-expired");
@@ -453,7 +564,42 @@ export default function BudgetPage() {
           title="Planejamento indisponivel"
         />
       ) : (
-        <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
+        <div className="space-y-8">
+          <section className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
+            <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
+              Como usar
+            </div>
+            <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
+              Base recorrente e snapshot do mes sao coisas diferentes
+            </h2>
+            <div className="mt-6 grid gap-4 lg:grid-cols-2">
+              <article className="rounded-[24px] border border-[var(--color-line)] bg-white p-5">
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-accent)]">
+                  1. Base recorrente
+                </div>
+                <div className="mt-3 text-lg font-semibold text-[var(--color-foreground)]">
+                  Seu ponto de partida para os proximos meses
+                </div>
+                <p className="mt-3 text-sm leading-6 text-[var(--color-muted)]">
+                  Salvar a base nao altera o mes atual. Ela fica guardada para ser aplicada quando voce quiser.
+                </p>
+              </article>
+
+              <article className="rounded-[24px] border border-[color:rgba(15,118,110,0.14)] bg-[var(--color-accent-soft)] p-5">
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-accent)]">
+                  2. Snapshot de {monthReference}
+                </div>
+                <div className="mt-3 text-lg font-semibold text-[var(--color-foreground)]">
+                  O que realmente vale para este mes
+                </div>
+                <p className="mt-3 text-sm leading-6 text-[var(--color-muted)]">
+                  Salvar o snapshot substitui apenas {monthReference}. Os proximos meses continuam seguindo a sua base recorrente.
+                </p>
+              </article>
+            </div>
+          </section>
+
+          <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
           <div className="space-y-8">
             <section className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
               <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
@@ -510,7 +656,7 @@ export default function BudgetPage() {
                   onClick={handleApplyTemplate}
                   type="button"
                 >
-                  {isApplyingTemplate ? "Aplicando..." : "Aplicar base ao mes"}
+                  {isApplyingTemplate ? "Aplicando..." : "Aplicar base ao snapshot"}
                 </button>
               </div>
 
@@ -616,10 +762,10 @@ export default function BudgetPage() {
                   Edicao do mes
                 </div>
                 <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
-                  Criar, substituir ou limpar orcamento
+                  Montar o snapshot do mes
                 </h2>
                 <p className="mt-3 text-sm leading-6 text-[var(--color-muted)]">
-                  A base recorrente nao substitui este mes automaticamente. Ajuste o snapshot do mes quando precisar.
+                  Aqui voce decide o que ficou valendo em {monthReference}, mesmo que seja diferente da base recorrente.
                 </p>
               </div>
               <button
@@ -636,7 +782,7 @@ export default function BudgetPage() {
                 Voce esta editando o snapshot de {monthReference}.
               </div>
               <div className="mt-1 text-[var(--color-muted)]">
-                Salvar aqui substitui apenas este mes. Para corrigir lancamentos individuais, use{" "}
+                Salvar aqui substitui apenas este mes. A base recorrente continua intacta. Para corrigir lancamentos individuais, use{" "}
                 <Link
                   className="font-semibold text-[var(--color-foreground)] underline-offset-2 hover:underline"
                   href="/transactions"
@@ -720,11 +866,158 @@ export default function BudgetPage() {
                   disabled={isSubmitting}
                   type="submit"
                 >
-                  {isSubmitting ? "Salvando orcamento..." : "Salvar orcamento mensal"}
+                  {isSubmitting ? "Salvando snapshot..." : "Salvar snapshot mensal"}
                 </button>
               </form>
             )}
+
+            <div className="mt-6 rounded-[24px] border border-[var(--color-line)] bg-white p-5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-accent)]">
+                    Leitura rapida
+                  </div>
+                  <h3 className="mt-2 text-xl font-semibold text-[var(--color-foreground)]">
+                    Como o snapshot de {monthReference} ficou
+                  </h3>
+                  <p className="mt-2 text-sm leading-6 text-[var(--color-muted)]">
+                    Este quadro mostra o que seguiu igual a base, o que foi ajustado e o que ficou so neste mes.
+                  </p>
+                </div>
+                <div className="text-sm text-[var(--color-muted)]">
+                  Snapshot salvo:{" "}
+                  <span className="font-semibold text-[var(--color-foreground)]">
+                    {budget.categories.length} categoria{budget.categories.length === 1 ? "" : "s"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-3 md:grid-cols-4">
+                <article className="rounded-[20px] border border-[var(--color-line)] bg-[var(--color-panel)] p-4">
+                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--color-muted)]">
+                    Iguais a base
+                  </div>
+                  <div className="mt-2 text-2xl font-semibold text-[var(--color-foreground)]">
+                    {snapshotComparison?.matchingCount ?? 0}
+                  </div>
+                </article>
+                <article className="rounded-[20px] border border-[var(--color-line)] bg-[var(--color-panel)] p-4">
+                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--color-muted)]">
+                    Ajustadas no mes
+                  </div>
+                  <div className="mt-2 text-2xl font-semibold text-[var(--color-foreground)]">
+                    {snapshotComparison?.adjustedCount ?? 0}
+                  </div>
+                </article>
+                <article className="rounded-[20px] border border-[var(--color-line)] bg-[var(--color-panel)] p-4">
+                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--color-muted)]">
+                    So neste mes
+                  </div>
+                  <div className="mt-2 text-2xl font-semibold text-[var(--color-foreground)]">
+                    {snapshotComparison?.monthOnlyCount ?? 0}
+                  </div>
+                </article>
+                <article className="rounded-[20px] border border-[var(--color-line)] bg-[var(--color-panel)] p-4">
+                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--color-muted)]">
+                    Fora do snapshot
+                  </div>
+                  <div className="mt-2 text-2xl font-semibold text-[var(--color-foreground)]">
+                    {snapshotComparison?.baseOnlyCount ?? 0}
+                  </div>
+                </article>
+              </div>
+
+              {budget.categories.length === 0 ? (
+                <div className="mt-5 rounded-[20px] border border-dashed border-[var(--color-line)] px-4 py-5 text-sm leading-6 text-[var(--color-muted)]">
+                  Ainda nao existe snapshot salvo para {monthReference}. Se fizer sentido, aplique a base recorrente e ajuste so o que mudou neste mes.
+                </div>
+              ) : (
+                <div className="mt-5 space-y-3">
+                  {snapshotComparison?.snapshotRows.map((item) => {
+                    const statusCopy = getSnapshotStatusCopy(item.status);
+
+                    return (
+                      <article
+                        className="rounded-[20px] border border-[var(--color-line)] bg-[var(--color-panel)] p-4"
+                        key={item.categoryId}
+                      >
+                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                          <div>
+                            <div className="text-base font-semibold text-[var(--color-foreground)]">
+                              {item.categoryName}
+                            </div>
+                            <div className="mt-1 text-sm text-[var(--color-muted)]">
+                              Snapshot: {formatCurrency(item.monthPlanned ?? 0)}
+                              {item.templatePlanned !== null ? (
+                                <> • Base: {formatCurrency(item.templatePlanned)}</>
+                              ) : (
+                                " • Sem referencia na base"
+                              )}
+                            </div>
+                          </div>
+                          <span
+                            className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${statusCopy.className}`}
+                          >
+                            {statusCopy.label}
+                          </span>
+                        </div>
+
+                        <div className="mt-3 grid gap-3 text-sm text-[var(--color-muted)] md:grid-cols-2">
+                          <div>
+                            Gasto no mes:{" "}
+                            <span className="font-semibold text-[var(--color-foreground)]">
+                              {formatCurrency(item.spent)}
+                            </span>
+                          </div>
+                          <div>
+                            Restante no snapshot:{" "}
+                            <span className="font-semibold text-[var(--color-foreground)]">
+                              {formatCurrency(item.remaining ?? 0)}
+                            </span>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+
+              {snapshotComparison && snapshotComparison.baseOnlyRows.length > 0 ? (
+                <div className="mt-5 rounded-[20px] border border-[var(--color-line)] bg-[var(--color-panel)] p-4">
+                  <div className="text-sm font-semibold text-[var(--color-foreground)]">
+                    Categorias da base que ficaram fora de {monthReference}
+                  </div>
+                  <div className="mt-3 space-y-3">
+                    {snapshotComparison.baseOnlyRows.map((item) => {
+                      const statusCopy = getSnapshotStatusCopy(item.status);
+
+                      return (
+                        <div
+                          className="flex flex-col gap-2 rounded-[18px] border border-[var(--color-line)] bg-white px-4 py-3 md:flex-row md:items-center md:justify-between"
+                          key={item.categoryId}
+                        >
+                          <div>
+                            <div className="font-medium text-[var(--color-foreground)]">
+                              {item.categoryName}
+                            </div>
+                            <div className="text-sm text-[var(--color-muted)]">
+                              Base recorrente: {formatCurrency(item.templatePlanned ?? 0)}
+                            </div>
+                          </div>
+                          <span
+                            className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${statusCopy.className}`}
+                          >
+                            {statusCopy.label}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+            </div>
           </section>
+        </div>
         </div>
       )}
     </AppShell>
