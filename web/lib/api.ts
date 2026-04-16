@@ -34,6 +34,14 @@ export type TransactionResponse = {
   createdAtUtc: string;
 };
 
+export type TransactionHistoryResponse = {
+  items: TransactionResponse[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+};
+
 export type MonthlySummaryCategoryResponse = {
   categoryId: string | null;
   categoryName: string;
@@ -409,6 +417,31 @@ export async function listCategories(token: string) {
 
 export async function listTransactions(token: string) {
   return apiRequest<TransactionResponse[]>("/api/transactions", { token });
+}
+
+export async function listTransactionHistory(
+  token: string,
+  filters?: {
+    page?: number;
+    pageSize?: number;
+  },
+) {
+  const query = new URLSearchParams();
+
+  if (filters?.page) {
+    query.set("page", String(filters.page));
+  }
+
+  if (filters?.pageSize) {
+    query.set("pageSize", String(filters.pageSize));
+  }
+
+  const queryString = query.toString();
+
+  return apiRequest<TransactionHistoryResponse>(
+    `/api/transactions/history${queryString ? `?${queryString}` : ""}`,
+    { token },
+  );
 }
 
 export async function createTransaction(
