@@ -67,8 +67,13 @@ web/
 tests/
   Farol.Tests/
 docs/
+  product-decisions/
   sprints/
 ```
+
+## Decisoes de produto recentes
+
+- [Modelagem de meio de pagamento ou origem sem poluir categorias](docs/product-decisions/issue-37-payment-trail-modeling.md)
 
 ## Rodando localmente
 
