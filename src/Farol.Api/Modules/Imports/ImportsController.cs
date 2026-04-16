@@ -32,7 +32,7 @@ public sealed class ImportsController(FarolDbContext dbContext) : ControllerBase
 
         if (request.File.Length == 0)
         {
-            return BadRequest(new ErrorResponse("O arquivo CSV está vazio."));
+            return BadRequest(new ErrorResponse("O arquivo CSV esta vazio."));
         }
 
         var financialAccount = await dbContext.FinancialAccounts
@@ -54,12 +54,12 @@ public sealed class ImportsController(FarolDbContext dbContext) : ControllerBase
 
         if (headerLine is null)
         {
-            return BadRequest(new ErrorResponse("O arquivo CSV está vazio."));
+            return BadRequest(new ErrorResponse("O arquivo CSV esta vazio."));
         }
 
-        if (!TransactionCsvParser.IsExpectedHeader(headerLine))
+        if (!TransactionCsvParser.TryParseHeader(headerLine, out var layout, out var headerError))
         {
-            return BadRequest(new ErrorResponse("O cabeçalho do CSV é inválido. Use: occurredOn,description,amount,type,categoryName."));
+            return BadRequest(new ErrorResponse(headerError));
         }
 
         var visibleCategories = await dbContext.Categories
@@ -86,7 +86,7 @@ public sealed class ImportsController(FarolDbContext dbContext) : ControllerBase
 
             totalRows++;
 
-            if (!TransactionCsvParser.TryParseRow(line, rowNumber, out var parsedRow, out var error))
+            if (!TransactionCsvParser.TryParseRow(line, layout, rowNumber, out var parsedRow, out var error))
             {
                 errors.Add(new ImportTransactionsCsvErrorResponse
                 {
@@ -105,7 +105,7 @@ public sealed class ImportsController(FarolDbContext dbContext) : ControllerBase
                     errors.Add(new ImportTransactionsCsvErrorResponse
                     {
                         RowNumber = rowNumber,
-                        Message = "A categoria informada não foi encontrada."
+                        Message = "A categoria informada nao foi encontrada."
                     });
                     continue;
                 }
@@ -120,7 +120,7 @@ public sealed class ImportsController(FarolDbContext dbContext) : ControllerBase
                 errors.Add(new ImportTransactionsCsvErrorResponse
                 {
                     RowNumber = rowNumber,
-                    Message = "A categoria informada não combina com o tipo da transação."
+                    Message = "A categoria informada nao combina com o tipo da transacao."
                 });
                 continue;
             }
