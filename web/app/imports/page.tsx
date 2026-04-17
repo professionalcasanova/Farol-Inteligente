@@ -212,11 +212,19 @@ export default function ImportsPage() {
               <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
                 CSV simples e explícito
               </h2>
+              <div className="mt-4 rounded-[20px] border border-[var(--color-line)] bg-white px-4 py-4 text-sm leading-6 text-[var(--color-muted)]">
+                O importador agora aceita tambem extratos bancarios com linhas antes da tabela e colunas separadas de entrada e saida.
+              </div>
               <pre className="mt-6 overflow-x-auto rounded-[24px] border border-[var(--color-line)] bg-white p-4 text-sm leading-7 text-[var(--color-foreground)]">
 occurredOn,description,amount,type,categoryName
 2026-03-01,Salario,3000.00,Income,Salario
 2026-03-02,Mercado,120.50,Expense,Alimentacao
 2026-03-03,Uber viagem,42.00,Expense,
+              </pre>
+              <pre className="mt-4 overflow-x-auto rounded-[24px] border border-[var(--color-line)] bg-white p-4 text-sm leading-7 text-[var(--color-foreground)]">
+Data Lançamento,Data Contábil,Título,Descrição,Entrada(R$),Saída(R$),Saldo do Dia(R$)
+01/03/2026,01/03/2026,Salario Empresa,Credito mensal,&quot;3000,00&quot;,,&quot;3000,00&quot;
+02/03/2026,02/03/2026,Uber*Viagem,Uber viagem,,&quot;42,00&quot;,&quot;2958,00&quot;
               </pre>
             </article>
 

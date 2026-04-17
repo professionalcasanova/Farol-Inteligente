@@ -109,6 +109,7 @@ function createFreeMoneyResponse(
   return {
     month: 3,
     year: 2026,
+    isProjection: false,
     totalIncome: 0,
     totalExpense: 0,
     balance: 0,

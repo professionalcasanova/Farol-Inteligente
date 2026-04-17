@@ -106,6 +106,7 @@ builder.Services.AddDbContext<FarolDbContext>(options =>
 builder.Services.AddScoped<PasswordService>();
 builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddScoped<BillSeriesExpansionService>();
+builder.Services.AddScoped<BillPaymentService>();
 builder.Services.AddScoped<MonthlyInsightsService>();
 builder.Services.AddScoped<FinancialIntelligenceService>();
 builder.Services.AddSingleton(TimeProvider.System);

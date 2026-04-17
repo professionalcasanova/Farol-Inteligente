@@ -278,6 +278,55 @@ public sealed class TransactionCsvImportsEndpointsTests : IClassFixture<FarolApi
     }
 
     [Fact]
+    public async Task PostCsv_ShouldAcceptBrazilianBankExtractWithPreambleAndSplitAmounts()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var seed = await SeedAccountAndCategoriesAsync(
+            "maria@email.com",
+            ("Salario", CategoryType.Income),
+            ("Transporte", CategoryType.Expense));
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var content = CreateMultipartContent(seed.AccountId, """
+            Banco Exemplo
+            Agencia 0001
+            Conta 12345-6
+            Periodo 01/03/2026 a 31/03/2026
+
+            Data Lançamento,Data Contábil,Título,Descrição,Entrada(R$),Saída(R$),Saldo do Dia(R$)
+            01/03/2026,01/03/2026,Salario Empresa,Credito mensal,"3000,00",,"3000,00"
+            02/03/2026,02/03/2026,Uber*Viagem,Uber viagem,,"42,00","2958,00"
+            """);
+
+        var response = await client.PostAsync("/api/imports/transactions/csv", content);
+
+        response.EnsureSuccessStatusCode();
+
+        var summary = await response.Content.ReadFromJsonAsync<ImportTransactionsCsvResponse>();
+
+        Assert.NotNull(summary);
+        Assert.Equal(2, summary.TotalRows);
+        Assert.Equal(2, summary.ImportedRows);
+        Assert.Equal(0, summary.SkippedRows);
+        Assert.Empty(summary.Errors);
+
+        using var scope = _factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<FarolDbContext>();
+        var transactions = dbContext.Transactions.OrderBy(item => item.OccurredOn).ToList();
+
+        Assert.Equal(2, transactions.Count);
+        Assert.Equal(TransactionType.Income, transactions[0].Type);
+        Assert.Equal(3000m, transactions[0].Amount);
+        Assert.Equal("Salario Empresa - Credito mensal", transactions[0].Description);
+        Assert.Equal(TransactionType.Expense, transactions[1].Type);
+        Assert.Equal(42m, transactions[1].Amount);
+        Assert.Equal(seed.CategoryIds["Transporte"], transactions[1].CategoryId);
+    }
+
+    [Fact]
     public async Task PostCsv_ShouldSkipInvalidRowAndReturnError()
     {
         await _factory.ResetDatabaseAsync();

@@ -13,7 +13,8 @@ namespace Farol.Api.Modules.Bills;
 public sealed class BillsController(
     FarolDbContext dbContext,
     TimeProvider timeProvider,
-    BillSeriesExpansionService billSeriesExpansionService) : ControllerBase
+    BillSeriesExpansionService billSeriesExpansionService,
+    BillPaymentService billPaymentService) : ControllerBase
 {
     private const string PendingStatus = "pending";
     private const string PaidStatus = "paid";
@@ -142,7 +143,10 @@ public sealed class BillsController(
     }
 
     [HttpPatch("{id:guid}/pay")]
-    public async Task<ActionResult<BillResponse>> Pay(Guid id, CancellationToken cancellationToken)
+    public async Task<ActionResult<BillResponse>> Pay(
+        Guid id,
+        PayBillRequest request,
+        CancellationToken cancellationToken)
     {
         if (!AuthenticatedUser.TryGetUserId(User, out var userId))
         {
@@ -157,8 +161,24 @@ public sealed class BillsController(
             return NotFound(new ErrorResponse("Bill was not found."));
         }
 
-        bill.MarkAsPaid();
-        await dbContext.SaveChangesAsync(cancellationToken);
+        var account = await dbContext.FinancialAccounts
+            .SingleOrDefaultAsync(
+                candidate => candidate.Id == request.FinancialAccountId && candidate.UserId == userId,
+                cancellationToken);
+
+        if (account is null)
+        {
+            return NotFound(new ErrorResponse("Financial account was not found."));
+        }
+
+        try
+        {
+            await billPaymentService.PayAsync(bill, account, cancellationToken);
+        }
+        catch (InvalidOperationException exception)
+        {
+            return BadRequest(new ErrorResponse(exception.Message));
+        }
 
         return Ok(ToResponse(
             bill,
@@ -182,8 +202,7 @@ public sealed class BillsController(
             return NotFound(new ErrorResponse("Bill was not found."));
         }
 
-        bill.MarkAsUnpaid();
-        await dbContext.SaveChangesAsync(cancellationToken);
+        await billPaymentService.UnpayAsync(bill, cancellationToken);
 
         return Ok(ToResponse(
             bill,

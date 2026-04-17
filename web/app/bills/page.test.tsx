@@ -6,6 +6,7 @@ import BillsPage from "@/app/bills/page";
 import {
   createBill,
   deleteBill,
+  listAccounts,
   listBills,
   payBill,
   unpayBill,
@@ -57,6 +58,7 @@ vi.mock("@/lib/api", async () => {
     ...actual,
     createBill: vi.fn(),
     deleteBill: vi.fn(),
+    listAccounts: vi.fn(),
     listBills: vi.fn(),
     payBill: vi.fn(),
     unpayBill: vi.fn(),
@@ -67,6 +69,7 @@ vi.mock("@/lib/api", async () => {
 const mockedUseProtectedSession = vi.mocked(useProtectedSession);
 const mockedCreateBill = vi.mocked(createBill);
 const mockedDeleteBill = vi.mocked(deleteBill);
+const mockedListAccounts = vi.mocked(listAccounts);
 const mockedListBills = vi.mocked(listBills);
 const mockedPayBill = vi.mocked(payBill);
 const mockedUnpayBill = vi.mocked(unpayBill);
@@ -84,10 +87,21 @@ describe("BillsPage", () => {
     mockedUseProtectedSession.mockReset();
     mockedCreateBill.mockReset();
     mockedDeleteBill.mockReset();
+    mockedListAccounts.mockReset();
     mockedListBills.mockReset();
     mockedPayBill.mockReset();
     mockedUnpayBill.mockReset();
     mockedUpdateBill.mockReset();
+
+    mockedListAccounts.mockResolvedValue([
+      {
+        id: "account-1",
+        name: "Conta principal",
+        type: 2,
+        isActive: true,
+        createdAtUtc: "2026-03-01T00:00:00Z",
+      },
+    ]);
   });
 
   it("Bills_CreateInstallment_SendsInstallmentPayload", async () => {
@@ -309,6 +323,129 @@ describe("BillsPage", () => {
 
     await waitFor(() => {
       expect(mockedDeleteBill).toHaveBeenCalledWith("token", "bill-3", "series");
+    });
+  });
+
+  it("Bills_PaySingleAccount_UsesOnlyAvailableFinancialAccount", async () => {
+    const user = userEvent.setup();
+
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+
+    mockedListBills.mockResolvedValue([
+      {
+        id: "bill-1",
+        description: "Internet",
+        amount: 99.9,
+        dueOn: "2026-03-10",
+        billSeriesId: null,
+        seriesKind: null,
+        occurrenceNumber: null,
+        totalOccurrences: null,
+        isPaid: false,
+        paidAtUtc: null,
+        createdAtUtc: "2026-03-01T00:00:00Z",
+        status: "pending",
+      },
+    ]);
+    mockedPayBill.mockResolvedValue({
+      id: "bill-1",
+      description: "Internet",
+      amount: 99.9,
+      dueOn: "2026-03-10",
+      billSeriesId: null,
+      seriesKind: null,
+      occurrenceNumber: null,
+      totalOccurrences: null,
+      isPaid: true,
+      paidAtUtc: "2026-03-10T12:00:00Z",
+      createdAtUtc: "2026-03-01T00:00:00Z",
+      status: "paid",
+    });
+
+    render(<BillsPage />);
+
+    await user.click(await screen.findByRole("button", { name: /marcar como paga/i }));
+
+    await waitFor(() => {
+      expect(mockedPayBill).toHaveBeenCalledWith("token", "bill-1", {
+        financialAccountId: "account-1",
+      });
+    });
+  });
+
+  it("Bills_PayWithMultipleAccounts_RequestsAccountSelectionBeforeConfirming", async () => {
+    const user = userEvent.setup();
+
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+
+    mockedListAccounts.mockResolvedValue([
+      {
+        id: "account-1",
+        name: "Conta principal",
+        type: 2,
+        isActive: true,
+        createdAtUtc: "2026-03-01T00:00:00Z",
+      },
+      {
+        id: "account-2",
+        name: "Reserva",
+        type: 2,
+        isActive: true,
+        createdAtUtc: "2026-03-02T00:00:00Z",
+      },
+    ]);
+    mockedListBills.mockResolvedValue([
+      {
+        id: "bill-1",
+        description: "Energia",
+        amount: 150,
+        dueOn: "2026-03-10",
+        billSeriesId: null,
+        seriesKind: null,
+        occurrenceNumber: null,
+        totalOccurrences: null,
+        isPaid: false,
+        paidAtUtc: null,
+        createdAtUtc: "2026-03-01T00:00:00Z",
+        status: "pending",
+      },
+    ]);
+    mockedPayBill.mockResolvedValue({
+      id: "bill-1",
+      description: "Energia",
+      amount: 150,
+      dueOn: "2026-03-10",
+      billSeriesId: null,
+      seriesKind: null,
+      occurrenceNumber: null,
+      totalOccurrences: null,
+      isPaid: true,
+      paidAtUtc: "2026-03-10T12:00:00Z",
+      createdAtUtc: "2026-03-01T00:00:00Z",
+      status: "paid",
+    });
+
+    render(<BillsPage />);
+
+    await user.click(await screen.findByRole("button", { name: /marcar como paga/i }));
+
+    expect(screen.getByText("De qual conta saiu o dinheiro?")).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText(/conta financeira/i), "account-2");
+    await user.click(screen.getByRole("button", { name: /confirmar pagamento/i }));
+
+    await waitFor(() => {
+      expect(mockedPayBill).toHaveBeenCalledWith("token", "bill-1", {
+        financialAccountId: "account-2",
+      });
     });
   });
 });

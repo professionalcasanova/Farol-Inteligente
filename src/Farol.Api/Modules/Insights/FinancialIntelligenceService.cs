@@ -22,6 +22,11 @@ public sealed class FinancialIntelligenceService(
             periodStart,
             cancellationToken);
 
+        if (snapshot.IsFuturePeriod)
+        {
+            return BuildProjectedMonthHealthResponse(snapshot);
+        }
+
         var response = await financialIntelligenceClient.AnalyzeAsync(
             BuildRequest(userId, periodStart, snapshot, options.Value),
             cancellationToken);
@@ -74,6 +79,79 @@ public sealed class FinancialIntelligenceService(
                 })
                 .ToList()
         };
+    }
+
+    private static MonthHealthResponse BuildProjectedMonthHealthResponse(MonthlyInsightSnapshot snapshot)
+    {
+        var hasMappedCommitments = snapshot.TotalPendingBills > 0 || snapshot.TotalPlannedBudget > 0;
+        var needsIncomeConfirmation = hasMappedCommitments && snapshot.TotalIncome <= 0;
+        var status = needsIncomeConfirmation ? "attention" : "healthy";
+        var message = needsIncomeConfirmation
+            ? "O proximo mes ja tem compromissos mapeados, mas ainda esta em projecao."
+            : "Este mes futuro esta sendo tratado como projecao, nao como divida ja realizada.";
+        var cause = hasMappedCommitments
+            ? "Reservas do planejamento e contas previstas aparecem aqui como preparacao do mes. Elas ainda nao contam como saida realizada."
+            : "Ainda nao ha movimentacoes nem compromissos suficientes para uma leitura de risco. Este painel serve como preparo do proximo ciclo.";
+        var action = needsIncomeConfirmation
+            ? "Confirme as entradas esperadas e ajuste planejamento ou vencimentos antes do mes comecar."
+            : "Use este periodo para organizar entradas, reservas e vencimentos sem tratar previsoes como atraso.";
+
+        return new MonthHealthResponse
+        {
+            Status = status,
+            Score = needsIncomeConfirmation ? 78 : 92,
+            Message = message,
+            Reasons = [cause],
+            Actions = [action],
+            Priority = needsIncomeConfirmation ? AttentionPriority : HealthyPriority,
+            Summary = new MonthHealthSummaryResponse
+            {
+                Message = message,
+                Cause = cause,
+                Action = action
+            },
+            Insights = [],
+            RecommendedActions = BuildProjectedRecommendedActions(needsIncomeConfirmation, snapshot)
+        };
+    }
+
+    private static IReadOnlyList<RecommendedActionResponse> BuildProjectedRecommendedActions(
+        bool needsIncomeConfirmation,
+        MonthlyInsightSnapshot snapshot)
+    {
+        var actions = new List<RecommendedActionResponse>();
+
+        if (needsIncomeConfirmation)
+        {
+            actions.Add(new RecommendedActionResponse
+            {
+                Id = "review_planned_income",
+                Label = "Registrar entradas previstas",
+                Target = "/transactions"
+            });
+        }
+
+        if (snapshot.TotalPlannedBudget > 0)
+        {
+            actions.Add(new RecommendedActionResponse
+            {
+                Id = "review_budget_projection",
+                Label = "Revisar planejamento",
+                Target = "/budget"
+            });
+        }
+
+        if (snapshot.TotalPendingBills > 0)
+        {
+            actions.Add(new RecommendedActionResponse
+            {
+                Id = "review_next_bills",
+                Label = "Conferir vencimentos",
+                Target = "/bills?status=pending"
+            });
+        }
+
+        return actions;
     }
 
     private static IReadOnlyList<string> MapFallbackList(

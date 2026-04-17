@@ -11,8 +11,10 @@ import {
   deleteBill,
   getFriendlyApiMessage,
   isUnauthorizedApiError,
+  listAccounts,
   listBills,
   payBill,
+  type AccountResponse,
   type BillResponse,
   type BillSeriesKind,
   type BillStatus,
@@ -50,6 +52,8 @@ const billMessageMap = {
     "Informe pelo menos 2 parcelas para criar um parcelamento.",
   "Recurring and installment bills must be ended with scope=series.":
     "Contas recorrentes e parceladas precisam ser encerradas como serie.",
+  "Financial account was not found.":
+    "A conta usada para dar baixa no pagamento nao foi encontrada.",
 } as const;
 
 type BillFormKind = "single" | "recurring" | "installment";
@@ -163,6 +167,7 @@ export default function BillsPage() {
   const { session, isLoading, logout } = useProtectedSession();
   const [monthValue, setMonthValue] = useState(getCurrentMonthInputValue());
   const [statusFilter, setStatusFilter] = useState<"" | BillStatus>("");
+  const [accounts, setAccounts] = useState<AccountResponse[]>([]);
   const [bills, setBills] = useState<BillResponse[]>([]);
   const [form, setForm] = useState<BillFormState>(() =>
     createEmptyForm(getCurrentMonthInputValue()),
@@ -174,6 +179,8 @@ export default function BillsPage() {
   const [isFetching, setIsFetching] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [actionBillId, setActionBillId] = useState<string | null>(null);
+  const [paymentBillId, setPaymentBillId] = useState<string | null>(null);
+  const [paymentAccountId, setPaymentAccountId] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
 
   const monthAndYear = useMemo(
@@ -208,17 +215,21 @@ export default function BillsPage() {
       setLoadError("");
 
       try {
-        const response = await listBills(accessToken, {
-          month: monthAndYear.month,
-          year: monthAndYear.year,
-          status: statusFilter,
-        });
+        const [billsResponse, accountsResponse] = await Promise.all([
+          listBills(accessToken, {
+            month: monthAndYear.month,
+            year: monthAndYear.year,
+            status: statusFilter,
+          }),
+          listAccounts(accessToken),
+        ]);
 
         if (isCancelled) {
           return;
         }
 
-        setBills(response);
+        setBills(billsResponse);
+        setAccounts(accountsResponse.filter((account) => account.isActive));
       } catch (caughtError) {
         if (isUnauthorizedApiError(caughtError)) {
           logout("session-expired");
@@ -278,6 +289,26 @@ export default function BillsPage() {
     setFormError("");
     setSuccess("");
     resetForm(form.kind);
+  }
+
+  function closePaymentSelection() {
+    setPaymentBillId(null);
+    setPaymentAccountId("");
+  }
+
+  function beginPayBill(bill: BillResponse) {
+    if (accounts.length === 0) {
+      setFormError("Crie ou reative uma conta financeira antes de marcar um pagamento.");
+      return;
+    }
+
+    if (accounts.length === 1) {
+      void confirmPayment(bill, accounts[0].id);
+      return;
+    }
+
+    setPaymentBillId(bill.id);
+    setPaymentAccountId((current) => current || accounts[0]?.id || "");
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -401,20 +432,59 @@ export default function BillsPage() {
       return;
     }
 
-    setActionBillId(bill.id);
     setFormError("");
     setSuccess("");
 
     try {
       if (bill.isPaid) {
+        setActionBillId(bill.id);
         await unpayBill(session.accessToken, bill.id);
         setSuccess("Pagamento removido com sucesso.");
       } else {
-        await payBill(session.accessToken, bill.id);
-        setSuccess("Bill marcada como paga.");
+        beginPayBill(bill);
+        return;
       }
 
       await refreshBills();
+    } catch (caughtError) {
+      if (isUnauthorizedApiError(caughtError)) {
+        logout("session-expired");
+        return;
+      }
+
+      setFormError(
+        getFriendlyApiMessage(
+          caughtError,
+          "Nao foi possivel atualizar a conta a pagar agora. Tente novamente.",
+          { messageMap: billMessageMap },
+        ),
+      );
+    } finally {
+      setActionBillId(null);
+    }
+  }
+
+  async function confirmPayment(bill: BillResponse, financialAccountId: string) {
+    if (!session) {
+      return;
+    }
+
+    if (!financialAccountId) {
+      setFormError("Escolha a conta financeira usada para pagar esta conta.");
+      return;
+    }
+
+    setActionBillId(bill.id);
+    setFormError("");
+    setSuccess("");
+
+    try {
+      await payBill(session.accessToken, bill.id, {
+        financialAccountId,
+      });
+      await refreshBills();
+      setSuccess("Conta marcada como paga e registrada como saida na conta escolhida.");
+      closePaymentSelection();
     } catch (caughtError) {
       if (isUnauthorizedApiError(caughtError)) {
         logout("session-expired");
@@ -811,6 +881,48 @@ export default function BillsPage() {
                               </>
                             ) : null}
                           </div>
+                          {paymentBillId === bill.id && !bill.isPaid ? (
+                            <div className="w-full rounded-[20px] border border-[var(--color-line)] bg-[var(--color-panel)] p-4 md:max-w-sm">
+                              <div className="text-sm font-semibold text-[var(--color-foreground)]">
+                                De qual conta saiu o dinheiro?
+                              </div>
+                              <div className="mt-1 text-xs leading-5 text-[var(--color-muted)]">
+                                Essa escolha gera a saida real para o saldo acompanhar o pagamento.
+                              </div>
+                              <label className="mt-4 flex flex-col gap-2 text-sm text-[var(--color-muted)]">
+                                <span>Conta financeira</span>
+                                <select
+                                  className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3 text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)]"
+                                  onChange={(event) => setPaymentAccountId(event.target.value)}
+                                  value={paymentAccountId}
+                                >
+                                  {accounts.map((account) => (
+                                    <option key={account.id} value={account.id}>
+                                      {account.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                              <div className="mt-4 flex flex-wrap gap-2">
+                                <button
+                                  className="rounded-2xl bg-[var(--color-foreground)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-70"
+                                  disabled={actionBillId === bill.id}
+                                  onClick={() => confirmPayment(bill, paymentAccountId)}
+                                  type="button"
+                                >
+                                  Confirmar pagamento
+                                </button>
+                                <button
+                                  className="rounded-2xl border border-[var(--color-line)] px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-white"
+                                  disabled={actionBillId === bill.id}
+                                  onClick={closePaymentSelection}
+                                  type="button"
+                                >
+                                  Cancelar
+                                </button>
+                              </div>
+                            </div>
+                          ) : null}
                         </div>
 
                         <div className="flex flex-col items-start gap-3 md:items-end">

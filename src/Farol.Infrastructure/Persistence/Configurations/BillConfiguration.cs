@@ -1,4 +1,5 @@
 using Farol.Domain.Bills;
+using Farol.Domain.Ledger;
 using Farol.Domain.Users;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -17,7 +18,9 @@ public sealed class BillConfiguration : IEntityTypeConfiguration<Bill>
 
         builder.HasIndex(bill => new { bill.UserId, bill.IsPaid, bill.DueOn });
 
-        builder.HasIndex(bill => new { bill.BillSeriesId, bill.DueOn });
+        builder.HasIndex(bill => new { bill.BillSeriesId, bill.DueOn })
+            .IsUnique()
+            .HasFilter("\"BillSeriesId\" IS NOT NULL");
 
         builder.Property(bill => bill.UserId)
             .IsRequired();
@@ -42,6 +45,8 @@ public sealed class BillConfiguration : IEntityTypeConfiguration<Bill>
         builder.Property(bill => bill.IsPaid)
             .IsRequired();
 
+        builder.Property(bill => bill.PaidTransactionId);
+
         builder.Property(bill => bill.PaidAtUtc);
 
         builder.Property(bill => bill.CreatedAtUtc)
@@ -55,6 +60,11 @@ public sealed class BillConfiguration : IEntityTypeConfiguration<Bill>
         builder.HasOne<BillSeries>()
             .WithMany()
             .HasForeignKey(bill => bill.BillSeriesId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<Transaction>()
+            .WithMany()
+            .HasForeignKey(bill => bill.PaidTransactionId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

@@ -18,12 +18,14 @@ public sealed class BillTests
     public void MarkAsPaid_ShouldSetPaymentFlags()
     {
         var paidAtUtc = new DateTimeOffset(2026, 3, 17, 12, 30, 0, TimeSpan.Zero);
+        var paymentTransactionId = Guid.NewGuid();
         var bill = new Bill(Guid.NewGuid(), "Internet", 99.90m, new DateOnly(2026, 3, 25));
 
-        bill.MarkAsPaid(paidAtUtc);
+        bill.MarkAsPaid(paidAtUtc, paymentTransactionId);
 
         Assert.True(bill.IsPaid);
         Assert.Equal(paidAtUtc, bill.PaidAtUtc);
+        Assert.Equal(paymentTransactionId, bill.PaidTransactionId);
     }
 
     [Fact]
@@ -35,6 +37,7 @@ public sealed class BillTests
         bill.MarkAsUnpaid();
 
         Assert.False(bill.IsPaid);
+        Assert.Null(bill.PaidTransactionId);
         Assert.Null(bill.PaidAtUtc);
     }
 }
