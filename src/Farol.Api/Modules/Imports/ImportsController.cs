@@ -50,16 +50,44 @@ public sealed class ImportsController(FarolDbContext dbContext) : ControllerBase
             Encoding.UTF8,
             detectEncodingFromByteOrderMarks: true);
 
-        var headerLine = await reader.ReadLineAsync(cancellationToken);
+        var lines = new List<string>();
 
-        if (headerLine is null)
+        while (await reader.ReadLineAsync(cancellationToken) is { } line)
+        {
+            lines.Add(line);
+        }
+
+        if (lines.Count == 0)
         {
             return BadRequest(new ErrorResponse("O arquivo CSV esta vazio."));
         }
 
-        if (!TransactionCsvParser.TryParseHeader(headerLine, out var layout, out var headerError))
+        TransactionCsvLayout layout = null!;
+        var headerLineNumber = 0;
+        var headerFound = false;
+
+        for (var index = 0; index < lines.Count; index++)
         {
-            return BadRequest(new ErrorResponse(headerError));
+            var candidate = lines[index];
+
+            if (string.IsNullOrWhiteSpace(candidate))
+            {
+                continue;
+            }
+
+            if (!TransactionCsvParser.TryParseHeader(candidate, out layout, out _))
+            {
+                continue;
+            }
+
+            headerLineNumber = index + 1;
+            headerFound = true;
+            break;
+        }
+
+        if (!headerFound)
+        {
+            return BadRequest(new ErrorResponse(TransactionCsvParser.InvalidHeaderMessage));
         }
 
         var visibleCategories = await dbContext.Categories
@@ -73,11 +101,10 @@ public sealed class ImportsController(FarolDbContext dbContext) : ControllerBase
         var errors = new List<ImportTransactionsCsvErrorResponse>();
         var importedRows = 0;
         var totalRows = 0;
-        var rowNumber = 1;
-
-        while (await reader.ReadLineAsync(cancellationToken) is { } line)
+        for (var index = headerLineNumber; index < lines.Count; index++)
         {
-            rowNumber++;
+            var rowNumber = index + 1;
+            var line = lines[index];
 
             if (string.IsNullOrWhiteSpace(line))
             {

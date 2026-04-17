@@ -413,7 +413,8 @@ public sealed class FreeMoneyInsightsEndpointsTests : IClassFixture<FarolApiFact
         Assert.Equal(1, response.RecurringBillsCount);
         Assert.Equal(500m, response.InstallmentBillsReserve);
         Assert.Equal(1, response.InstallmentBillsCount);
-        Assert.Equal(2340m, response.FreeToSpend);
+        Assert.True(response.IsProjection);
+        Assert.Equal(3000m, response.FreeToSpend);
     }
 
     private async Task<(Guid AccountId, Dictionary<string, Guid> CategoryIds)> SeedAccountAndCategoriesAsync(

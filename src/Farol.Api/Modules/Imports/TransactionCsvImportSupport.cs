@@ -16,9 +16,12 @@ internal sealed record TransactionCsvLayout(
     char Delimiter,
     int HeaderColumnCount,
     int OccurredOnIndex,
-    int DescriptionIndex,
-    int AmountIndex,
-    int TypeIndex,
+    int? DescriptionIndex,
+    int? TitleIndex,
+    int? AmountIndex,
+    int? TypeIndex,
+    int? IncomeAmountIndex,
+    int? ExpenseAmountIndex,
     int? CategoryNameIndex);
 
 internal sealed class TransactionImportCategoryResolver
@@ -141,7 +144,7 @@ internal sealed class TransactionImportCategoryResolver
 
 internal static class TransactionCsvParser
 {
-    private const string InvalidHeaderMessage =
+    internal const string InvalidHeaderMessage =
         "O cabecalho do CSV e invalido. Informe colunas para data, descricao, valor e tipo. Categoria e opcional.";
 
     private static readonly string[] DateFormats =
@@ -157,9 +160,11 @@ internal static class TransactionCsvParser
         ["occurredon"] = "occurredOn",
         ["date"] = "occurredOn",
         ["data"] = "occurredOn",
+        ["datalancamento"] = "occurredOn",
         ["transactiondate"] = "occurredOn",
         ["postedon"] = "occurredOn",
         ["dataocorrencia"] = "occurredOn",
+        ["datacontabil"] = "bookedOn",
         ["description"] = "description",
         ["descricao"] = "description",
         ["details"] = "description",
@@ -167,10 +172,18 @@ internal static class TransactionCsvParser
         ["detalhe"] = "description",
         ["historico"] = "description",
         ["memo"] = "description",
+        ["title"] = "title",
+        ["titulo"] = "title",
         ["amount"] = "amount",
         ["valor"] = "amount",
         ["value"] = "amount",
         ["total"] = "amount",
+        ["entrada"] = "incomeAmount",
+        ["entradar"] = "incomeAmount",
+        ["creditamount"] = "incomeAmount",
+        ["saida"] = "expenseAmount",
+        ["saidar"] = "expenseAmount",
+        ["debitamount"] = "expenseAmount",
         ["type"] = "type",
         ["tipo"] = "type",
         ["transactiontype"] = "type",
@@ -221,10 +234,23 @@ internal static class TransactionCsvParser
             }
         }
 
-        if (!canonicalIndexes.TryGetValue("occurredOn", out var occurredOnIndex) ||
-            !canonicalIndexes.TryGetValue("description", out var descriptionIndex) ||
-            !canonicalIndexes.TryGetValue("amount", out var amountIndex) ||
-            !canonicalIndexes.TryGetValue("type", out var typeIndex))
+        if (!canonicalIndexes.TryGetValue("occurredOn", out var occurredOnIndex))
+        {
+            return false;
+        }
+
+        canonicalIndexes.TryGetValue("description", out var descriptionIndex);
+        canonicalIndexes.TryGetValue("title", out var titleIndex);
+        canonicalIndexes.TryGetValue("amount", out var amountIndex);
+        canonicalIndexes.TryGetValue("type", out var typeIndex);
+        canonicalIndexes.TryGetValue("incomeAmount", out var incomeAmountIndex);
+        canonicalIndexes.TryGetValue("expenseAmount", out var expenseAmountIndex);
+
+        var hasDescriptionSource = canonicalIndexes.ContainsKey("description") || canonicalIndexes.ContainsKey("title");
+        var hasExplicitTypeLayout = canonicalIndexes.ContainsKey("amount") && canonicalIndexes.ContainsKey("type");
+        var hasSplitAmountLayout = canonicalIndexes.ContainsKey("incomeAmount") && canonicalIndexes.ContainsKey("expenseAmount");
+
+        if (!hasDescriptionSource || (!hasExplicitTypeLayout && !hasSplitAmountLayout))
         {
             return false;
         }
@@ -235,9 +261,12 @@ internal static class TransactionCsvParser
             delimiter,
             headerColumns.Count,
             occurredOnIndex,
-            descriptionIndex,
-            amountIndex,
-            typeIndex,
+            canonicalIndexes.ContainsKey("description") ? descriptionIndex : null,
+            canonicalIndexes.ContainsKey("title") ? titleIndex : null,
+            canonicalIndexes.ContainsKey("amount") ? amountIndex : null,
+            canonicalIndexes.ContainsKey("type") ? typeIndex : null,
+            canonicalIndexes.ContainsKey("incomeAmount") ? incomeAmountIndex : null,
+            canonicalIndexes.ContainsKey("expenseAmount") ? expenseAmountIndex : null,
             canonicalIndexes.ContainsKey("categoryName") ? categoryNameIndex : null);
 
         error = string.Empty;
@@ -268,9 +297,24 @@ internal static class TransactionCsvParser
         }
 
         var occurredOnValue = GetColumnValue(columns, layout.OccurredOnIndex);
-        var descriptionValue = GetColumnValue(columns, layout.DescriptionIndex);
-        var amountValue = GetColumnValue(columns, layout.AmountIndex);
-        var typeValue = GetColumnValue(columns, layout.TypeIndex);
+        var descriptionValue = layout.DescriptionIndex.HasValue
+            ? GetColumnValue(columns, layout.DescriptionIndex.Value)
+            : string.Empty;
+        var titleValue = layout.TitleIndex.HasValue
+            ? GetColumnValue(columns, layout.TitleIndex.Value)
+            : string.Empty;
+        var amountValue = layout.AmountIndex.HasValue
+            ? GetColumnValue(columns, layout.AmountIndex.Value)
+            : string.Empty;
+        var typeValue = layout.TypeIndex.HasValue
+            ? GetColumnValue(columns, layout.TypeIndex.Value)
+            : string.Empty;
+        var incomeAmountValue = layout.IncomeAmountIndex.HasValue
+            ? GetColumnValue(columns, layout.IncomeAmountIndex.Value)
+            : string.Empty;
+        var expenseAmountValue = layout.ExpenseAmountIndex.HasValue
+            ? GetColumnValue(columns, layout.ExpenseAmountIndex.Value)
+            : string.Empty;
         var categoryNameValue = layout.CategoryNameIndex.HasValue
             ? GetColumnValue(columns, layout.CategoryNameIndex.Value)
             : string.Empty;
@@ -281,7 +325,7 @@ internal static class TransactionCsvParser
             return false;
         }
 
-        var description = descriptionValue.Trim();
+        var description = BuildDescription(titleValue, descriptionValue);
 
         if (string.IsNullOrWhiteSpace(description))
         {
@@ -289,15 +333,25 @@ internal static class TransactionCsvParser
             return false;
         }
 
-        if (!TryParseAmount(amountValue, out var amount))
-        {
-            error = "O valor em amount esta invalido.";
-            return false;
-        }
+        decimal amount;
+        TransactionType type;
 
-        if (!TryParseTransactionType(typeValue, out var type))
+        if (layout.AmountIndex.HasValue && layout.TypeIndex.HasValue)
         {
-            error = "O tipo de transacao esta invalido.";
+            if (!TryParseAmount(amountValue, out amount))
+            {
+                error = "O valor em amount esta invalido.";
+                return false;
+            }
+
+            if (!TryParseTransactionType(typeValue, out type))
+            {
+                error = "O tipo de transacao esta invalido.";
+                return false;
+            }
+        }
+        else if (!TryParseSplitAmountColumns(incomeAmountValue, expenseAmountValue, out amount, out type, out error))
+        {
             return false;
         }
 
@@ -391,6 +445,74 @@ internal static class TransactionCsvParser
             out amount);
     }
 
+    private static bool TryParseSplitAmountColumns(
+        string incomeValue,
+        string expenseValue,
+        out decimal amount,
+        out TransactionType type,
+        out string error)
+    {
+        amount = 0;
+        type = default;
+        error = string.Empty;
+
+        var hasIncome = TryParseOptionalAmount(incomeValue, out var incomeAmount, out error);
+
+        if (!hasIncome && !string.IsNullOrEmpty(error))
+        {
+            return false;
+        }
+
+        var hasExpense = TryParseOptionalAmount(expenseValue, out var expenseAmount, out error);
+
+        if (!hasExpense && !string.IsNullOrEmpty(error))
+        {
+            return false;
+        }
+
+        if (!hasIncome && !hasExpense)
+        {
+            error = "Informe um valor em entrada ou saida.";
+            return false;
+        }
+
+        if (hasIncome && hasExpense)
+        {
+            error = "A linha nao pode trazer entrada e saida ao mesmo tempo.";
+            return false;
+        }
+
+        if (hasIncome)
+        {
+            amount = incomeAmount;
+            type = TransactionType.Income;
+            return true;
+        }
+
+        amount = expenseAmount;
+        type = TransactionType.Expense;
+        return true;
+    }
+
+    private static bool TryParseOptionalAmount(string value, out decimal amount, out string error)
+    {
+        amount = 0;
+        error = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        if (!TryParseAmount(value, out amount))
+        {
+            error = "O valor em entrada ou saida esta invalido.";
+            return false;
+        }
+
+        return amount > 0;
+    }
+
     private static List<string>? ParseColumns(string line, char delimiter, out string error)
     {
         error = string.Empty;
@@ -468,6 +590,34 @@ internal static class TransactionCsvParser
     private static string NormalizeToken(string value)
     {
         return TransactionImportCategoryResolver.NormalizeText(value);
+    }
+
+    private static string BuildDescription(string titleValue, string descriptionValue)
+    {
+        var title = titleValue.Trim();
+        var description = descriptionValue.Trim();
+
+        if (string.IsNullOrWhiteSpace(description))
+        {
+            return title;
+        }
+
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            return description;
+        }
+
+        if (string.Equals(title, description, StringComparison.OrdinalIgnoreCase))
+        {
+            return description;
+        }
+
+        if (description.Contains(title, StringComparison.OrdinalIgnoreCase))
+        {
+            return description;
+        }
+
+        return $"{title} - {description}";
     }
 
     private static bool TryParseTransactionType(string value, out TransactionType type)

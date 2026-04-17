@@ -1,3 +1,4 @@
+using Farol.Domain.Bills;
 using Farol.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -38,7 +39,7 @@ public sealed class BillSeriesExpansionService(FarolDbContext dbContext)
             .Select(item => $"{item.BillSeriesId:N}:{item.DueOn:yyyy-MM-dd}")
             .ToHashSet(StringComparer.Ordinal);
 
-        var created = false;
+        var createdKeys = new List<string>();
 
         foreach (var item in series)
         {
@@ -60,12 +61,58 @@ public sealed class BillSeriesExpansionService(FarolDbContext dbContext)
 
             dbContext.Bills.Add(item.CreateOccurrenceForMonth(periodStart));
             existingKeys.Add(key);
-            created = true;
+            createdKeys.Add(key);
         }
 
-        if (created)
+        if (createdKeys.Count == 0)
+        {
+            return;
+        }
+
+        try
         {
             await dbContext.SaveChangesAsync(cancellationToken);
         }
+        catch (DbUpdateException)
+        {
+            await DetachAddedBillsAsync();
+
+            var persistedKeys = await dbContext.Bills
+                .AsNoTracking()
+                .Where(bill =>
+                    bill.UserId == userId &&
+                    bill.BillSeriesId.HasValue &&
+                    seriesIds.Contains(bill.BillSeriesId.Value) &&
+                    bill.DueOn >= periodStart &&
+                    bill.DueOn < periodEnd)
+                .Select(bill => new { bill.BillSeriesId, bill.DueOn })
+                .ToListAsync(cancellationToken);
+
+            var persistedKeySet = persistedKeys
+                .Select(item => $"{item.BillSeriesId:N}:{item.DueOn:yyyy-MM-dd}")
+                .ToHashSet(StringComparer.Ordinal);
+
+            if (createdKeys.All(persistedKeySet.Contains))
+            {
+                return;
+            }
+
+            throw;
+        }
+    }
+
+    private Task DetachAddedBillsAsync()
+    {
+        foreach (var entry in dbContext.ChangeTracker.Entries())
+        {
+            if (entry.Entity is not Bill || entry.State != EntityState.Added)
+            {
+                continue;
+            }
+
+            entry.State = EntityState.Detached;
+        }
+
+        return Task.CompletedTask;
     }
 }

@@ -65,7 +65,7 @@ public sealed class BillsSummaryEndpointsTests : IClassFixture<FarolApiFactory>
         await _factory.ResetDatabaseAsync();
         using var client = _factory.CreateClient();
         var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = _factory.Today;
         var nextMonthStart = new DateOnly(today.Year, today.Month, 1).AddMonths(1);
         var month = nextMonthStart.Month;
         var year = nextMonthStart.Year;
@@ -144,7 +144,7 @@ public sealed class BillsSummaryEndpointsTests : IClassFixture<FarolApiFactory>
         using var client = _factory.CreateClient();
         var mariaToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
         await RegisterAndGetTokenAsync(client, "joao@email.com");
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = _factory.Today;
         var month = today.Month;
         var year = today.Year;
 

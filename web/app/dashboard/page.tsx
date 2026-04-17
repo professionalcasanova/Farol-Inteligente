@@ -18,10 +18,8 @@ import {
   getMonthlyBudget,
   getMonthlySummary,
   isUnauthorizedApiError,
-  listBills,
   listAccounts,
   listCategories,
-  listTransactions,
   type AccountResponse,
   type AlertsResponse,
   type BillsSummaryResponse,
@@ -139,6 +137,10 @@ const monthHealthStatusStyles = {
 } as const;
 
 function getFinancialSupportText(data: DashboardData) {
+  if (data.freeMoney.isProjection) {
+    return "Este mes ainda esta em projecao. Reservas e contas previstas ajudam no preparo, mas ainda nao contam como gasto realizado nem viram saldo carregado automaticamente.";
+  }
+
   if (
     data.summary.totalIncome === 0 &&
     data.summary.totalExpense === 0 &&
@@ -152,9 +154,24 @@ function getFinancialSupportText(data: DashboardData) {
 }
 
 function isFirstUseState(data: DashboardData) {
+  const hasActionableMonthHealth = Boolean(
+    data.monthHealth &&
+      (data.monthHealth.status !== "healthy" ||
+        data.monthHealth.insights.length > 0 ||
+        (data.monthHealth.recommendedActions?.length ?? 0) > 0),
+  );
+  const hasFinancialActivity =
+    data.summary.totalIncome > 0 ||
+    data.summary.totalExpense > 0 ||
+    data.freeMoney.totalIncome > 0 ||
+    data.freeMoney.totalExpense > 0 ||
+    data.freeMoney.balance !== 0 ||
+    data.freeMoney.plannedReserve > 0 ||
+    data.freeMoney.unpaidBillsReserve > 0;
+
   return (
-    data.summary.totalIncome === 0 &&
-    data.summary.totalExpense === 0 &&
+    !hasActionableMonthHealth &&
+    !hasFinancialActivity &&
     data.billsSummary.countPending === 0 &&
     data.billsSummary.countOverdue === 0 &&
     data.budget.totalPlanned === 0 &&
@@ -162,6 +179,14 @@ function isFirstUseState(data: DashboardData) {
     !data.onboarding.hasTransaction &&
     !data.onboarding.hasBill
   );
+}
+
+function getProjectionSupportMessage(data: DashboardData) {
+  if (!data.freeMoney.isProjection) {
+    return "";
+  }
+
+  return "Se voce reserva dinheiro para um objetivo, isso continua como compromisso planejado do mes escolhido. Nao acumula sozinho para o mes seguinte sem registro ou ajuste do planejamento.";
 }
 
 function getActivationMessage(data: DashboardData) {
@@ -320,6 +345,11 @@ export default function DashboardPage() {
     [monthValue],
   );
   const firstUseState = data ? isFirstUseState(data) : false;
+  const monthHealth = data?.monthHealth;
+  const monthHealthStatus = monthHealth?.status;
+  const shouldShowMonthHealthSection = data
+    ? Boolean(data.monthHealth) && (!firstUseState || monthHealthStatus !== "healthy")
+    : false;
   const showSecondarySections = data ? !firstUseState || !data.monthHealth : false;
   const activationMessage = data ? getActivationMessage(data) : null;
   const prioritizedRecommendedActions = data?.monthHealth?.recommendedActions?.slice(0, 3) ?? [];
@@ -389,6 +419,7 @@ export default function DashboardPage() {
   const budgetFlowMax = data
     ? Math.max(1, data.budget.totalPlanned, data.budget.totalSpent)
     : 1;
+  const projectionSupportMessage = data ? getProjectionSupportMessage(data) : "";
 
   useEffect(() => {
     const accounts = data?.accounts ?? [];
@@ -478,8 +509,6 @@ export default function DashboardPage() {
           freeMoney,
           budget,
           accounts,
-          transactions,
-          bills,
         ] = await Promise.all([
           monthHealthPromise,
           getMonthlySummary(
@@ -497,8 +526,6 @@ export default function DashboardPage() {
             monthAndYear.year,
           ),
           listAccounts(accessToken),
-          listTransactions(accessToken),
-          listBills(accessToken),
         ]);
 
         if (!isCancelled) {
@@ -513,8 +540,15 @@ export default function DashboardPage() {
             monthHealth,
             onboarding: {
               hasAccount: accounts.length > 0,
-              hasBill: bills.length > 0,
-              hasTransaction: transactions.length > 0,
+              hasBill:
+                billsSummary.countPending +
+                  billsSummary.countOverdue +
+                  billsSummary.countPaid >
+                0,
+              hasTransaction:
+                summary.byCategory.length > 0 ||
+                summary.totalIncome !== 0 ||
+                summary.totalExpense !== 0,
             },
             summary,
           });
@@ -675,7 +709,7 @@ export default function DashboardPage() {
         return null;
       });
 
-      const [monthHealth, summary, alerts, billsSummary, freeMoney, budget, transactions, bills] =
+      const [monthHealth, summary, alerts, billsSummary, freeMoney, budget] =
         await Promise.all([
           monthHealthPromise,
           getMonthlySummary(accessToken, monthAndYear.month, monthAndYear.year),
@@ -683,8 +717,6 @@ export default function DashboardPage() {
           getBillsSummary(accessToken, monthAndYear.month, monthAndYear.year),
           getFreeMoney(accessToken, monthAndYear.month, monthAndYear.year),
           getMonthlyBudget(accessToken, monthAndYear.month, monthAndYear.year),
-          listTransactions(accessToken),
-          listBills(accessToken),
         ]);
 
       setData((current) =>
@@ -698,8 +730,15 @@ export default function DashboardPage() {
               monthHealth,
               onboarding: {
                 hasAccount: current.accounts.length > 0,
-                hasBill: bills.length > 0,
-                hasTransaction: transactions.length > 0,
+                hasBill:
+                  billsSummary.countPending +
+                    billsSummary.countOverdue +
+                    billsSummary.countPaid >
+                  0,
+                hasTransaction:
+                  summary.byCategory.length > 0 ||
+                  summary.totalIncome !== 0 ||
+                  summary.totalExpense !== 0,
               },
               summary,
             }
@@ -1273,6 +1312,64 @@ export default function DashboardPage() {
             )}
           </section>
 
+          {firstUseState && activationMessage ? (
+            <section className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
+              <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.18fr)_minmax(320px,0.82fr)]">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
+                      Primeiro uso
+                    </div>
+                    <span className="rounded-full border border-[color:rgba(15,118,110,0.16)] bg-[var(--color-accent-soft)] px-3 py-1 text-xs font-semibold text-[var(--color-accent)]">
+                      Ativação guiada
+                    </span>
+                  </div>
+
+                  <h2 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-[var(--color-foreground)]">
+                    {activationMessage.message}
+                  </h2>
+                  <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--color-muted)]">
+                    {activationMessage.cause}
+                  </p>
+                </div>
+
+                <div className="rounded-[24px] border border-[color:rgba(15,118,110,0.14)] bg-[var(--color-accent-soft)] px-5 py-5">
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-accent)]">
+                    O que fazer agora
+                  </div>
+                  <div className="mt-3 text-sm leading-6 text-[var(--color-foreground)]">
+                    {activationMessage.action}
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    {!data.onboarding.hasAccount ? (
+                      <Link
+                        className="rounded-full border border-[var(--color-line)] bg-white px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-[var(--color-panel)]"
+                        href="/dashboard#quick-account"
+                      >
+                        Criar primeira conta
+                      </Link>
+                    ) : (
+                      <>
+                        <Link
+                          className="rounded-full border border-[var(--color-line)] bg-white px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-[var(--color-panel)]"
+                          href="/dashboard#quick-account"
+                        >
+                          Registrar agora
+                        </Link>
+                        <Link
+                          className="rounded-full border border-[var(--color-line)] bg-white px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-[var(--color-panel)]"
+                          href="/imports"
+                        >
+                          Importar dados de arquivo
+                        </Link>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </section>
+          ) : null}
+
           {showFallbackAlertHighlights ? (
             <section
               className="rounded-[28px] border border-[color:rgba(217,119,6,0.18)] bg-[color:rgba(255,247,237,0.92)] p-6"
@@ -1335,7 +1432,7 @@ export default function DashboardPage() {
             </section>
           ) : null}
 
-          {data.monthHealth ? (
+          {shouldShowMonthHealthSection && monthHealth ? (
             <>
               {isCriticalHealth ? (
                 <section
@@ -1348,7 +1445,7 @@ export default function DashboardPage() {
                         Risco financeiro crítico
                       </div>
                       <div className="mt-3 text-2xl font-bold tracking-[-0.04em] text-red-800">
-                        {data.monthHealth.message ?? data.monthHealth.summary.message}
+                        {monthHealth.message ?? monthHealth.summary.message}
                       </div>
                     </div>
                     {notificationCount > 0 ? (
@@ -1366,7 +1463,7 @@ export default function DashboardPage() {
                         O que isso significa no mes
                       </div>
                       <p className="max-w-3xl text-sm leading-6 text-[var(--color-foreground)]">
-                        {data.monthHealth.summary.cause}
+                        {monthHealth.summary.cause}
                       </p>
 
                       {criticalReasons.length > 0 ? (
@@ -1393,7 +1490,7 @@ export default function DashboardPage() {
                         Comece por aqui
                       </div>
                       <div className="mt-3 text-base font-semibold leading-7 text-[var(--color-foreground)]">
-                        {data.monthHealth.summary.action}
+                        {monthHealth.summary.action}
                       </div>
                       {criticalPriorityReason ? (
                         <div className="mt-4 rounded-[18px] border border-[color:rgba(185,28,28,0.12)] bg-[color:rgba(254,242,242,0.9)] px-4 py-4">
@@ -1480,21 +1577,21 @@ export default function DashboardPage() {
                       {firstUseState ? "Primeiro uso" : "Visão do mês"}
                     </div>
                     <span
-                      className={`rounded-full border px-3 py-1 text-xs font-semibold ${monthHealthStatusStyles[data.monthHealth.status]}`}
+                      className={`rounded-full border px-3 py-1 text-xs font-semibold ${monthHealthStatusStyles[monthHealth.status]}`}
                     >
-                      {monthHealthStatusLabels[data.monthHealth.status]}
+                      {monthHealthStatusLabels[monthHealth.status]}
                     </span>
                   </div>
 
                   <h2 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-[var(--color-foreground)]">
                     {firstUseState && activationMessage
                       ? activationMessage.message
-                      : data.monthHealth.summary.message}
+                      : monthHealth.summary.message}
                   </h2>
                   <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--color-muted)]">
                     {firstUseState && activationMessage
                       ? activationMessage.cause
-                      : data.monthHealth.summary.cause}
+                      : monthHealth.summary.cause}
                   </p>
                 </div>
 
@@ -1505,7 +1602,7 @@ export default function DashboardPage() {
                   <div className="mt-3 text-sm leading-6 text-[var(--color-foreground)]">
                     {firstUseState && activationMessage
                       ? activationMessage.action
-                      : data.monthHealth.summary.action}
+                      : monthHealth.summary.action}
                   </div>
                   {!firstUseState && prioritizedRecommendedActions.length > 0 ? (
                     <div className="mt-4">
@@ -1560,9 +1657,9 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {data.monthHealth.insights.length > 0 && !firstUseState ? (
+              {monthHealth.insights.length > 0 && !firstUseState ? (
                 <div className="mt-6 grid gap-3 md:grid-cols-3">
-                  {data.monthHealth.insights.map((insight) => (
+                  {monthHealth.insights.map((insight) => (
                     <article
                       className="rounded-[24px] border border-[var(--color-line)] bg-white px-5 py-4"
                       key={insight.type}
@@ -1691,6 +1788,12 @@ export default function DashboardPage() {
                   </article>
                 ))}
               </div>
+
+              {projectionSupportMessage ? (
+                <div className="mt-6 rounded-[24px] border border-[color:rgba(15,118,110,0.14)] bg-[var(--color-accent-soft)] px-5 py-4 text-sm leading-6 text-[var(--color-foreground)]">
+                  {projectionSupportMessage}
+                </div>
+              ) : null}
 
               <div className="mt-6 grid gap-4 xl:grid-cols-2">
                 <article className="rounded-[24px] border border-[var(--color-line)] bg-white p-5">
@@ -1943,6 +2046,7 @@ export default function DashboardPage() {
             </article>
               </section>
 
+              {data.summary.byCategory.length > 0 ? (
               <section className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
             <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
               Leitura por categoria
@@ -1952,17 +2056,7 @@ export default function DashboardPage() {
             </h2>
 
             <div className="mt-6 grid gap-3 md:grid-cols-2">
-              {data.summary.byCategory.length === 0 ? (
-                <div className="rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
-                  Ainda não há movimentações registradas neste mês. Crie uma
-                  entrada ou saída em{" "}
-                  <Link className="font-semibold text-[var(--color-accent)]" href="/transactions">
-                    Movimentações
-                  </Link>{" "}
-                  para alimentar o dashboard.
-                </div>
-              ) : (
-                data.summary.byCategory.map((item, index) => (
+              {data.summary.byCategory.map((item, index) => (
                   <div
                     className="rounded-[24px] border border-[var(--color-line)] bg-white px-5 py-4"
                     key={`${item.categoryName}-${index}`}
@@ -1979,12 +2073,12 @@ export default function DashboardPage() {
                       <div className="text-sm font-semibold text-[var(--color-foreground)]">
                         {formatCurrency(item.total)}
                       </div>
+                      </div>
                     </div>
-                  </div>
-                ))
-              )}
+                ))}
             </div>
               </section>
+              ) : null}
             </>
           ) : null}
         </div>

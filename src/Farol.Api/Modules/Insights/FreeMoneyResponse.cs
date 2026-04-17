@@ -4,6 +4,7 @@ public sealed class FreeMoneyResponse
 {
     public required int Month { get; init; }
     public required int Year { get; init; }
+    public required bool IsProjection { get; init; }
     public required decimal TotalIncome { get; init; }
     public required decimal TotalExpense { get; init; }
     public required decimal Balance { get; init; }

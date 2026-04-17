@@ -89,6 +89,7 @@ export type BudgetTemplateResponse = {
 export type FreeMoneyResponse = {
   month: number;
   year: number;
+  isProjection: boolean;
   totalIncome: number;
   totalExpense: number;
   balance: number;
@@ -709,10 +710,17 @@ export async function deleteBill(
   });
 }
 
-export async function payBill(token: string, billId: string) {
+export async function payBill(
+  token: string,
+  billId: string,
+  payload: {
+    financialAccountId: string;
+  },
+) {
   return apiRequest<BillResponse>(`/api/bills/${billId}/pay`, {
     method: "PATCH",
     token,
+    body: payload,
   });
 }
 

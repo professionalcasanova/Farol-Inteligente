@@ -5,6 +5,7 @@
 
 # dotenv files
 .env
+.dotnet/.dotnet/
 .dotnet/.dotnet/TelemetryStorageService/
 .dotnet/.dotnet/toolResolverCache/
 NuGet.Config.local

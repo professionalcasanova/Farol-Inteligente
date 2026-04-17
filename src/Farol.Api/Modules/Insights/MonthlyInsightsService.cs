@@ -21,6 +21,8 @@ public sealed class MonthlyInsightsService(
     {
         var periodEnd = periodStart.AddMonths(1);
         var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+        var currentPeriodStart = new DateOnly(today.Year, today.Month, 1);
+        var isFuturePeriod = periodStart > currentPeriodStart;
 
         await billSeriesExpansionService.ExpandForMonthAsync(
             userId,
@@ -125,20 +127,22 @@ public sealed class MonthlyInsightsService(
                 .Where(series => seriesIds.Contains(series.Id))
                 .ToDictionaryAsync(series => series.Id, series => series.Kind, cancellationToken);
 
-        var pendingBills = bills
-            .Where(bill => !bill.IsPaid && bill.DueOn >= today)
-            .ToList();
+        var pendingBills = isFuturePeriod
+            ? bills.Where(bill => !bill.IsPaid).ToList()
+            : bills.Where(bill => !bill.IsPaid && bill.DueOn >= today).ToList();
 
-        var upcoming7DaysBills = bills
-            .Where(bill =>
-                !bill.IsPaid &&
-                bill.DueOn >= today &&
-                bill.DueOn <= today.AddDays(7))
-            .ToList();
+        var upcoming7DaysBills = isFuturePeriod
+            ? []
+            : bills
+                .Where(bill =>
+                    !bill.IsPaid &&
+                    bill.DueOn >= today &&
+                    bill.DueOn <= today.AddDays(7))
+                .ToList();
 
-        var overdueBills = bills
-            .Where(bill => !bill.IsPaid && bill.DueOn < today)
-            .ToList();
+        var overdueBills = isFuturePeriod
+            ? []
+            : bills.Where(bill => !bill.IsPaid && bill.DueOn < today).ToList();
         var predictableBills = bills
             .Where(bill => !bill.IsPaid && bill.BillSeriesId.HasValue)
             .ToList();
@@ -161,7 +165,9 @@ public sealed class MonthlyInsightsService(
         var totalBudgetRemaining = totalPlannedBudget - totalBudgetSpent;
         var plannedRemaining = Math.Max(totalBudgetRemaining, 0m);
         var unpaidBillsReserve = pendingBills.Sum(bill => bill.Amount) + overdueBills.Sum(bill => bill.Amount);
-        var freeToSpend = balance - plannedRemaining - unpaidBillsReserve;
+        var freeToSpend = isFuturePeriod
+            ? balance
+            : balance - plannedRemaining - unpaidBillsReserve;
 
         var categoryIdsForSummary = transactions
             .Where(transaction => transaction.CategoryId.HasValue)
@@ -189,6 +195,7 @@ public sealed class MonthlyInsightsService(
             .ToList();
 
         return new MonthlyInsightSnapshot(
+            isFuturePeriod,
             totalIncome,
             totalExpense,
             balance,
@@ -221,6 +228,7 @@ public sealed class MonthlyInsightsService(
         {
             Month = month,
             Year = year,
+            IsProjection = snapshot.IsFuturePeriod,
             TotalIncome = snapshot.TotalIncome,
             TotalExpense = snapshot.TotalExpense,
             Balance = snapshot.Balance,
@@ -242,6 +250,14 @@ public sealed class MonthlyInsightsService(
     public AlertsResponse BuildAlertsResponse(MonthlyInsightSnapshot snapshot)
     {
         var alerts = new List<AlertResponse>();
+
+        if (snapshot.IsFuturePeriod)
+        {
+            return new AlertsResponse
+            {
+                Alerts = alerts
+            };
+        }
 
         if (snapshot.TotalOverdueBills > 0)
         {
@@ -299,6 +315,7 @@ public sealed class MonthlyInsightsService(
 }
 
 public sealed record MonthlyInsightSnapshot(
+    bool IsFuturePeriod,
     decimal TotalIncome,
     decimal TotalExpense,
     decimal Balance,
