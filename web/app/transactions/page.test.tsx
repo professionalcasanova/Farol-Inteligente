@@ -575,6 +575,97 @@ describe("TransactionsPage", () => {
     expect(await screen.findByText("Mostrando 1-12 de 12")).toBeInTheDocument();
     expect(screen.getByText("Página 1 de 1")).toBeInTheDocument();
   });
+
+  it("Transactions_Create_IgnoresInactiveAccountsInNewSelections", async () => {
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+
+    mockTransactionsApi({
+      accounts: [
+        {
+          id: "account-1",
+          name: "Conta principal",
+          type: 2,
+          isActive: true,
+          createdAtUtc: "2026-03-01T00:00:00Z",
+        },
+        {
+          id: "account-2",
+          name: "Cartao antigo",
+          type: 3,
+          isActive: false,
+          createdAtUtc: "2026-03-02T00:00:00Z",
+        },
+      ],
+    });
+
+    render(<TransactionsPage />);
+
+    const accountSelect = await screen.findByLabelText(/conta financeira/i);
+
+    expect(accountSelect).toHaveValue("account-1");
+    expect(accountSelect).toBeDisabled();
+    expect(screen.getByRole("option", { name: "Conta principal" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("option", { name: /Cartao antigo/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("Transactions_Edit_KeepsInactiveCurrentAccountAvailable", async () => {
+    const user = userEvent.setup();
+
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+
+    mockTransactionsApi({
+      accounts: [
+        {
+          id: "account-1",
+          name: "Conta principal",
+          type: 2,
+          isActive: true,
+          createdAtUtc: "2026-03-01T00:00:00Z",
+        },
+        {
+          id: "account-2",
+          name: "Cartao antigo",
+          type: 3,
+          isActive: false,
+          createdAtUtc: "2026-03-02T00:00:00Z",
+        },
+      ],
+      transactions: [
+        {
+          id: "transaction-1",
+          financialAccountId: "account-2",
+          categoryId: "category-1",
+          type: 2,
+          amount: 85,
+          description: "Mercado",
+          occurredOn: "2026-03-21",
+          createdAtUtc: "2026-03-21T00:00:00Z",
+        },
+      ],
+    });
+
+    render(<TransactionsPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Editar" }));
+
+    expect(screen.getByLabelText(/conta financeira/i)).toHaveValue("account-2");
+    expect(
+      screen.getByRole("option", { name: "Cartao antigo (inativa)" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Esta transação segue vinculada a uma conta inativa/i),
+    ).toBeInTheDocument();
+  });
 });
 
 

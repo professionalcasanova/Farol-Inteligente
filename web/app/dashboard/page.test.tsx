@@ -532,6 +532,72 @@ describe("DashboardPage", () => {
     expect(screen.getByLabelText(/conta financeira/i)).not.toBeDisabled();
   });
 
+  it("Dashboard_WithExistingAccounts_ShowsDedicatedAccountsManagementLink", async () => {
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+
+    mockDashboardApi({
+      accounts: [
+        {
+          id: "account-1",
+          name: "Conta principal",
+          type: 2,
+          isActive: true,
+          createdAtUtc: "2026-03-01T00:00:00Z",
+        },
+      ],
+    });
+
+    render(<DashboardPage />);
+
+    expect(await screen.findByText("Suas contas financeiras")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Gerenciar contas" })).toHaveAttribute(
+      "href",
+      "/accounts",
+    );
+  });
+
+  it("Dashboard_QuickEntry_UsesOnlyActiveAccounts", async () => {
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+
+    mockDashboardApi({
+      accounts: [
+        {
+          id: "account-1",
+          name: "Conta principal",
+          type: 2,
+          isActive: true,
+          createdAtUtc: "2026-03-01T00:00:00Z",
+        },
+        {
+          id: "account-2",
+          name: "Cartao antigo",
+          type: 3,
+          isActive: false,
+          createdAtUtc: "2026-03-02T00:00:00Z",
+        },
+      ],
+    });
+
+    render(<DashboardPage />);
+
+    const accountSelect = await screen.findByLabelText(/conta financeira/i);
+
+    expect(accountSelect).toHaveValue("account-1");
+    expect(accountSelect).toBeDisabled();
+    expect(screen.getByRole("option", { name: "Conta principal" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("option", { name: /Cartao antigo/i }),
+    ).not.toBeInTheDocument();
+  });
+
   it("Dashboard_ManyAccounts_ConstrainsAccountListInsideScrollablePanel", async () => {
     mockedUseProtectedSession.mockReturnValue({
       session,

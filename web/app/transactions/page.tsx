@@ -77,6 +77,10 @@ function buildEditFormState(transaction: TransactionResponse): TransactionFormSt
   };
 }
 
+function getAccountOptionLabel(account: AccountResponse) {
+  return account.isActive ? account.name : `${account.name} (inativa)`;
+}
+
 export default function TransactionsPage() {
   const { session, isLoading, logout } = useProtectedSession();
   const [accounts, setAccounts] = useState<AccountResponse[]>([]);
@@ -103,12 +107,29 @@ export default function TransactionsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
 
+  const activeAccounts = useMemo(
+    () => accounts.filter((account) => account.isActive),
+    [accounts],
+  );
   const visibleCategories = useMemo(
     () => categories.filter((category) => category.type === form.type),
     [categories, form.type],
   );
   const editingTransaction =
     transactions.find((transaction) => transaction.id === editingTransactionId) ?? null;
+  const selectableAccounts = useMemo(() => {
+    if (!editingTransaction) {
+      return activeAccounts;
+    }
+
+    const currentAccount = accounts.find(
+      (account) => account.id === editingTransaction.financialAccountId,
+    );
+
+    return currentAccount
+      ? [currentAccount, ...activeAccounts.filter((account) => account.id !== currentAccount.id)]
+      : activeAccounts;
+  }, [accounts, activeAccounts, editingTransaction]);
   const isEditing = editingTransactionId !== null;
   const isDashboardCorrectionFlow =
     Boolean(requestedEditTransactionId) &&
@@ -120,6 +141,9 @@ export default function TransactionsPage() {
       ? 0
       : Math.min(historyTotalItems, historyStart + transactions.length - 1);
   const showPaginationControls = historyTotalItems > 0;
+  const selectedAccount =
+    selectableAccounts.find((account) => account.id === form.financialAccountId) ?? null;
+  const isSelectedAccountInactive = Boolean(selectedAccount && !selectedAccount.isActive);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -245,11 +269,12 @@ export default function TransactionsPage() {
 
   useEffect(() => {
     setForm((current) => {
-      const hasSelectedAccount = accounts.some(
+      const availableAccounts = editingTransactionId ? selectableAccounts : activeAccounts;
+      const hasSelectedAccount = availableAccounts.some(
         (account) => account.id === current.financialAccountId,
       );
 
-      if (accounts.length === 0) {
+      if (availableAccounts.length === 0) {
         return current.financialAccountId
           ? { ...current, financialAccountId: "" }
           : current;
@@ -259,10 +284,10 @@ export default function TransactionsPage() {
         return current;
       }
 
-      if (accounts.length === 1) {
+      if (!editingTransactionId && activeAccounts.length === 1) {
         return {
           ...current,
-          financialAccountId: accounts[0].id,
+          financialAccountId: activeAccounts[0].id,
         };
       }
 
@@ -270,7 +295,7 @@ export default function TransactionsPage() {
         ? { ...current, financialAccountId: "" }
         : current;
     });
-  }, [accounts]);
+  }, [activeAccounts, editingTransactionId, selectableAccounts]);
 
   useEffect(() => {
     if (
@@ -305,7 +330,7 @@ export default function TransactionsPage() {
     startEditing(transactionToEdit);
   }, [editingTransactionId, handledRequestedEditId, requestedEditTransactionId, transactions]);
 
-  function resetForm(financialAccountId = accounts.length === 1 ? accounts[0].id : "") {
+  function resetForm(financialAccountId = activeAccounts.length === 1 ? activeAccounts[0].id : "") {
     setEditingTransactionId(null);
     setForm(buildCreateFormState(financialAccountId));
   }
@@ -377,6 +402,11 @@ export default function TransactionsPage() {
     event.preventDefault();
 
     if (!session) {
+      return;
+    }
+
+    if (!isEditing && activeAccounts.length === 0) {
+      setFormError("Reative ao menos uma conta em Contas para registrar novas transações.");
       return;
     }
 
@@ -506,6 +536,14 @@ export default function TransactionsPage() {
                 </Link>{" "}
                 e volte aqui.
               </div>
+            ) : activeAccounts.length === 0 && !isEditing ? (
+              <div className="mt-6 rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
+                Todas as suas contas estao inativas. Reative ao menos uma em{" "}
+                <Link className="font-semibold text-[var(--color-accent)]" href="/accounts">
+                  Contas
+                </Link>{" "}
+                para registrar novas transações.
+              </div>
             ) : (
               <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
                 {isEditing ? (
@@ -532,6 +570,7 @@ export default function TransactionsPage() {
                   <span>Conta financeira</span>
                   <select
                     className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3 text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)]"
+                    disabled={!isEditing && activeAccounts.length === 1}
                     onChange={(event) =>
                       setForm((current) => ({
                         ...current,
@@ -540,16 +579,27 @@ export default function TransactionsPage() {
                     }
                     value={form.financialAccountId}
                   >
-                    {accounts.length > 1 ? (
+                    {!isEditing && activeAccounts.length > 1 ? (
                       <option value="">Escolha a conta para continuar</option>
                     ) : null}
-                    {accounts.map((account) => (
+                    {selectableAccounts.map((account) => (
                       <option key={account.id} value={account.id}>
-                        {account.name}
+                        {getAccountOptionLabel(account)}
                       </option>
                     ))}
                   </select>
                 </label>
+
+                {isSelectedAccountInactive ? (
+                  <div className="rounded-[20px] border border-[color:rgba(217,119,6,0.18)] bg-[color:rgba(255,247,237,0.95)] px-4 py-3 text-xs leading-5 text-[var(--color-warm)]">
+                    Esta transação segue vinculada a uma conta inativa. Voce pode corrigir a
+                    conta aqui ou reativar a conta em{" "}
+                    <Link className="font-semibold" href="/accounts">
+                      Contas
+                    </Link>
+                    .
+                  </div>
+                ) : null}
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">

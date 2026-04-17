@@ -71,6 +71,26 @@ describe("AppShell", () => {
     ).toHaveAttribute("aria-current", "page");
   });
 
+  it("AppShell_AccountsNavigation_ShowsDedicatedAccountsEntry", () => {
+    mockedUsePathname.mockReturnValue("/accounts");
+
+    render(
+      <AppShell
+        description="DescriÃ§Ã£o"
+        onLogout={vi.fn()}
+        session={session}
+        title="Contas financeiras"
+      >
+        <div>ConteÃºdo</div>
+      </AppShell>,
+    );
+
+    expect(screen.getByRole("link", { name: "Contas" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  });
+
   it("AppShell_MobileLayout_KeepsSessionBlockAndLogoutInsideUsefulWidth", () => {
     mockedUsePathname.mockReturnValue("/dashboard");
 
