@@ -150,6 +150,22 @@ function getBillCadenceLabel(bill: BillResponse) {
   return "Lancamento unico";
 }
 
+function getEditActionLabel(bill: BillResponse) {
+  return bill.billSeriesId ? "Editar ocorrencia" : "Editar";
+}
+
+function getPaymentActionLabel(bill: BillResponse, isBusy: boolean) {
+  if (isBusy) {
+    return "Atualizando...";
+  }
+
+  if (!bill.billSeriesId) {
+    return bill.isPaid ? "Desmarcar pagamento" : "Marcar como paga";
+  }
+
+  return bill.isPaid ? "Desmarcar ocorrencia paga" : "Marcar ocorrencia paga";
+}
+
 function buildEditFormState(bill: BillResponse): BillFormState {
   return {
     description: bill.description,
@@ -403,7 +419,9 @@ export default function BillsPage() {
       await refreshBills();
       setSuccess(
         editingBillId
-          ? "Conta a pagar atualizada com sucesso."
+          ? editingBill?.billSeriesId
+            ? "Ocorrencia atualizada com sucesso. As proximas continuam seguindo a serie."
+            : "Conta a pagar atualizada com sucesso."
           : "Conta a pagar criada com sucesso.",
       );
       resetForm(form.kind);
@@ -439,7 +457,11 @@ export default function BillsPage() {
       if (bill.isPaid) {
         setActionBillId(bill.id);
         await unpayBill(session.accessToken, bill.id);
-        setSuccess("Pagamento removido com sucesso.");
+        setSuccess(
+          bill.billSeriesId
+            ? "Pagamento desta ocorrencia removido com sucesso."
+            : "Pagamento removido com sucesso.",
+        );
       } else {
         beginPayBill(bill);
         return;
@@ -618,14 +640,18 @@ export default function BillsPage() {
               {isEditing ? "Editando conta" : "Nova conta"}
             </div>
             <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
-              {isEditing ? "Corrigir vencimento" : "Registrar vencimento"}
+              {isEditing
+                ? editingBill?.billSeriesId
+                  ? "Corrigir ocorrencia da serie"
+                  : "Corrigir vencimento"
+                : "Registrar vencimento"}
             </h2>
 
             <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
               {isEditing ? (
                 <div className="rounded-[24px] border border-[color:rgba(15,118,110,0.14)] bg-[var(--color-accent-soft)] px-4 py-4 text-sm text-[var(--color-foreground)]">
                   <div className="font-medium">
-                    Você está editando{" "}
+                    Voce esta editando{" "}
                     <span className="font-semibold">
                       {editingBill?.description ?? "esta conta"}
                     </span>
@@ -633,8 +659,25 @@ export default function BillsPage() {
                   </div>
                   <div className="mt-1 text-[var(--color-muted)]">
                     {editingBill?.billSeriesId
-                      ? "A edição corrige só esta ocorrência já criada. Para parar as próximas, use Encerrar série na agenda."
-                      : "Ajuste descrição, valor ou vencimento e salve quando terminar."}
+                      ? "Salvar aqui corrige apenas esta ocorrencia ja criada. As proximas parcelas ou recorrencias continuam como estao."
+                      : "Ajuste descricao, valor ou vencimento e salve quando terminar."}
+                  </div>
+                </div>
+              ) : null}
+
+              {editingBill?.billSeriesId ? (
+                <div className="rounded-[24px] border border-[var(--color-line)] bg-white px-4 py-4 text-sm leading-6 text-[var(--color-muted)]">
+                  <div className="font-medium text-[var(--color-foreground)]">
+                    Contrato de edicao da serie
+                  </div>
+                  <div className="mt-2">
+                    Editar corrige descricao, valor e vencimento desta ocorrencia.
+                  </div>
+                  <div>
+                    Marcar como paga ou desmarcar pagamento altera so o status desta ocorrencia.
+                  </div>
+                  <div>
+                    Para impedir cobrancas futuras, use <span className="font-semibold text-[var(--color-foreground)]">Encerrar serie</span> na agenda.
                   </div>
                 </div>
               ) : null}
@@ -815,7 +858,7 @@ export default function BillsPage() {
                   onClick={cancelEditing}
                   type="button"
                 >
-                  Cancelar edição
+                  Cancelar edicao
                 </button>
               ) : null}
             </form>
@@ -830,6 +873,9 @@ export default function BillsPage() {
                 <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
                   Contas encontradas
                 </h2>
+                <p className="mt-3 text-sm leading-6 text-[var(--color-muted)]">
+                  Em series recorrentes ou parceladas, editar e pagar atuam na ocorrencia atual. Encerrar serie impede as proximas nao pagas.
+                </p>
               </div>
               <div className="text-sm text-[var(--color-muted)]">
                 {bills.length} itens
@@ -936,7 +982,9 @@ export default function BillsPage() {
                               onClick={() => startEditing(bill)}
                               type="button"
                             >
-                              {editingBillId === bill.id ? "Editando" : "Editar"}
+                              {editingBillId === bill.id
+                                ? "Editando"
+                                : getEditActionLabel(bill)}
                             </button>
                             <button
                               className="rounded-2xl border border-[var(--color-line)] px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-[var(--color-accent-soft)] disabled:cursor-not-allowed disabled:opacity-70"
@@ -944,11 +992,7 @@ export default function BillsPage() {
                               onClick={() => handleTogglePayment(bill)}
                               type="button"
                             >
-                              {actionBillId === bill.id
-                                ? "Atualizando..."
-                                : bill.isPaid
-                                  ? "Desmarcar pagamento"
-                                  : "Marcar como paga"}
+                              {getPaymentActionLabel(bill, actionBillId === bill.id)}
                             </button>
                             <button
                               className="rounded-2xl border border-[color:rgba(185,28,28,0.14)] px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-[color:rgba(254,226,226,0.7)] disabled:cursor-not-allowed disabled:opacity-70"
@@ -959,7 +1003,7 @@ export default function BillsPage() {
                               {actionBillId === bill.id
                                 ? "Atualizando..."
                                 : bill.billSeriesId
-                                  ? "Encerrar série"
+                                  ? "Encerrar serie"
                                   : "Excluir"}
                             </button>
                           </div>
