@@ -17,10 +17,6 @@ public sealed class DashboardController(
     TimeProvider timeProvider,
     BillSeriesExpansionService billSeriesExpansionService) : ControllerBase
 {
-    private const string PendingStatus = "pending";
-    private const string PaidStatus = "paid";
-    private const string OverdueStatus = "overdue";
-
     [HttpGet("monthly-summary")]
     public async Task<ActionResult<MonthlySummaryResponse>> GetMonthlySummary(
         [FromQuery] MonthlySummaryRequest request,
@@ -31,25 +27,21 @@ public sealed class DashboardController(
             return Unauthorized(new { message = "Invalid access token." });
         }
 
-        DateOnly periodStart;
-
-        try
-        {
-            periodStart = new DateOnly(request.Year, request.Month, 1);
-        }
-        catch (ArgumentOutOfRangeException)
+        if (!MonthlyPeriodContext.TryCreate(
+                request.Month,
+                request.Year,
+                timeProvider,
+                out var period))
         {
             return BadRequest(new { message = "Month and year are invalid." });
         }
-
-        var periodEnd = periodStart.AddMonths(1);
 
         var transactions = await dbContext.Transactions
             .AsNoTracking()
             .Where(transaction =>
                 transaction.UserId == userId &&
-                transaction.OccurredOn >= periodStart &&
-                transaction.OccurredOn < periodEnd)
+                transaction.OccurredOn >= period!.Start &&
+                transaction.OccurredOn < period.End)
             .Select(transaction => new
             {
                 transaction.Type,
@@ -110,42 +102,37 @@ public sealed class DashboardController(
             return Unauthorized(new { message = "Invalid access token." });
         }
 
-        DateOnly periodStart;
-
-        try
-        {
-            periodStart = new DateOnly(request.Year, request.Month, 1);
-        }
-        catch (ArgumentOutOfRangeException)
+        if (!MonthlyPeriodContext.TryCreate(
+                request.Month,
+                request.Year,
+                timeProvider,
+                out var period))
         {
             return BadRequest(new { message = "Month and year are invalid." });
         }
 
-        var periodEnd = periodStart.AddMonths(1);
-        var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
-
         await billSeriesExpansionService.ExpandForMonthAsync(
             userId,
-            periodStart,
+            period!.Start,
             cancellationToken);
 
         var bills = await dbContext.Bills
             .AsNoTracking()
             .Where(bill =>
                 bill.UserId == userId &&
-                bill.DueOn >= periodStart &&
-                bill.DueOn < periodEnd)
+                bill.DueOn >= period.Start &&
+                bill.DueOn < period.End)
             .OrderBy(bill => bill.DueOn)
             .ThenBy(bill => bill.CreatedAtUtc)
             .ToListAsync(cancellationToken);
         var seriesKindsById = await ResolveSeriesKindsAsync(bills, cancellationToken);
 
         var pendingBills = bills
-            .Where(bill => !bill.IsPaid && bill.DueOn >= today)
+            .Where(bill => period.IsPendingBill(bill.IsPaid, bill.DueOn))
             .ToList();
 
         var overdueBills = bills
-            .Where(bill => !bill.IsPaid && bill.DueOn < today)
+            .Where(bill => period.IsOverdueBill(bill.IsPaid, bill.DueOn))
             .ToList();
 
         var paidBills = bills
@@ -177,7 +164,7 @@ public sealed class DashboardController(
                 Description = bill.Description,
                 Amount = bill.Amount,
                 DueOn = bill.DueOn,
-                Status = ResolveBillStatus(bill, today),
+                Status = period.ResolveBillStatus(bill.IsPaid, bill.DueOn),
                 SeriesKind = bill.BillSeriesId.HasValue &&
                     seriesKindsById.TryGetValue(bill.BillSeriesId.Value, out var kind)
                     ? kind
@@ -224,15 +211,5 @@ public sealed class DashboardController(
             .AsNoTracking()
             .Where(series => seriesIds.Contains(series.Id))
             .ToDictionaryAsync(series => series.Id, series => series.Kind, cancellationToken);
-    }
-
-    private static string ResolveBillStatus(Bill bill, DateOnly today)
-    {
-        if (bill.IsPaid)
-        {
-            return PaidStatus;
-        }
-
-        return bill.DueOn < today ? OverdueStatus : PendingStatus;
     }
 }

@@ -1,3 +1,4 @@
+using Farol.Api.Common;
 using Farol.Api.Modules.Bills;
 using Farol.Domain.Bills;
 using Farol.Domain.Ledger;
@@ -19,10 +20,12 @@ public sealed class MonthlyInsightsService(
         DateOnly periodStart,
         CancellationToken cancellationToken)
     {
-        var periodEnd = periodStart.AddMonths(1);
-        var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
-        var currentPeriodStart = new DateOnly(today.Year, today.Month, 1);
-        var isFuturePeriod = periodStart > currentPeriodStart;
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var period = new MonthlyPeriodContext(
+            periodStart,
+            periodStart.AddMonths(1),
+            DateOnly.FromDateTime(now),
+            new DateOnly(now.Year, now.Month, 1));
 
         await billSeriesExpansionService.ExpandForMonthAsync(
             userId,
@@ -34,7 +37,7 @@ public sealed class MonthlyInsightsService(
             .Where(transaction =>
                 transaction.UserId == userId &&
                 transaction.OccurredOn >= periodStart &&
-                transaction.OccurredOn < periodEnd)
+                transaction.OccurredOn < period.End)
             .Select(transaction => new
             {
                 transaction.Type,
@@ -106,7 +109,7 @@ public sealed class MonthlyInsightsService(
             .Where(bill =>
                 bill.UserId == userId &&
                 bill.DueOn >= periodStart &&
-                bill.DueOn < periodEnd)
+                bill.DueOn < period.End)
             .Select(bill => new
             {
                 bill.Amount,
@@ -127,22 +130,21 @@ public sealed class MonthlyInsightsService(
                 .Where(series => seriesIds.Contains(series.Id))
                 .ToDictionaryAsync(series => series.Id, series => series.Kind, cancellationToken);
 
-        var pendingBills = isFuturePeriod
-            ? bills.Where(bill => !bill.IsPaid).ToList()
-            : bills.Where(bill => !bill.IsPaid && bill.DueOn >= today).ToList();
+        var pendingBills = bills
+            .Where(bill => period.IsPendingBill(bill.IsPaid, bill.DueOn))
+            .ToList();
 
-        var upcoming7DaysBills = isFuturePeriod
+        var upcoming7DaysBills = period.IsFuturePeriod
             ? []
             : bills
                 .Where(bill =>
-                    !bill.IsPaid &&
-                    bill.DueOn >= today &&
-                    bill.DueOn <= today.AddDays(7))
+                    period.IsPendingBill(bill.IsPaid, bill.DueOn) &&
+                    bill.DueOn <= period.Today.AddDays(7))
                 .ToList();
 
-        var overdueBills = isFuturePeriod
-            ? []
-            : bills.Where(bill => !bill.IsPaid && bill.DueOn < today).ToList();
+        var overdueBills = bills
+            .Where(bill => period.IsOverdueBill(bill.IsPaid, bill.DueOn))
+            .ToList();
         var predictableBills = bills
             .Where(bill => !bill.IsPaid && bill.BillSeriesId.HasValue)
             .ToList();
@@ -160,12 +162,12 @@ public sealed class MonthlyInsightsService(
             .ToList();
         var maxOverdueDays = overdueBills.Count == 0
             ? 0
-            : overdueBills.Max(bill => today.DayNumber - bill.DueOn.DayNumber);
+            : overdueBills.Max(bill => period.Today.DayNumber - bill.DueOn.DayNumber);
 
         var totalBudgetRemaining = totalPlannedBudget - totalBudgetSpent;
         var plannedRemaining = Math.Max(totalBudgetRemaining, 0m);
         var unpaidBillsReserve = pendingBills.Sum(bill => bill.Amount) + overdueBills.Sum(bill => bill.Amount);
-        var freeToSpend = isFuturePeriod
+        var freeToSpend = period.IsFuturePeriod
             ? balance
             : balance - plannedRemaining - unpaidBillsReserve;
 
@@ -195,7 +197,7 @@ public sealed class MonthlyInsightsService(
             .ToList();
 
         return new MonthlyInsightSnapshot(
-            isFuturePeriod,
+            period.IsFuturePeriod,
             totalIncome,
             totalExpense,
             balance,
