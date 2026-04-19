@@ -67,8 +67,14 @@ web/
 tests/
   Farol.Tests/
 docs/
+  product-decisions/
   sprints/
 ```
+
+## Decisoes de produto recentes
+
+- [Modelagem de meio de pagamento ou origem sem poluir categorias](docs/product-decisions/issue-37-payment-trail-modeling.md)
+- [Primeira fase do assistente financeiro em linguagem natural](docs/product-decisions/issue-38-natural-language-assistant-phase-1.md)
 
 ## Rodando localmente
 

@@ -5,6 +5,7 @@ export type CategoryType = 1 | 2;
 export type FinancialAccountType = 1 | 2 | 3 | 4;
 export type BillStatus = "pending" | "paid" | "overdue";
 export type BillSeriesKind = "recurring" | "installment";
+export type BillUpdateScope = "single" | "forward" | "series";
 
 export type AuthResponse = StoredSession;
 
@@ -32,6 +33,14 @@ export type TransactionResponse = {
   description: string;
   occurredOn: string;
   createdAtUtc: string;
+};
+
+export type TransactionHistoryResponse = {
+  items: TransactionResponse[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
 };
 
 export type MonthlySummaryCategoryResponse = {
@@ -81,6 +90,7 @@ export type BudgetTemplateResponse = {
 export type FreeMoneyResponse = {
   month: number;
   year: number;
+  isProjection: boolean;
   totalIncome: number;
   totalExpense: number;
   balance: number;
@@ -237,6 +247,10 @@ const defaultMessageMap: Record<string, string> = {
     "E-mail ou senha invalidos. Confira os dados e tente novamente.",
   "Email and password are required.": "Informe e-mail e senha para entrar.",
   "Financial account was not found.": "A conta selecionada nao foi encontrada.",
+  "Financial account name is required.": "Informe o nome da conta para continuar.",
+  "Financial account name cannot exceed 120 characters.":
+    "O nome da conta ficou longo demais. Tente um nome menor.",
+  "Financial account type is invalid.": "Selecione um tipo de conta valido.",
   "Category was not found.": "A categoria selecionada nao foi encontrada.",
   "Transaction was not found.": "A transacao nao foi encontrada.",
   "One or more categories were not found.":
@@ -403,12 +417,53 @@ export async function createAccount(
   });
 }
 
+export async function updateAccount(
+  token: string,
+  accountId: string,
+  payload: {
+    name: string;
+    type: FinancialAccountType;
+    isActive: boolean;
+  },
+) {
+  return apiRequest<AccountResponse>(`/api/accounts/${accountId}`, {
+    method: "PUT",
+    token,
+    body: payload,
+  });
+}
+
 export async function listCategories(token: string) {
   return apiRequest<CategoryResponse[]>("/api/categories", { token });
 }
 
 export async function listTransactions(token: string) {
   return apiRequest<TransactionResponse[]>("/api/transactions", { token });
+}
+
+export async function listTransactionHistory(
+  token: string,
+  filters?: {
+    page?: number;
+    pageSize?: number;
+  },
+) {
+  const query = new URLSearchParams();
+
+  if (filters?.page) {
+    query.set("page", String(filters.page));
+  }
+
+  if (filters?.pageSize) {
+    query.set("pageSize", String(filters.pageSize));
+  }
+
+  const queryString = query.toString();
+
+  return apiRequest<TransactionHistoryResponse>(
+    `/api/transactions/history${queryString ? `?${queryString}` : ""}`,
+    { token },
+  );
 }
 
 export async function createTransaction(
@@ -654,6 +709,7 @@ export async function updateBill(
     description: string;
     amount: number;
     dueOn: string;
+    scope?: BillUpdateScope;
   },
 ) {
   return apiRequest<BillResponse>(`/api/bills/${billId}`, {
@@ -676,10 +732,17 @@ export async function deleteBill(
   });
 }
 
-export async function payBill(token: string, billId: string) {
+export async function payBill(
+  token: string,
+  billId: string,
+  payload: {
+    financialAccountId: string;
+  },
+) {
   return apiRequest<BillResponse>(`/api/bills/${billId}/pay`, {
     method: "PATCH",
     token,
+    body: payload,
   });
 }
 

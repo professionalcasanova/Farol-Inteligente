@@ -2,34 +2,28 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { loadDashboardData, refreshDashboardData } from "./_lib/dashboard-data";
+import type { DashboardData, QuickEntryFormState } from "./_lib/dashboard-types";
+import {
+  buildNotificationItems,
+  getActivationMessage,
+  getComparisonBarWidth,
+  getCriticalPriorityReason,
+  getCriticalSupportMessage,
+  getFinancialSupportText,
+  getPredictableBillLabel,
+  getProjectionSupportMessage,
+  isActionNavigableFromDashboard,
+  isFirstUseState,
+} from "./_lib/dashboard-view-model";
 import { AppShell } from "@/components/app-shell";
 import { LoadErrorState } from "@/components/load-error-state";
 import { LoadingScreen } from "@/components/loading-screen";
 import { MonthPicker } from "@/components/month-picker";
 import {
-  accountTypeOptions,
-  createAccount,
   createTransaction,
-  getAlerts,
-  getBillsSummary,
   getFriendlyApiMessage,
-  getFreeMoney,
-  getMonthHealth,
-  getMonthlyBudget,
-  getMonthlySummary,
   isUnauthorizedApiError,
-  listBills,
-  listAccounts,
-  listCategories,
-  listTransactions,
-  type AccountResponse,
-  type AlertsResponse,
-  type BillsSummaryResponse,
-  type CategoryResponse,
-  type FreeMoneyResponse,
-  type MonthHealthResponse,
-  type MonthlyBudgetResponse,
-  type MonthlySummaryResponse,
   type TransactionType,
 } from "@/lib/api";
 import {
@@ -40,48 +34,6 @@ import {
   parseMonthInputValue,
 } from "@/lib/format";
 import { useProtectedSession } from "@/lib/use-protected-session";
-
-type AccountFormState = {
-  name: string;
-  type: 1 | 2 | 3 | 4;
-};
-
-type DashboardData = {
-  accounts: AccountResponse[];
-  alerts: AlertsResponse;
-  billsSummary: BillsSummaryResponse;
-  budget: MonthlyBudgetResponse;
-  categories: CategoryResponse[];
-  freeMoney: FreeMoneyResponse;
-  monthHealth: MonthHealthResponse | null;
-  onboarding: {
-    hasAccount: boolean;
-    hasBill: boolean;
-    hasTransaction: boolean;
-  };
-  summary: MonthlySummaryResponse;
-};
-
-type QuickEntryFormState = {
-  financialAccountId: string;
-  amount: string;
-  type: TransactionType;
-  description: string;
-  categoryId: string;
-};
-
-type NotificationItem = {
-  id: string;
-  href: string;
-  title: string;
-  message: string;
-  severity: "high" | "medium";
-};
-
-const defaultAccountForm: AccountFormState = {
-  name: "",
-  type: 2,
-};
 
 const defaultQuickEntryForm: QuickEntryFormState = {
   financialAccountId: "",
@@ -98,10 +50,6 @@ const quickEntryTypeOptions: Array<{
   { value: 1, label: "Entrou dinheiro" },
   { value: 2, label: "Saiu dinheiro" },
 ];
-
-const accountTypeLabels = Object.fromEntries(
-  accountTypeOptions.map((option) => [option.value, option.label]),
-) as Record<AccountResponse["type"], string>;
 
 const quickEntryMessageMap = {
   "Financial account was not found.": "A conta usada para registrar agora não foi encontrada.",
@@ -138,177 +86,22 @@ const monthHealthStatusStyles = {
     "border-[color:rgba(185,28,28,0.16)] bg-[color:rgba(254,226,226,0.82)] text-red-700",
 } as const;
 
-function getFinancialSupportText(data: DashboardData) {
-  if (
-    data.summary.totalIncome === 0 &&
-    data.summary.totalExpense === 0 &&
-    data.billsSummary.countPending === 0 &&
-    data.budget.totalPlanned === 0
-  ) {
-    return "Este painel mostra a base do mês. Conforme você registrar movimentações, vencimentos e planejamento, a leitura fica mais precisa.";
-  }
-
-  return "Entradas, saídas, saldo e dinheiro livre ajudam a confirmar o contexto do mês antes de agir. Aqui, o dinheiro livre já considera o que ficou reservado no planejamento e as contas em aberto do mês.";
-}
-
-function isFirstUseState(data: DashboardData) {
-  return (
-    data.summary.totalIncome === 0 &&
-    data.summary.totalExpense === 0 &&
-    data.billsSummary.countPending === 0 &&
-    data.billsSummary.countOverdue === 0 &&
-    data.budget.totalPlanned === 0 &&
-    data.accounts.length <= 1 &&
-    !data.onboarding.hasTransaction &&
-    !data.onboarding.hasBill
-  );
-}
-
-function getActivationMessage(data: DashboardData) {
-  if (!data.onboarding.hasAccount) {
-    return {
-      message: "Comece criando sua primeira conta no Farol.",
-      cause:
-        "Sem uma conta financeira, ainda não dá para registrar movimentações, importar um arquivo ou acompanhar seu mês.",
-      action:
-        "Crie uma conta abaixo e depois registre uma entrada ou importe seus primeiros dados para liberar a leitura do mês.",
-    };
-  }
-
-  return {
-    message: "Seu mês ainda não tem dados suficientes.",
-    cause:
-      "Você já tem conta, mas ainda faltam movimentações ou vencimentos para o Farol montar seu primeiro estado do mês.",
-    action:
-      "Registre uma entrada agora ou importe um arquivo para chegar ao primeiro insight do mês.",
-  };
-}
-
-function getCriticalPriorityReason(monthHealth: MonthHealthResponse | null | undefined) {
-  if (!monthHealth) {
-    return "";
-  }
-
-  const insightTypes = new Set(monthHealth.insights.map((insight) => insight.type));
-
-  if (
-    insightTypes.has("negative_balance_high_variable_expense") ||
-    insightTypes.has("negative_free_money")
-  ) {
-    return "Revisar as maiores saidas primeiro mostra o que pode ser cortado ou adiado antes de faltar para o essencial.";
-  }
-
-  if (insightTypes.has("overdue_bills_long") || insightTypes.has("overdue_bills")) {
-    return "Comecar pelas contas vencidas reduz juros, evita mais pressao no caixa e protege o restante do mes.";
-  }
-
-  if (insightTypes.has("short_term_bills_pressure")) {
-    return "Organizar os proximos vencimentos agora evita que a pressao de poucos dias vire atraso em cadeia.";
-  }
-
-  return "O primeiro passo precisa proteger sua rotina e abrir espaco para o restante do mes.";
-}
-
-function getCriticalSupportMessage(monthHealth: MonthHealthResponse | null | undefined) {
-  if (!monthHealth || monthHealth.status !== "critical") {
-    return "";
-  }
-
-  return "Voce nao precisa resolver tudo hoje. Comece pelo que protege sua rotina e seu caixa neste mes.";
-}
-
-function getComparisonBarWidth(value: number, max: number) {
-  if (value <= 0 || max <= 0) {
-    return "0%";
-  }
-
-  return `${Math.max(10, Math.min(100, (value / max) * 100))}%`;
-}
-
-function isActionNavigableFromDashboard(target?: string | null) {
-  return Boolean(target && target.trim() && target !== "/dashboard");
-}
-
-function getPredictableBillLabel(bill: BillsSummaryResponse["upcoming"][number]) {
-  if (bill.seriesKind === "installment" && bill.occurrenceNumber && bill.totalOccurrences) {
-    return `Parcela ${bill.occurrenceNumber}/${bill.totalOccurrences}`;
-  }
-
-  if (bill.seriesKind === "recurring") {
-    return "Recorrente";
-  }
-
-  return "";
-}
-
-function buildNotificationItems(
-  monthHealth: MonthHealthResponse | null | undefined,
-  alerts: AlertsResponse["alerts"],
-  fallbackHref: string,
-) {
-  const items: NotificationItem[] = [];
-  const seen = new Set<string>();
-
-  const addItem = (item: NotificationItem) => {
-    const normalizedHref = isActionNavigableFromDashboard(item.href) ? item.href : fallbackHref;
-    const dedupeKey = `${normalizedHref}::${item.message}`;
-
-    if (seen.has(dedupeKey)) {
-      return;
-    }
-
-    seen.add(dedupeKey);
-    items.push({
-      ...item,
-      href: normalizedHref,
-    });
-  };
-
-  if (monthHealth && monthHealth.status !== "healthy") {
-    const summaryMessage = monthHealth.message ?? monthHealth.summary.message;
-    const summaryHref =
-      monthHealth.recommendedActions?.find((action) =>
-        isActionNavigableFromDashboard(action.target),
-      )?.target ?? fallbackHref;
-
-    addItem({
-      id: "month-health-summary",
-      href: summaryHref,
-      title: monthHealth.status === "critical" ? "Foco principal" : "Leitura do mes",
-      message: summaryMessage,
-      severity: monthHealth.status === "critical" ? "high" : "medium",
-    });
-  }
-
-  alerts.forEach((alert, index) => {
-    addItem({
-      id: `${alert.type}-${index}`,
-      href: alert.actionUrl ?? fallbackHref,
-      title: "Alerta do mes",
-      message: alert.message,
-      severity: alert.severity,
-    });
-  });
-
-  return items.slice(0, 5);
-}
+const dashboardStandardGridClass =
+  "grid items-start gap-6 xl:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)]";
+const dashboardSectionStackClass = "space-y-6";
 
 export default function DashboardPage() {
   const { session, isLoading, logout } = useProtectedSession();
   const [monthValue, setMonthValue] = useState(getCurrentMonthInputValue());
   const [data, setData] = useState<DashboardData | null>(null);
   const [loadError, setLoadError] = useState("");
-  const [accountError, setAccountError] = useState("");
-  const [accountSuccess, setAccountSuccess] = useState("");
   const [quickEntryError, setQuickEntryError] = useState("");
   const [quickEntrySuccess, setQuickEntrySuccess] = useState("");
   const [quickEntryCreatedTransactionId, setQuickEntryCreatedTransactionId] = useState<
     string | null
   >(null);
   const [isFetching, setIsFetching] = useState(true);
-  const [isCreatingAccount, setIsCreatingAccount] = useState(false);
   const [isRegisteringNow, setIsRegisteringNow] = useState(false);
-  const [accountForm, setAccountForm] = useState<AccountFormState>(defaultAccountForm);
   const [quickEntryForm, setQuickEntryForm] =
     useState<QuickEntryFormState>(defaultQuickEntryForm);
   const [showQuickEntryDetails, setShowQuickEntryDetails] = useState(false);
@@ -319,7 +112,16 @@ export default function DashboardPage() {
     () => parseMonthInputValue(monthValue),
     [monthValue],
   );
+  const activeAccounts = useMemo(
+    () => data?.accounts.filter((account) => account.isActive) ?? [],
+    [data?.accounts],
+  );
   const firstUseState = data ? isFirstUseState(data) : false;
+  const monthHealth = data?.monthHealth;
+  const monthHealthStatus = monthHealth?.status;
+  const shouldShowMonthHealthSection = data
+    ? Boolean(data.monthHealth) && (!firstUseState || monthHealthStatus !== "healthy")
+    : false;
   const showSecondarySections = data ? !firstUseState || !data.monthHealth : false;
   const activationMessage = data ? getActivationMessage(data) : null;
   const prioritizedRecommendedActions = data?.monthHealth?.recommendedActions?.slice(0, 3) ?? [];
@@ -356,6 +158,33 @@ export default function DashboardPage() {
         ? "Esse valor já desconta o que segue reservado no planejamento."
         : ""
     : "";
+  const monthReserveTotal = data
+    ? data.freeMoney.plannedReserve + data.freeMoney.unpaidBillsReserve
+    : 0;
+  const monthStateCards = data
+    ? [
+        {
+          label: "Saldo realizado",
+          value: formatCurrency(data.freeMoney.balance),
+          detail: "Entradas menos saídas já registradas no mês.",
+          tone: "bg-[color:rgba(17,37,51,0.08)] text-[var(--color-foreground)]",
+        },
+        {
+          label: "Dinheiro livre",
+          value: formatCurrency(data.freeMoney.freeToSpend),
+          detail: "O que ainda sobra depois do planejamento e das contas em aberto do mês.",
+          tone: "bg-[color:rgba(41,128,90,0.12)] text-[var(--color-success)]",
+          composition: freeMoneyReserveRows,
+          note: freeMoneyReserveNote,
+        },
+        {
+          label: "Reservado",
+          value: formatCurrency(monthReserveTotal),
+          detail: "Planejamento restante e contas abertas que ainda consomem o mês.",
+          tone: "bg-[color:rgba(15,118,110,0.08)] text-[var(--color-accent)]",
+        },
+      ]
+    : [];
 
   const isCriticalHealth = data?.monthHealth?.status === "critical";
   const criticalReasons = data?.monthHealth
@@ -389,9 +218,10 @@ export default function DashboardPage() {
   const budgetFlowMax = data
     ? Math.max(1, data.budget.totalPlanned, data.budget.totalSpent)
     : 1;
+  const projectionSupportMessage = data ? getProjectionSupportMessage(data) : "";
 
   useEffect(() => {
-    const accounts = data?.accounts ?? [];
+    const accounts = activeAccounts;
 
     setQuickEntryForm((current) => {
       const hasSelectedAccount = accounts.some(
@@ -419,7 +249,7 @@ export default function DashboardPage() {
         ? { ...current, financialAccountId: "" }
         : current;
     });
-  }, [data?.accounts]);
+  }, [activeAccounts]);
 
   useEffect(() => {
     if (
@@ -448,76 +278,11 @@ export default function DashboardPage() {
       setLoadError("");
 
       try {
-        const monthHealthPromise = getMonthHealth(
-          accessToken,
-          monthAndYear.month,
-          monthAndYear.year,
-        ).catch((caughtError) => {
-          if (isUnauthorizedApiError(caughtError)) {
-            throw caughtError;
-          }
-
-          return null;
-        });
-        const categoriesPromise = listCategories(accessToken).catch(
-          (caughtError) => {
-            if (isUnauthorizedApiError(caughtError)) {
-              throw caughtError;
-            }
-
-            return [];
-          },
-        );
-
-        const [
-          monthHealth,
-          summary,
-          alerts,
-          billsSummary,
-          categories,
-          freeMoney,
-          budget,
-          accounts,
-          transactions,
-          bills,
-        ] = await Promise.all([
-          monthHealthPromise,
-          getMonthlySummary(
-            accessToken,
-            monthAndYear.month,
-            monthAndYear.year,
-          ),
-          getAlerts(accessToken, monthAndYear.month, monthAndYear.year),
-          getBillsSummary(accessToken, monthAndYear.month, monthAndYear.year),
-          categoriesPromise,
-          getFreeMoney(accessToken, monthAndYear.month, monthAndYear.year),
-          getMonthlyBudget(
-            accessToken,
-            monthAndYear.month,
-            monthAndYear.year,
-          ),
-          listAccounts(accessToken),
-          listTransactions(accessToken),
-          listBills(accessToken),
-        ]);
+        const nextData = await loadDashboardData(accessToken, monthAndYear);
 
         if (!isCancelled) {
           setLoadError("");
-          setData({
-            accounts,
-            alerts,
-            billsSummary,
-            budget,
-            categories,
-            freeMoney,
-            monthHealth,
-            onboarding: {
-              hasAccount: accounts.length > 0,
-              hasBill: bills.length > 0,
-              hasTransaction: transactions.length > 0,
-            },
-            summary,
-          });
+          setData(nextData);
         }
       } catch (caughtError) {
         if (isUnauthorizedApiError(caughtError)) {
@@ -545,77 +310,11 @@ export default function DashboardPage() {
     return () => {
       isCancelled = true;
     };
-  }, [logout, monthAndYear.month, monthAndYear.year, reloadKey, session]);
+  }, [logout, monthAndYear, reloadKey, session]);
 
   useEffect(() => {
     setIsNotificationsOpen(false);
   }, [monthValue, reloadKey]);
-
-  async function handleCreateAccount(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (!session) {
-      return;
-    }
-
-    const accessToken = session.accessToken;
-    setIsCreatingAccount(true);
-    setAccountError("");
-    setAccountSuccess("");
-
-    try {
-      await createAccount(accessToken, {
-        name: accountForm.name,
-        type: accountForm.type,
-      });
-
-      const accounts = await listAccounts(accessToken);
-
-      setData((current) =>
-        current
-          ? {
-              ...current,
-              accounts,
-              onboarding: {
-                ...current.onboarding,
-                hasAccount: accounts.length > 0,
-              },
-            }
-          : current,
-      );
-      setAccountForm(defaultAccountForm);
-      setAccountSuccess(
-        accounts.length > 1
-          ? "Conta adicionada com sucesso. Agora escolha em qual conta deseja registrar a próxima movimentação ou importação."
-          : "Conta criada com sucesso. Agora você já pode registrar uma movimentação ou importar um arquivo.",
-      );
-    } catch (caughtError) {
-      if (isUnauthorizedApiError(caughtError)) {
-        logout("session-expired");
-        return;
-      }
-
-      setAccountError(
-        getFriendlyApiMessage(
-          caughtError,
-          "Não foi possível criar a conta agora. Revise os dados e tente novamente.",
-          {
-            messageMap: {
-              "Name is required.": "Informe o nome da conta para continuar.",
-              "Financial account name is required.":
-                "Informe o nome da conta para continuar.",
-              "Financial account name cannot exceed 120 characters.":
-                "O nome da conta ficou longo demais. Tente um nome menor.",
-              "Financial account type is invalid.":
-                "Selecione um tipo de conta válido.",
-            },
-          },
-        ),
-      );
-    } finally {
-      setIsCreatingAccount(false);
-    }
-  }
 
   async function handleQuickEntrySubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -627,6 +326,13 @@ export default function DashboardPage() {
     if (data.accounts.length === 0) {
       setQuickEntryError(
         "Crie sua primeira conta abaixo para começar a registrar movimentações.",
+      );
+      return;
+    }
+
+    if (activeAccounts.length === 0) {
+      setQuickEntryError(
+        "Reative ao menos uma conta em Contas para registrar novas movimentações.",
       );
       return;
     }
@@ -663,48 +369,9 @@ export default function DashboardPage() {
         occurredOn: getCurrentDateInputValue(),
       });
 
-      const monthHealthPromise = getMonthHealth(
-        accessToken,
-        monthAndYear.month,
-        monthAndYear.year,
-      ).catch((caughtError) => {
-        if (isUnauthorizedApiError(caughtError)) {
-          throw caughtError;
-        }
+      const nextData = await refreshDashboardData(accessToken, monthAndYear, data);
 
-        return null;
-      });
-
-      const [monthHealth, summary, alerts, billsSummary, freeMoney, budget, transactions, bills] =
-        await Promise.all([
-          monthHealthPromise,
-          getMonthlySummary(accessToken, monthAndYear.month, monthAndYear.year),
-          getAlerts(accessToken, monthAndYear.month, monthAndYear.year),
-          getBillsSummary(accessToken, monthAndYear.month, monthAndYear.year),
-          getFreeMoney(accessToken, monthAndYear.month, monthAndYear.year),
-          getMonthlyBudget(accessToken, monthAndYear.month, monthAndYear.year),
-          listTransactions(accessToken),
-          listBills(accessToken),
-        ]);
-
-      setData((current) =>
-        current
-          ? {
-              ...current,
-              alerts,
-              billsSummary,
-              budget,
-              freeMoney,
-              monthHealth,
-              onboarding: {
-                hasAccount: current.accounts.length > 0,
-                hasBill: bills.length > 0,
-                hasTransaction: transactions.length > 0,
-              },
-              summary,
-            }
-          : current,
-      );
+      setData(nextData);
       setQuickEntryForm((current) => ({
         ...defaultQuickEntryForm,
         financialAccountId: current.financialAccountId,
@@ -846,32 +513,6 @@ export default function DashboardPage() {
       session={session}
       title="Visão do Mês"
     >
-      {accountSuccess ? (
-        <div className="mb-6 rounded-[24px] border border-[color:rgba(29,130,93,0.16)] bg-[color:rgba(220,252,231,0.8)] px-5 py-4 text-sm text-green-700">
-          <div>{accountSuccess}</div>
-          <div className="mt-3 flex flex-wrap gap-3">
-            <Link
-              className="rounded-full border border-[color:rgba(29,130,93,0.18)] px-4 py-2 text-sm font-medium text-green-700 transition hover:bg-white"
-              href="/transactions"
-            >
-              Registrar movimentação
-            </Link>
-            <Link
-              className="rounded-full border border-[color:rgba(29,130,93,0.18)] px-4 py-2 text-sm font-medium text-green-700 transition hover:bg-white"
-              href="/imports"
-            >
-              Importar dados de arquivo
-            </Link>
-          </div>
-        </div>
-      ) : null}
-
-      {accountError ? (
-        <div className="mb-6 rounded-[24px] border border-[color:rgba(185,28,28,0.14)] bg-[color:rgba(254,226,226,0.8)] px-5 py-4 text-sm text-red-700">
-          {accountError}
-        </div>
-      ) : null}
-
       {isFetching ? (
         <LoadingScreen message="Atualizando o resumo do mês..." />
       ) : loadError ? (
@@ -939,342 +580,262 @@ export default function DashboardPage() {
             ) : null}
 
             {data.accounts.length === 0 ? (
-              <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.76fr)]">
-                <div className="rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm leading-6 text-[var(--color-muted)]">
-                  Você ainda não tem uma conta cadastrada. Crie a primeira aqui
-                  para começar a registrar o que entrou ou saiu sem sair da
-                  página.
+              <div className="mt-6 rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm leading-6 text-[var(--color-muted)]">
+                Você ainda não tem uma conta cadastrada. Para usar a ação rápida,
+                crie sua primeira conta em{" "}
+                <Link className="font-semibold text-[var(--color-accent)]" href="/accounts">
+                  Contas
+                </Link>{" "}
+                e depois volte para registrar o que entrou ou saiu.
                 </div>
-
-                <form className="space-y-4 rounded-[24px] border border-[var(--color-line)] bg-white p-5" onSubmit={handleCreateAccount}>
-                  <div className="text-sm font-semibold text-[var(--color-foreground)]">
-                    Criar primeira conta
-                  </div>
-
-                  <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
-                    <span>Nome da conta</span>
-                    <input
-                      className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3 text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)]"
-                      onChange={(event) =>
-                        setAccountForm((current) => ({
-                          ...current,
-                          name: event.target.value,
-                        }))
-                      }
-                      placeholder="Conta principal"
-                      value={accountForm.name}
-                    />
-                  </label>
-
-                  <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
-                    <span>Tipo</span>
-                    <select
-                      className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3 text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)]"
-                      onChange={(event) =>
-                        setAccountForm((current) => ({
-                          ...current,
-                          type: Number(event.target.value) as 1 | 2 | 3 | 4,
-                        }))
-                      }
-                      value={accountForm.type}
-                    >
-                      {accountTypeOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <button
-                    className="w-full rounded-2xl bg-[var(--color-foreground)] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-70"
-                    disabled={isCreatingAccount}
-                    type="submit"
-                  >
-                    {isCreatingAccount ? "Criando conta..." : "Criar conta"}
-                  </button>
-                </form>
-              </div>
             ) : (
               <div
                 className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1.28fr)_minmax(320px,0.92fr)]"
                 data-testid="quick-entry-layout"
               >
-                <form className="self-start space-y-5 rounded-[24px] border border-[var(--color-line)] bg-white p-5" onSubmit={handleQuickEntrySubmit}>
-                  <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
-                    <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
-                      <span>Conta financeira</span>
-                      <select
-                        className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-4 text-base font-medium text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)] disabled:cursor-not-allowed disabled:bg-[var(--color-panel)]"
-                        disabled={data.accounts.length === 1}
-                        onChange={(event) =>
-                          setQuickEntryForm((current) => ({
-                            ...current,
-                            financialAccountId: event.target.value,
-                          }))
-                        }
-                        value={quickEntryForm.financialAccountId}
-                      >
-                        {data.accounts.length > 1 ? (
-                          <option value="">Escolha a conta para registrar</option>
-                        ) : null}
-                        {data.accounts.map((account) => (
-                          <option key={account.id} value={account.id}>
-                            {account.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <div className="rounded-[24px] border border-[var(--color-line)] bg-[var(--color-panel)] px-5 py-4 text-sm leading-6 text-[var(--color-muted)]">
-                      {data.accounts.length === 1
-                        ? "Essa movimentação será registrada na sua conta disponível."
-                        : "Escolha explicitamente a conta para evitar lançar a movimentação no lugar errado."}
-                    </div>
+                {activeAccounts.length === 0 ? (
+                  <div className="self-start rounded-[24px] border border-dashed border-[var(--color-line)] bg-white px-5 py-6 text-sm leading-6 text-[var(--color-muted)]">
+                    Todas as suas contas estao inativas. Reative ao menos uma em{" "}
+                    <Link className="font-semibold text-[var(--color-accent)]" href="/accounts">
+                      Contas
+                    </Link>{" "}
+                    para registrar novas movimentacoes ou importar dados.
                   </div>
+                ) : (
+                  <form className="self-start space-y-5 rounded-[24px] border border-[var(--color-line)] bg-white p-5" onSubmit={handleQuickEntrySubmit}>
+                    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
+                      <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
+                        <span>Conta financeira</span>
+                        <select
+                          className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-4 text-base font-medium text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)] disabled:cursor-not-allowed disabled:bg-[var(--color-panel)]"
+                          disabled={activeAccounts.length === 1}
+                          onChange={(event) =>
+                            setQuickEntryForm((current) => ({
+                              ...current,
+                              financialAccountId: event.target.value,
+                            }))
+                          }
+                          value={quickEntryForm.financialAccountId}
+                        >
+                          {activeAccounts.length > 1 ? (
+                            <option value="">Escolha a conta para registrar</option>
+                          ) : null}
+                          {activeAccounts.map((account) => (
+                            <option key={account.id} value={account.id}>
+                              {account.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
 
-                  <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_auto] xl:items-end">
-                    <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
-                      <span>Quanto foi?</span>
-                      <input
-                        autoFocus
-                        className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-4 text-2xl font-semibold text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)]"
-                        inputMode="decimal"
-                        min="0.01"
-                        onChange={(event) =>
-                          setQuickEntryForm((current) => ({
-                            ...current,
-                            amount: event.target.value,
-                          }))
-                        }
-                        placeholder="120"
-                        step="0.01"
-                        type="number"
-                        value={quickEntryForm.amount}
-                      />
-                    </label>
+                      <div className="rounded-[24px] border border-[var(--color-line)] bg-[var(--color-panel)] px-5 py-4 text-sm leading-6 text-[var(--color-muted)]">
+                        {activeAccounts.length === 1
+                          ? "Essa movimentação será registrada na sua conta ativa disponível."
+                          : "Escolha explicitamente a conta ativa para evitar lançar a movimentação no lugar errado."}
+                      </div>
+                    </div>
 
-                    <div className="grid gap-3 sm:grid-cols-[auto_auto] xl:self-end">
-                      <div
-                        aria-label="Tipo da movimentação"
-                        className="inline-flex rounded-2xl border border-[var(--color-line)] bg-white p-1"
-                        role="group"
-                      >
-                        {quickEntryTypeOptions.map((option) => {
-                          const isSelected = quickEntryForm.type === option.value;
+                    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_auto] xl:items-end">
+                      <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
+                        <span>Quanto foi?</span>
+                        <input
+                          autoFocus
+                          className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-4 text-2xl font-semibold text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)]"
+                          inputMode="decimal"
+                          min="0.01"
+                          onChange={(event) =>
+                            setQuickEntryForm((current) => ({
+                              ...current,
+                              amount: event.target.value,
+                            }))
+                          }
+                          placeholder="120"
+                          step="0.01"
+                          type="number"
+                          value={quickEntryForm.amount}
+                        />
+                      </label>
+
+                      <div className="grid gap-3 sm:grid-cols-[auto_auto] xl:self-end">
+                        <div
+                          aria-label="Tipo da movimentação"
+                          className="inline-flex rounded-2xl border border-[var(--color-line)] bg-white p-1"
+                          role="group"
+                        >
+                          {quickEntryTypeOptions.map((option) => {
+                            const isSelected = quickEntryForm.type === option.value;
+
+                            return (
+                              <button
+                                aria-pressed={isSelected}
+                                className={`rounded-[18px] px-4 py-3 text-sm font-semibold transition ${isSelected ? "bg-[var(--color-foreground)] text-white" : "text-[var(--color-muted)] hover:text-[var(--color-foreground)]"}`}
+                                key={option.value}
+                                onClick={() =>
+                                  setQuickEntryForm((current) => ({
+                                    ...current,
+                                    type: option.value,
+                                  }))
+                                }
+                                type="button"
+                              >
+                                {option.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        <button
+                          className="w-full rounded-2xl bg-[var(--color-foreground)] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-70"
+                          disabled={isRegisteringNow}
+                          type="submit"
+                        >
+                          {isRegisteringNow ? "Registrando..." : quickEntrySubmitLabel}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="text-sm font-medium text-[var(--color-foreground)]">
+                          Categoria
+                        </div>
+                        <div className="text-xs text-[var(--color-muted)]">
+                          As opções mudam quando você troca entre entrada e saída.
+                        </div>
+                      </div>
+                      <div className="text-xs leading-5 text-[var(--color-muted)]">
+                        Categoria responde ao motivo da movimentação. PIX, boleto e cartão ficam para um campo futuro de meio de pagamento.
+                      </div>
+                      <div className="flex gap-2 overflow-x-auto pb-2">
+                        <button
+                          className={`shrink-0 rounded-full border px-4 py-2 text-sm font-medium transition ${quickEntryForm.categoryId === "" ? "border-[var(--color-foreground)] bg-[var(--color-foreground)] text-white" : "border-[var(--color-line)] bg-white text-[var(--color-foreground)] hover:bg-[var(--color-accent-soft)]"}`}
+                          onClick={() =>
+                            setQuickEntryForm((current) => ({
+                              ...current,
+                              categoryId: "",
+                            }))
+                          }
+                          type="button"
+                        >
+                          Sem categoria
+                        </button>
+                        {visibleQuickEntryCategories.map((category) => {
+                          const isSelected = quickEntryForm.categoryId === category.id;
 
                           return (
                             <button
-                              aria-pressed={isSelected}
-                              className={`rounded-[18px] px-4 py-3 text-sm font-semibold transition ${isSelected ? "bg-[var(--color-foreground)] text-white" : "text-[var(--color-muted)] hover:text-[var(--color-foreground)]"}`}
-                              key={option.value}
+                              className={`shrink-0 rounded-full border px-4 py-2 text-sm font-medium transition ${isSelected ? "border-[var(--color-foreground)] bg-[var(--color-foreground)] text-white" : "border-[var(--color-line)] bg-white text-[var(--color-foreground)] hover:bg-[var(--color-accent-soft)]"}`}
+                              key={category.id}
                               onClick={() =>
                                 setQuickEntryForm((current) => ({
                                   ...current,
-                                  type: option.value,
+                                  categoryId: category.id,
                                 }))
                               }
                               type="button"
                             >
-                              {option.label}
+                              {category.name}
                             </button>
                           );
                         })}
                       </div>
+                    </div>
 
+                    <div>
                       <button
-                        className="w-full rounded-2xl bg-[var(--color-foreground)] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-70"
-                        disabled={isRegisteringNow}
-                        type="submit"
-                      >
-                        {isRegisteringNow ? "Registrando..." : quickEntrySubmitLabel}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="text-sm font-medium text-[var(--color-foreground)]">
-                        Categoria
-                      </div>
-                      <div className="text-xs text-[var(--color-muted)]">
-                        As opções mudam quando você troca entre entrada e saída.
-                      </div>
-                    </div>
-                    <div className="text-xs leading-5 text-[var(--color-muted)]">
-                      Categoria responde ao motivo da movimentação. PIX, boleto e cartão ficam para um campo futuro de meio de pagamento.
-                    </div>
-                    <div className="flex gap-2 overflow-x-auto pb-2">
-                      <button
-                        className={`shrink-0 rounded-full border px-4 py-2 text-sm font-medium transition ${quickEntryForm.categoryId === "" ? "border-[var(--color-foreground)] bg-[var(--color-foreground)] text-white" : "border-[var(--color-line)] bg-white text-[var(--color-foreground)] hover:bg-[var(--color-accent-soft)]"}`}
-                        onClick={() =>
-                          setQuickEntryForm((current) => ({
-                            ...current,
-                            categoryId: "",
-                          }))
-                        }
+                        aria-expanded={showQuickEntryDetails}
+                        className="text-sm font-medium text-[var(--color-muted)] transition hover:text-[var(--color-foreground)]"
+                        onClick={() => setShowQuickEntryDetails((current) => !current)}
                         type="button"
                       >
-                        Sem categoria
+                        {showQuickEntryDetails
+                          ? "Esconder descrição"
+                          : "Adicionar descrição"}
                       </button>
-                      {visibleQuickEntryCategories.map((category) => {
-                        const isSelected = quickEntryForm.categoryId === category.id;
+                    </div>
 
-                        return (
-                          <button
-                            className={`shrink-0 rounded-full border px-4 py-2 text-sm font-medium transition ${isSelected ? "border-[var(--color-foreground)] bg-[var(--color-foreground)] text-white" : "border-[var(--color-line)] bg-white text-[var(--color-foreground)] hover:bg-[var(--color-accent-soft)]"}`}
-                            key={category.id}
-                            onClick={() =>
+                    {showQuickEntryDetails ? (
+                      <div className="rounded-[24px] border border-[var(--color-line)] bg-[color:rgba(255,255,255,0.68)] p-4">
+                        <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
+                          <span>Descrição (se quiser)</span>
+                          <input
+                            className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3 text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)]"
+                            onChange={(event) =>
                               setQuickEntryForm((current) => ({
                                 ...current,
-                                categoryId: category.id,
+                                description: event.target.value,
                               }))
                             }
-                            type="button"
-                          >
-                            {category.name}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div>
-                    <button
-                      aria-expanded={showQuickEntryDetails}
-                      className="text-sm font-medium text-[var(--color-muted)] transition hover:text-[var(--color-foreground)]"
-                      onClick={() => setShowQuickEntryDetails((current) => !current)}
-                      type="button"
-                    >
-                      {showQuickEntryDetails
-                        ? "Esconder descrição"
-                        : "Adicionar descrição"}
-                    </button>
-                  </div>
-
-                  {showQuickEntryDetails ? (
-                    <div className="rounded-[24px] border border-[var(--color-line)] bg-[color:rgba(255,255,255,0.68)] p-4">
-                      <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
-                        <span>Descrição (se quiser)</span>
-                        <input
-                          className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3 text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)]"
-                          onChange={(event) =>
-                            setQuickEntryForm((current) => ({
-                              ...current,
-                              description: event.target.value,
-                            }))
-                          }
-                          placeholder="Mercado, salário, almoço..."
-                          value={quickEntryForm.description}
-                        />
-                      </label>
-                    </div>
-                  ) : null}
-                </form>
-
-                <div
-                  className="self-start space-y-4 xl:grid xl:max-h-[34rem] xl:grid-rows-[minmax(0,1fr)_auto] xl:gap-4 xl:space-y-0"
-                  data-testid="accounts-rail"
-                >
-                  <div className="min-h-0 rounded-[24px] border border-[var(--color-line)] bg-white p-5 xl:flex xl:flex-col">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <div className="text-sm font-semibold text-[var(--color-foreground)]">
-                          Suas contas financeiras
-                        </div>
-                        <div className="mt-1 text-sm leading-6 text-[var(--color-muted)]">
-                          Mantenha mais de uma conta ativa para separar conta corrente, cartão e outros contextos do mês.
-                        </div>
+                            placeholder="Mercado, salário, almoço..."
+                            value={quickEntryForm.description}
+                          />
+                        </label>
                       </div>
-                      <div className="rounded-full border border-[var(--color-line)] bg-[var(--color-panel)] px-3 py-1 text-xs font-semibold text-[var(--color-foreground)]">
-                        {data.accounts.length} {data.accounts.length === 1 ? "conta" : "contas"}
-                      </div>
-                    </div>
-
-                    <div
-                      aria-label="Lista de contas financeiras"
-                      className="mt-4 max-h-[22rem] space-y-3 overflow-y-auto pr-1 xl:min-h-0 xl:max-h-none xl:flex-1"
-                    >
-                      {data.accounts.map((account) => (
-                        <div
-                          className="rounded-[20px] border border-[var(--color-line)] bg-[var(--color-panel)] px-4 py-4"
-                          key={account.id}
-                        >
-                          <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div>
-                              <div className="text-sm font-semibold text-[var(--color-foreground)]">
-                                {account.name}
-                              </div>
-                              <div className="mt-1 text-xs text-[var(--color-muted)]">
-                                {accountTypeLabels[account.type]}
-                              </div>
-                            </div>
-                            <span className="rounded-full border border-[color:rgba(15,118,110,0.14)] bg-[var(--color-accent-soft)] px-3 py-1 text-xs font-semibold text-[var(--color-foreground)]">
-                              {account.isActive ? "Ativa" : "Inativa"}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <form className="space-y-4 rounded-[24px] border border-[var(--color-line)] bg-white p-5" onSubmit={handleCreateAccount}>
-                    <div>
-                      <div className="text-sm font-semibold text-[var(--color-foreground)]">
-                        Adicionar conta
-                      </div>
-                      <div className="mt-1 text-sm leading-6 text-[var(--color-muted)]">
-                        Crie outra conta sem sair do dashboard e depois escolha explicitamente onde cada movimentação deve entrar.
-                      </div>
-                    </div>
-
-                    <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
-                      <span>Nome da conta</span>
-                      <input
-                        className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3 text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)]"
-                        onChange={(event) =>
-                          setAccountForm((current) => ({
-                            ...current,
-                            name: event.target.value,
-                          }))
-                        }
-                        placeholder="Conta corrente, cartão, reserva..."
-                        value={accountForm.name}
-                      />
-                    </label>
-
-                    <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
-                      <span>Tipo da conta</span>
-                      <select
-                        className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3 text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)]"
-                        onChange={(event) =>
-                          setAccountForm((current) => ({
-                            ...current,
-                            type: Number(event.target.value) as 1 | 2 | 3 | 4,
-                          }))
-                        }
-                        value={accountForm.type}
-                      >
-                        {accountTypeOptions.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <button
-                      className="w-full rounded-2xl bg-[var(--color-foreground)] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-70"
-                      disabled={isCreatingAccount}
-                      type="submit"
-                    >
-                      {isCreatingAccount ? "Adicionando conta..." : "Adicionar conta"}
-                    </button>
+                    ) : null}
                   </form>
-                </div>
+                )}
+
               </div>
             )}
           </section>
+
+          {firstUseState && activationMessage ? (
+            <section className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
+              <div className={dashboardStandardGridClass}>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
+                      Primeiro uso
+                    </div>
+                    <span className="rounded-full border border-[color:rgba(15,118,110,0.16)] bg-[var(--color-accent-soft)] px-3 py-1 text-xs font-semibold text-[var(--color-accent)]">
+                      Ativação guiada
+                    </span>
+                  </div>
+
+                  <h2 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-[var(--color-foreground)]">
+                    {activationMessage.message}
+                  </h2>
+                  <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--color-muted)]">
+                    {activationMessage.cause}
+                  </p>
+                </div>
+
+                <div className="rounded-[24px] border border-[color:rgba(15,118,110,0.14)] bg-[var(--color-accent-soft)] px-5 py-5">
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-accent)]">
+                    O que fazer agora
+                  </div>
+                  <div className="mt-3 text-sm leading-6 text-[var(--color-foreground)]">
+                    {activationMessage.action}
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    {!data.onboarding.hasAccount ? (
+                      <Link
+                        className="rounded-full border border-[var(--color-line)] bg-white px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-[var(--color-panel)]"
+                        href="/accounts"
+                      >
+                        Criar primeira conta
+                      </Link>
+                    ) : (
+                      <>
+                        <Link
+                          className="rounded-full border border-[var(--color-line)] bg-white px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-[var(--color-panel)]"
+                          href="/dashboard#quick-account"
+                        >
+                          Registrar agora
+                        </Link>
+                        <Link
+                          className="rounded-full border border-[var(--color-line)] bg-white px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-[var(--color-panel)]"
+                          href="/imports"
+                        >
+                          Importar dados de arquivo
+                        </Link>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </section>
+          ) : null}
 
           {showFallbackAlertHighlights ? (
             <section
@@ -1338,7 +899,7 @@ export default function DashboardPage() {
             </section>
           ) : null}
 
-          {data.monthHealth ? (
+          {shouldShowMonthHealthSection && monthHealth ? (
             <>
               {isCriticalHealth ? (
                 <section
@@ -1351,7 +912,7 @@ export default function DashboardPage() {
                         Risco financeiro crítico
                       </div>
                       <div className="mt-3 text-2xl font-bold tracking-[-0.04em] text-red-800">
-                        {data.monthHealth.message ?? data.monthHealth.summary.message}
+                        {monthHealth.message ?? monthHealth.summary.message}
                       </div>
                     </div>
                     {notificationCount > 0 ? (
@@ -1363,13 +924,13 @@ export default function DashboardPage() {
                     ) : null}
                   </div>
 
-                  <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.12fr)_minmax(280px,0.88fr)]">
+                  <div className={dashboardStandardGridClass}>
                     <div className="min-w-0">
                       <div className="text-xs font-semibold uppercase tracking-[0.18em] text-red-700">
                         O que isso significa no mes
                       </div>
                       <p className="max-w-3xl text-sm leading-6 text-[var(--color-foreground)]">
-                        {data.monthHealth.summary.cause}
+                        {monthHealth.summary.cause}
                       </p>
 
                       {criticalReasons.length > 0 ? (
@@ -1396,7 +957,7 @@ export default function DashboardPage() {
                         Comece por aqui
                       </div>
                       <div className="mt-3 text-base font-semibold leading-7 text-[var(--color-foreground)]">
-                        {data.monthHealth.summary.action}
+                        {monthHealth.summary.action}
                       </div>
                       {criticalPriorityReason ? (
                         <div className="mt-4 rounded-[18px] border border-[color:rgba(185,28,28,0.12)] bg-[color:rgba(254,242,242,0.9)] px-4 py-4">
@@ -1416,12 +977,20 @@ export default function DashboardPage() {
                         </div>
                       ) : null}
                       <div className="mt-5">
-                        <Link
-                          href={primaryRecommendedAction?.target ?? dashboardFocusHref}
-                          className="inline-flex rounded-xl bg-red-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-800"
-                        >
-                          {primaryRecommendedAction?.label ?? "Ver resumo do mes"}
-                        </Link>
+                        <div className="flex flex-wrap gap-3">
+                          <Link
+                            href={primaryRecommendedAction?.target ?? dashboardFocusHref}
+                            className="inline-flex rounded-xl bg-red-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-800"
+                          >
+                            {primaryRecommendedAction?.label ?? "Ver resumo do mes"}
+                          </Link>
+                          <Link
+                            className="inline-flex rounded-xl border border-[color:rgba(185,28,28,0.14)] bg-white px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-[color:rgba(254,242,242,0.9)]"
+                            href={`/analysis?month=${monthValue}`}
+                          >
+                            Ver analise do mes
+                          </Link>
+                        </div>
                       </div>
                       {criticalSupportMessage ? (
                         <p className="mt-4 text-sm leading-6 text-[var(--color-muted)]">
@@ -1476,28 +1045,31 @@ export default function DashboardPage() {
               ) : null}
 
               <section className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
-                <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.18fr)_minmax(320px,0.82fr)]">
+                <div
+                  className={dashboardStandardGridClass}
+                  data-testid="dashboard-month-health-grid"
+                >
                   <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-3">
                     <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
                       {firstUseState ? "Primeiro uso" : "Visão do mês"}
                     </div>
                     <span
-                      className={`rounded-full border px-3 py-1 text-xs font-semibold ${monthHealthStatusStyles[data.monthHealth.status]}`}
+                      className={`rounded-full border px-3 py-1 text-xs font-semibold ${monthHealthStatusStyles[monthHealth.status]}`}
                     >
-                      {monthHealthStatusLabels[data.monthHealth.status]}
+                      {monthHealthStatusLabels[monthHealth.status]}
                     </span>
                   </div>
 
                   <h2 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-[var(--color-foreground)]">
                     {firstUseState && activationMessage
                       ? activationMessage.message
-                      : data.monthHealth.summary.message}
+                      : monthHealth.summary.message}
                   </h2>
                   <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--color-muted)]">
                     {firstUseState && activationMessage
                       ? activationMessage.cause
-                      : data.monthHealth.summary.cause}
+                      : monthHealth.summary.cause}
                   </p>
                 </div>
 
@@ -1508,7 +1080,7 @@ export default function DashboardPage() {
                   <div className="mt-3 text-sm leading-6 text-[var(--color-foreground)]">
                     {firstUseState && activationMessage
                       ? activationMessage.action
-                      : data.monthHealth.summary.action}
+                      : monthHealth.summary.action}
                   </div>
                   {!firstUseState && prioritizedRecommendedActions.length > 0 ? (
                     <div className="mt-4">
@@ -1559,13 +1131,22 @@ export default function DashboardPage() {
                         </>
                       )}
                     </div>
-                  ) : null}
+                  ) : (
+                    <div className="mt-4">
+                      <Link
+                        className="inline-flex rounded-full border border-[var(--color-line)] bg-white px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-[var(--color-panel)]"
+                        href={`/analysis?month=${monthValue}`}
+                      >
+                        Ver analise do mes
+                      </Link>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {data.monthHealth.insights.length > 0 && !firstUseState ? (
+              {monthHealth.insights.length > 0 && !firstUseState ? (
                 <div className="mt-6 grid gap-3 md:grid-cols-3">
-                  {data.monthHealth.insights.map((insight) => (
+                  {monthHealth.insights.map((insight) => (
                     <article
                       className="rounded-[24px] border border-[var(--color-line)] bg-white px-5 py-4"
                       key={insight.type}
@@ -1596,7 +1177,7 @@ export default function DashboardPage() {
 
           {showSecondarySections ? (
             <>
-              <section className="space-y-8">
+              <section className={dashboardSectionStackClass}>
             <article
               className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6"
               id="resumo-financeiro"
@@ -1606,6 +1187,9 @@ export default function DashboardPage() {
               </div>
               <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                 <div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-muted)]">
+                    Estado do mês
+                  </div>
                   <h2 className="text-3xl font-semibold tracking-[-0.04em] text-[var(--color-foreground)]">
                     Base do mês
                   </h2>
@@ -1623,35 +1207,8 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                {[
-                  {
-                    label: "Entradas",
-                    value: formatCurrency(data.freeMoney.totalIncome),
-                    detail: "Dinheiro que entrou no mês.",
-                    tone: "bg-[color:rgba(15,118,110,0.08)] text-[var(--color-accent)]",
-                  },
-                  {
-                    label: "Saídas",
-                    value: formatCurrency(data.freeMoney.totalExpense),
-                    detail: "Dinheiro que já saiu no mês.",
-                    tone: "bg-[color:rgba(209,123,15,0.12)] text-[var(--color-warm)]",
-                  },
-                  {
-                    label: "Saldo",
-                    value: formatCurrency(data.freeMoney.balance),
-                    detail: "Resultado entre entradas e saídas.",
-                    tone: "bg-[color:rgba(17,37,51,0.08)] text-[var(--color-foreground)]",
-                  },
-                  {
-                    label: "Dinheiro livre",
-                    value: formatCurrency(data.freeMoney.freeToSpend),
-                    detail: "O que ainda sobra depois do planejamento e das contas em aberto do mês.",
-                    tone: "bg-[color:rgba(41,128,90,0.12)] text-[var(--color-success)]",
-                    composition: freeMoneyReserveRows,
-                    note: freeMoneyReserveNote,
-                  },
-                ].map((item) => (
+              <div className="mt-6 grid gap-4 md:grid-cols-3">
+                {monthStateCards.map((item) => (
                   <article
                     className="rounded-[24px] border border-[var(--color-line)] bg-white p-5"
                     key={item.label}
@@ -1695,7 +1252,125 @@ export default function DashboardPage() {
                 ))}
               </div>
 
-              <div className="mt-6 grid gap-4 xl:grid-cols-2">
+              {projectionSupportMessage ? (
+                <div className="mt-6 rounded-[24px] border border-[color:rgba(15,118,110,0.14)] bg-[var(--color-accent-soft)] px-5 py-4 text-sm leading-6 text-[var(--color-foreground)]">
+                  {projectionSupportMessage}
+                </div>
+              ) : null}
+
+            </article>
+              </section>
+
+              <section
+                className={dashboardStandardGridClass}
+                data-testid="dashboard-summary-grid"
+              >
+            <article className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
+              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
+                Contas a pagar do mês
+              </div>
+              <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
+                Compromissos do mês
+              </h2>
+
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
+                {[
+                  {
+                    label: "A pagar",
+                    total: data.billsSummary.totalPending,
+                    count: data.billsSummary.countPending,
+                    tone: "bg-[color:rgba(217,119,6,0.12)] text-[var(--color-warm)]",
+                  },
+                  {
+                    label: "Vencido",
+                    total: data.billsSummary.totalOverdue,
+                    count: data.billsSummary.countOverdue,
+                    tone: "bg-[color:rgba(185,28,28,0.1)] text-red-700",
+                  },
+                ].map((item) => (
+                  <article
+                    className="rounded-[24px] border border-[var(--color-line)] bg-white p-4"
+                    key={item.label}
+                  >
+                    <div className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${item.tone}`}>
+                      {item.label}
+                    </div>
+                    <div className="mt-4 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
+                      {formatCurrency(item.total)}
+                    </div>
+                    <div className="mt-2 text-xs text-[var(--color-muted)]">
+                      {item.count} {item.count === 1 ? "conta" : "contas"}
+                    </div>
+                  </article>
+                ))}
+              </div>
+
+              {data.billsSummary.countPredictable > 0 ? (
+                <details className="mt-6 rounded-[24px] border border-[var(--color-line)] bg-white p-5">
+                  <summary className="cursor-pointer list-none text-sm font-semibold text-[var(--color-foreground)]">
+                    Ver detalhe de compromissos previsiveis
+                  </summary>
+                  <div className="mt-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+                    <div>
+                      <div className="text-sm font-semibold text-[var(--color-foreground)]">
+                        Compromissos previsiveis em aberto
+                      </div>
+                      <div className="mt-1 text-xs leading-5 text-[var(--color-muted)]">
+                        Contas recorrentes e parcelas ja previstas neste mes que ainda seguem abertas.
+                      </div>
+                    </div>
+                    <div className="text-sm font-semibold text-[var(--color-foreground)]">
+                      {formatCurrency(data.billsSummary.predictableTotal)}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 md:grid-cols-3">
+                    {[
+                      {
+                        label: "Previsiveis",
+                        total: data.billsSummary.predictableTotal,
+                        count: data.billsSummary.countPredictable,
+                      },
+                      {
+                        label: "Recorrentes",
+                        total: data.billsSummary.recurringTotal,
+                        count: data.billsSummary.countRecurring,
+                      },
+                      {
+                        label: "Parceladas",
+                        total: data.billsSummary.installmentTotal,
+                        count: data.billsSummary.countInstallment,
+                      },
+                    ].map((item) => (
+                      <div
+                        className="rounded-[20px] border border-[var(--color-line)] bg-[var(--color-panel)] px-4 py-3"
+                        key={item.label}
+                      >
+                        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--color-muted)]">
+                          {item.label}
+                        </div>
+                        <div className="mt-3 text-lg font-semibold text-[var(--color-foreground)]">
+                          {formatCurrency(item.total)}
+                        </div>
+                        <div className="mt-1 text-xs text-[var(--color-muted)]">
+                          {item.count} {item.count === 1 ? "conta" : "contas"}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              ) : null}
+            </article>
+
+            <article className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
+              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
+                Bloco secundário
+              </div>
+              <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
+                Detalhes do mês
+              </h2>
+
+              <div className="mt-6 space-y-4">
                 <article className="rounded-[24px] border border-[var(--color-line)] bg-white p-5">
                   <div className="text-sm font-semibold text-[var(--color-foreground)]">
                     Entradas x saídas
@@ -1789,163 +1464,62 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 </article>
-              </div>
-            </article>
-              </section>
 
-              <section className="grid items-start gap-8 xl:grid-cols-[minmax(0,0.94fr)_minmax(0,1.06fr)]">
-            <article className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
-              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
-                Contas a pagar do mês
-              </div>
-              <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
-                Vencimentos em destaque
-              </h2>
-
-              <div className="mt-6 grid gap-4 md:grid-cols-3">
-                {[
-                  {
-                    label: "A pagar",
-                    total: data.billsSummary.totalPending,
-                    count: data.billsSummary.countPending,
-                    tone: "bg-[color:rgba(217,119,6,0.12)] text-[var(--color-warm)]",
-                  },
-                  {
-                    label: "Vencido",
-                    total: data.billsSummary.totalOverdue,
-                    count: data.billsSummary.countOverdue,
-                    tone: "bg-[color:rgba(185,28,28,0.1)] text-red-700",
-                  },
-                  {
-                    label: "Pago",
-                    total: data.billsSummary.totalPaid,
-                    count: data.billsSummary.countPaid,
-                    tone: "bg-[color:rgba(29,130,93,0.12)] text-[var(--color-success)]",
-                  },
-                ].map((item) => (
-                  <article
-                    className="rounded-[24px] border border-[var(--color-line)] bg-white p-4"
-                    key={item.label}
-                  >
-                    <div className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${item.tone}`}>
-                      {item.label}
-                    </div>
-                    <div className="mt-4 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
-                      {formatCurrency(item.total)}
-                    </div>
-                    <div className="mt-2 text-xs text-[var(--color-muted)]">
-                      {item.count} {item.count === 1 ? "conta" : "contas"}
-                    </div>
-                  </article>
-                ))}
-              </div>
-
-              {data.billsSummary.countPredictable > 0 ? (
-                <div className="mt-6 rounded-[24px] border border-[var(--color-line)] bg-white p-5">
-                  <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-                    <div>
-                      <div className="text-sm font-semibold text-[var(--color-foreground)]">
-                        Compromissos previsiveis em aberto
-                      </div>
-                      <div className="mt-1 text-xs leading-5 text-[var(--color-muted)]">
-                        Contas recorrentes e parcelas ja previstas neste mes que ainda seguem abertas.
-                      </div>
-                    </div>
-                    <div className="text-sm font-semibold text-[var(--color-foreground)]">
-                      {formatCurrency(data.billsSummary.predictableTotal)}
-                    </div>
+                <article className="rounded-[24px] border border-[var(--color-line)] bg-white p-5">
+                  <div className="text-sm font-semibold text-[var(--color-foreground)]">
+                    Próximas contas
+                  </div>
+                  <div className="mt-1 text-xs leading-5 text-[var(--color-muted)]">
+                    Até 5 vencimentos pendentes
                   </div>
 
-                  <div className="mt-4 grid gap-3 md:grid-cols-3">
-                    {[
-                      {
-                        label: "Previsiveis",
-                        total: data.billsSummary.predictableTotal,
-                        count: data.billsSummary.countPredictable,
-                      },
-                      {
-                        label: "Recorrentes",
-                        total: data.billsSummary.recurringTotal,
-                        count: data.billsSummary.countRecurring,
-                      },
-                      {
-                        label: "Parceladas",
-                        total: data.billsSummary.installmentTotal,
-                        count: data.billsSummary.countInstallment,
-                      },
-                    ].map((item) => (
-                      <div
-                        className="rounded-[20px] border border-[var(--color-line)] bg-[var(--color-panel)] px-4 py-3"
-                        key={item.label}
-                      >
-                        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--color-muted)]">
-                          {item.label}
-                        </div>
-                        <div className="mt-3 text-lg font-semibold text-[var(--color-foreground)]">
-                          {formatCurrency(item.total)}
-                        </div>
-                        <div className="mt-1 text-xs text-[var(--color-muted)]">
-                          {item.count} {item.count === 1 ? "conta" : "contas"}
-                        </div>
+                  <div className="mt-4 space-y-3">
+                    {data.billsSummary.upcoming.length === 0 ? (
+                      <div className="rounded-[20px] border border-dashed border-[var(--color-line)] px-4 py-5 text-sm text-[var(--color-muted)]">
+                        Nenhuma conta pendente para este mês. Se quiser demonstrar
+                        vencimentos e alertas, crie uma nova conta a pagar em{" "}
+                        <Link className="font-semibold text-[var(--color-accent)]" href="/bills">
+                          Contas a pagar
+                        </Link>
+                        .
                       </div>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-            </article>
-
-            <article className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
-              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
-                Próximas contas
-              </div>
-              <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
-                Até 5 vencimentos pendentes
-              </h2>
-
-              <div className="mt-6 space-y-3">
-                {data.billsSummary.upcoming.length === 0 ? (
-                  <div className="rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
-                    Nenhuma conta pendente para este mês. Se quiser demonstrar
-                    vencimentos e alertas, crie uma nova conta a pagar em{" "}
-                    <Link className="font-semibold text-[var(--color-accent)]" href="/bills">
-                      Contas a pagar
-                    </Link>
-                    .
-                  </div>
-                ) : (
-                  data.billsSummary.upcoming.map((bill) => (
-                    <div
-                      className="flex flex-col gap-3 rounded-[24px] border border-[var(--color-line)] bg-white px-5 py-4 md:flex-row md:items-center md:justify-between"
-                      key={bill.id}
-                    >
-                      <div>
-                        <div className="text-sm font-semibold text-[var(--color-foreground)]">
-                          {bill.description}
-                        </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-muted)]">
-                          <span>Vence em {formatDate(bill.dueOn)}</span>
-                          {getPredictableBillLabel(bill) ? (
-                            <span className="rounded-full border border-[var(--color-line)] bg-[var(--color-panel)] px-2 py-1 font-semibold text-[var(--color-foreground)]">
-                              {getPredictableBillLabel(bill)}
+                    ) : (
+                      data.billsSummary.upcoming.map((bill) => (
+                        <div
+                          className="flex flex-col gap-3 rounded-[20px] border border-[var(--color-line)] bg-[var(--color-panel)] px-4 py-4 md:flex-row md:items-center md:justify-between"
+                          key={bill.id}
+                        >
+                          <div>
+                            <div className="text-sm font-semibold text-[var(--color-foreground)]">
+                              {bill.description}
+                            </div>
+                            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-muted)]">
+                              <span>Vence em {formatDate(bill.dueOn)}</span>
+                              {getPredictableBillLabel(bill) ? (
+                                <span className="rounded-full border border-[var(--color-line)] bg-white px-2 py-1 font-semibold text-[var(--color-foreground)]">
+                                  {getPredictableBillLabel(bill)}
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="rounded-full border border-[color:rgba(217,119,6,0.14)] bg-[color:rgba(217,119,6,0.12)] px-3 py-1 text-xs font-semibold text-[var(--color-warm)]">
+                              Pendente
                             </span>
-                          ) : null}
+                            <div className="text-sm font-semibold text-[var(--color-foreground)]">
+                              {formatCurrency(bill.amount)}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="rounded-full border border-[color:rgba(217,119,6,0.14)] bg-[color:rgba(217,119,6,0.12)] px-3 py-1 text-xs font-semibold text-[var(--color-warm)]">
-                          Pendente
-                        </span>
-                        <div className="text-sm font-semibold text-[var(--color-foreground)]">
-                          {formatCurrency(bill.amount)}
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
+                      ))
+                    )}
+                  </div>
+                </article>
               </div>
             </article>
               </section>
 
+              {data.summary.byCategory.length > 0 ? (
               <section className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
             <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
               Leitura por categoria
@@ -1955,17 +1529,7 @@ export default function DashboardPage() {
             </h2>
 
             <div className="mt-6 grid gap-3 md:grid-cols-2">
-              {data.summary.byCategory.length === 0 ? (
-                <div className="rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
-                  Ainda não há movimentações registradas neste mês. Crie uma
-                  entrada ou saída em{" "}
-                  <Link className="font-semibold text-[var(--color-accent)]" href="/transactions">
-                    Movimentações
-                  </Link>{" "}
-                  para alimentar o dashboard.
-                </div>
-              ) : (
-                data.summary.byCategory.map((item, index) => (
+              {data.summary.byCategory.map((item, index) => (
                   <div
                     className="rounded-[24px] border border-[var(--color-line)] bg-white px-5 py-4"
                     key={`${item.categoryName}-${index}`}
@@ -1982,12 +1546,12 @@ export default function DashboardPage() {
                       <div className="text-sm font-semibold text-[var(--color-foreground)]">
                         {formatCurrency(item.total)}
                       </div>
+                      </div>
                     </div>
-                  </div>
-                ))
-              )}
+                ))}
             </div>
               </section>
+              ) : null}
             </>
           ) : null}
         </div>

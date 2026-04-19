@@ -11,11 +11,14 @@ import {
   deleteBill,
   getFriendlyApiMessage,
   isUnauthorizedApiError,
+  listAccounts,
   listBills,
   payBill,
+  type AccountResponse,
   type BillResponse,
   type BillSeriesKind,
   type BillStatus,
+  type BillUpdateScope,
   unpayBill,
   updateBill,
 } from "@/lib/api";
@@ -50,6 +53,16 @@ const billMessageMap = {
     "Informe pelo menos 2 parcelas para criar um parcelamento.",
   "Recurring and installment bills must be ended with scope=series.":
     "Contas recorrentes e parceladas precisam ser encerradas como serie.",
+  "Financial account was not found.":
+    "A conta usada para dar baixa no pagamento nao foi encontrada.",
+  "Bill update scope is invalid. Use single, forward or series.":
+    "Escolha como a edicao deve ser aplicada antes de salvar.",
+  "Recurring occurrences can only change due date inside the same month when scope=single.":
+    "Ao editar apenas esta ocorrencia, o vencimento deve continuar no mesmo mes.",
+  "Paid recurring occurrences can only be edited with scope=single.":
+    "Uma ocorrencia ja paga so pode ser editada isoladamente.",
+  "Recurring series with paid occurrences can only be edited with scope=single or scope=forward.":
+    "Series com ocorrencias pagas podem ser ajustadas apenas nesta ocorrencia ou desta em diante.",
 } as const;
 
 type BillFormKind = "single" | "recurring" | "installment";
@@ -60,6 +73,7 @@ type BillFormState = {
   amount: string;
   dueOn: string;
   kind: BillFormKind;
+  editScope: BillUpdateScope;
   recurrenceEndMode: RecurrenceEndMode;
   recurrenceUntilDate: string;
   recurrenceCount: string;
@@ -117,6 +131,7 @@ function createEmptyForm(
     amount: "",
     dueOn: getDefaultDueOn(monthValue),
     kind: currentKind ?? "single",
+    editScope: "single",
     recurrenceEndMode: "open_ended",
     recurrenceUntilDate: "",
     recurrenceCount: "",
@@ -146,12 +161,29 @@ function getBillCadenceLabel(bill: BillResponse) {
   return "Lancamento unico";
 }
 
+function getEditActionLabel(bill: BillResponse) {
+  return bill.billSeriesId ? "Editar ocorrencia" : "Editar";
+}
+
+function getPaymentActionLabel(bill: BillResponse, isBusy: boolean) {
+  if (isBusy) {
+    return "Atualizando...";
+  }
+
+  if (!bill.billSeriesId) {
+    return bill.isPaid ? "Desmarcar pagamento" : "Marcar como paga";
+  }
+
+  return bill.isPaid ? "Desmarcar ocorrencia paga" : "Marcar ocorrencia paga";
+}
+
 function buildEditFormState(bill: BillResponse): BillFormState {
   return {
     description: bill.description,
     amount: String(bill.amount),
     dueOn: bill.dueOn,
     kind: getBillKind(bill),
+    editScope: "single",
     recurrenceEndMode: "open_ended",
     recurrenceUntilDate: "",
     recurrenceCount: "",
@@ -163,6 +195,7 @@ export default function BillsPage() {
   const { session, isLoading, logout } = useProtectedSession();
   const [monthValue, setMonthValue] = useState(getCurrentMonthInputValue());
   const [statusFilter, setStatusFilter] = useState<"" | BillStatus>("");
+  const [accounts, setAccounts] = useState<AccountResponse[]>([]);
   const [bills, setBills] = useState<BillResponse[]>([]);
   const [form, setForm] = useState<BillFormState>(() =>
     createEmptyForm(getCurrentMonthInputValue()),
@@ -174,6 +207,8 @@ export default function BillsPage() {
   const [isFetching, setIsFetching] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [actionBillId, setActionBillId] = useState<string | null>(null);
+  const [paymentBillId, setPaymentBillId] = useState<string | null>(null);
+  const [paymentAccountId, setPaymentAccountId] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
 
   const monthAndYear = useMemo(
@@ -208,17 +243,21 @@ export default function BillsPage() {
       setLoadError("");
 
       try {
-        const response = await listBills(accessToken, {
-          month: monthAndYear.month,
-          year: monthAndYear.year,
-          status: statusFilter,
-        });
+        const [billsResponse, accountsResponse] = await Promise.all([
+          listBills(accessToken, {
+            month: monthAndYear.month,
+            year: monthAndYear.year,
+            status: statusFilter,
+          }),
+          listAccounts(accessToken),
+        ]);
 
         if (isCancelled) {
           return;
         }
 
-        setBills(response);
+        setBills(billsResponse);
+        setAccounts(accountsResponse.filter((account) => account.isActive));
       } catch (caughtError) {
         if (isUnauthorizedApiError(caughtError)) {
           logout("session-expired");
@@ -278,6 +317,26 @@ export default function BillsPage() {
     setFormError("");
     setSuccess("");
     resetForm(form.kind);
+  }
+
+  function closePaymentSelection() {
+    setPaymentBillId(null);
+    setPaymentAccountId("");
+  }
+
+  function beginPayBill(bill: BillResponse) {
+    if (accounts.length === 0) {
+      setFormError("Crie ou reative uma conta financeira antes de marcar um pagamento.");
+      return;
+    }
+
+    if (accounts.length === 1) {
+      void confirmPayment(bill, accounts[0].id);
+      return;
+    }
+
+    setPaymentBillId(bill.id);
+    setPaymentAccountId((current) => current || accounts[0]?.id || "");
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -359,6 +418,7 @@ export default function BillsPage() {
           description: form.description,
           amount: Number(form.amount),
           dueOn: form.dueOn,
+          scope: editingBill?.billSeriesId ? form.editScope : undefined,
         });
       } else {
         await createBill(session.accessToken, {
@@ -372,7 +432,13 @@ export default function BillsPage() {
       await refreshBills();
       setSuccess(
         editingBillId
-          ? "Conta a pagar atualizada com sucesso."
+          ? editingBill?.billSeriesId
+            ? form.editScope === "single"
+              ? "Ocorrencia atualizada com sucesso."
+              : form.editScope === "forward"
+                ? "Ocorrencia atual e futuras atualizadas com sucesso."
+                : "Serie inteira atualizada com sucesso."
+            : "Conta a pagar atualizada com sucesso."
           : "Conta a pagar criada com sucesso.",
       );
       resetForm(form.kind);
@@ -401,20 +467,63 @@ export default function BillsPage() {
       return;
     }
 
-    setActionBillId(bill.id);
     setFormError("");
     setSuccess("");
 
     try {
       if (bill.isPaid) {
+        setActionBillId(bill.id);
         await unpayBill(session.accessToken, bill.id);
-        setSuccess("Pagamento removido com sucesso.");
+        setSuccess(
+          bill.billSeriesId
+            ? "Pagamento desta ocorrencia removido com sucesso."
+            : "Pagamento removido com sucesso.",
+        );
       } else {
-        await payBill(session.accessToken, bill.id);
-        setSuccess("Bill marcada como paga.");
+        beginPayBill(bill);
+        return;
       }
 
       await refreshBills();
+    } catch (caughtError) {
+      if (isUnauthorizedApiError(caughtError)) {
+        logout("session-expired");
+        return;
+      }
+
+      setFormError(
+        getFriendlyApiMessage(
+          caughtError,
+          "Nao foi possivel atualizar a conta a pagar agora. Tente novamente.",
+          { messageMap: billMessageMap },
+        ),
+      );
+    } finally {
+      setActionBillId(null);
+    }
+  }
+
+  async function confirmPayment(bill: BillResponse, financialAccountId: string) {
+    if (!session) {
+      return;
+    }
+
+    if (!financialAccountId) {
+      setFormError("Escolha a conta financeira usada para pagar esta conta.");
+      return;
+    }
+
+    setActionBillId(bill.id);
+    setFormError("");
+    setSuccess("");
+
+    try {
+      await payBill(session.accessToken, bill.id, {
+        financialAccountId,
+      });
+      await refreshBills();
+      setSuccess("Conta marcada como paga e registrada como saida na conta escolhida.");
+      closePaymentSelection();
     } catch (caughtError) {
       if (isUnauthorizedApiError(caughtError)) {
         logout("session-expired");
@@ -548,14 +657,18 @@ export default function BillsPage() {
               {isEditing ? "Editando conta" : "Nova conta"}
             </div>
             <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
-              {isEditing ? "Corrigir vencimento" : "Registrar vencimento"}
+              {isEditing
+                ? editingBill?.billSeriesId
+                  ? "Corrigir ocorrencia da serie"
+                  : "Corrigir vencimento"
+                : "Registrar vencimento"}
             </h2>
 
             <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
               {isEditing ? (
                 <div className="rounded-[24px] border border-[color:rgba(15,118,110,0.14)] bg-[var(--color-accent-soft)] px-4 py-4 text-sm text-[var(--color-foreground)]">
                   <div className="font-medium">
-                    Você está editando{" "}
+                    Voce esta editando{" "}
                     <span className="font-semibold">
                       {editingBill?.description ?? "esta conta"}
                     </span>
@@ -563,9 +676,80 @@ export default function BillsPage() {
                   </div>
                   <div className="mt-1 text-[var(--color-muted)]">
                     {editingBill?.billSeriesId
-                      ? "A edição corrige só esta ocorrência já criada. Para parar as próximas, use Encerrar série na agenda."
-                      : "Ajuste descrição, valor ou vencimento e salve quando terminar."}
+                      ? "Escolha se a mudanca vale apenas aqui, desta ocorrencia em diante ou para toda a serie."
+                      : "Ajuste descricao, valor ou vencimento e salve quando terminar."}
                   </div>
+                </div>
+              ) : null}
+
+              {editingBill?.billSeriesId ? (
+                <div className="rounded-[24px] border border-[var(--color-line)] bg-white px-4 py-4 text-sm leading-6 text-[var(--color-muted)]">
+                  <div className="font-medium text-[var(--color-foreground)]">
+                    Como aplicar a edicao
+                  </div>
+                  <fieldset className="mt-4 space-y-3">
+                    <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-[var(--color-line)] px-4 py-3">
+                      <input
+                        checked={form.editScope === "single"}
+                        className="mt-1"
+                        name="edit-scope"
+                        onChange={() =>
+                          setForm((current) => ({ ...current, editScope: "single" }))
+                        }
+                        type="radio"
+                        value="single"
+                      />
+                      <span>
+                        <span className="block font-medium text-[var(--color-foreground)]">
+                          Apenas esta ocorrencia
+                        </span>
+                        <span className="block text-xs leading-5 text-[var(--color-muted)]">
+                          Corrige so este mes. O vencimento precisa continuar dentro do mesmo mes.
+                        </span>
+                      </span>
+                    </label>
+                    <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-[var(--color-line)] px-4 py-3">
+                      <input
+                        checked={form.editScope === "forward"}
+                        className="mt-1"
+                        name="edit-scope"
+                        onChange={() =>
+                          setForm((current) => ({ ...current, editScope: "forward" }))
+                        }
+                        type="radio"
+                        value="forward"
+                      />
+                      <span>
+                        <span className="block font-medium text-[var(--color-foreground)]">
+                          Esta e futuras
+                        </span>
+                        <span className="block text-xs leading-5 text-[var(--color-muted)]">
+                          Mantem o historico antigo e muda a recorrencia daqui para frente.
+                        </span>
+                      </span>
+                    </label>
+                    <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-[var(--color-line)] px-4 py-3">
+                      <input
+                        checked={form.editScope === "series"}
+                        className="mt-1"
+                        disabled={editingBill?.isPaid ?? false}
+                        name="edit-scope"
+                        onChange={() =>
+                          setForm((current) => ({ ...current, editScope: "series" }))
+                        }
+                        type="radio"
+                        value="series"
+                      />
+                      <span>
+                        <span className="block font-medium text-[var(--color-foreground)]">
+                          Toda a serie
+                        </span>
+                        <span className="block text-xs leading-5 text-[var(--color-muted)]">
+                          Reescreve todas as ocorrencias ainda coerentes com a serie. Se houver pagamento, use apenas esta ocorrencia ou esta e futuras.
+                        </span>
+                      </span>
+                    </label>
+                  </fieldset>
                 </div>
               ) : null}
 
@@ -745,7 +929,7 @@ export default function BillsPage() {
                   onClick={cancelEditing}
                   type="button"
                 >
-                  Cancelar edição
+                  Cancelar edicao
                 </button>
               ) : null}
             </form>
@@ -760,6 +944,9 @@ export default function BillsPage() {
                 <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
                   Contas encontradas
                 </h2>
+                <p className="mt-3 text-sm leading-6 text-[var(--color-muted)]">
+                  Em series recorrentes ou parceladas, voce pode editar so este mes, desta ocorrencia em diante ou a serie inteira. Encerrar serie impede as proximas nao pagas.
+                </p>
               </div>
               <div className="text-sm text-[var(--color-muted)]">
                 {bills.length} itens
@@ -811,6 +998,48 @@ export default function BillsPage() {
                               </>
                             ) : null}
                           </div>
+                          {paymentBillId === bill.id && !bill.isPaid ? (
+                            <div className="w-full rounded-[20px] border border-[var(--color-line)] bg-[var(--color-panel)] p-4 md:max-w-sm">
+                              <div className="text-sm font-semibold text-[var(--color-foreground)]">
+                                De qual conta saiu o dinheiro?
+                              </div>
+                              <div className="mt-1 text-xs leading-5 text-[var(--color-muted)]">
+                                Essa escolha gera a saida real para o saldo acompanhar o pagamento.
+                              </div>
+                              <label className="mt-4 flex flex-col gap-2 text-sm text-[var(--color-muted)]">
+                                <span>Conta financeira</span>
+                                <select
+                                  className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3 text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)]"
+                                  onChange={(event) => setPaymentAccountId(event.target.value)}
+                                  value={paymentAccountId}
+                                >
+                                  {accounts.map((account) => (
+                                    <option key={account.id} value={account.id}>
+                                      {account.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                              <div className="mt-4 flex flex-wrap gap-2">
+                                <button
+                                  className="rounded-2xl bg-[var(--color-foreground)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-70"
+                                  disabled={actionBillId === bill.id}
+                                  onClick={() => confirmPayment(bill, paymentAccountId)}
+                                  type="button"
+                                >
+                                  Confirmar pagamento
+                                </button>
+                                <button
+                                  className="rounded-2xl border border-[var(--color-line)] px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-white"
+                                  disabled={actionBillId === bill.id}
+                                  onClick={closePaymentSelection}
+                                  type="button"
+                                >
+                                  Cancelar
+                                </button>
+                              </div>
+                            </div>
+                          ) : null}
                         </div>
 
                         <div className="flex flex-col items-start gap-3 md:items-end">
@@ -824,7 +1053,9 @@ export default function BillsPage() {
                               onClick={() => startEditing(bill)}
                               type="button"
                             >
-                              {editingBillId === bill.id ? "Editando" : "Editar"}
+                              {editingBillId === bill.id
+                                ? "Editando"
+                                : getEditActionLabel(bill)}
                             </button>
                             <button
                               className="rounded-2xl border border-[var(--color-line)] px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-[var(--color-accent-soft)] disabled:cursor-not-allowed disabled:opacity-70"
@@ -832,11 +1063,7 @@ export default function BillsPage() {
                               onClick={() => handleTogglePayment(bill)}
                               type="button"
                             >
-                              {actionBillId === bill.id
-                                ? "Atualizando..."
-                                : bill.isPaid
-                                  ? "Desmarcar pagamento"
-                                  : "Marcar como paga"}
+                              {getPaymentActionLabel(bill, actionBillId === bill.id)}
                             </button>
                             <button
                               className="rounded-2xl border border-[color:rgba(185,28,28,0.14)] px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-[color:rgba(254,226,226,0.7)] disabled:cursor-not-allowed disabled:opacity-70"
@@ -847,7 +1074,7 @@ export default function BillsPage() {
                               {actionBillId === bill.id
                                 ? "Atualizando..."
                                 : bill.billSeriesId
-                                  ? "Encerrar série"
+                                  ? "Encerrar serie"
                                   : "Excluir"}
                             </button>
                           </div>

@@ -5,7 +5,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import DashboardPage from "@/app/dashboard/page";
 import {
   ApiError,
-  createAccount,
   createTransaction,
   getAlerts,
   getBillsSummary,
@@ -67,7 +66,6 @@ vi.mock("@/lib/api", async () => {
 
   return {
     ...actual,
-    createAccount: vi.fn(),
     createTransaction: vi.fn(),
     getAlerts: vi.fn(),
     getBillsSummary: vi.fn(),
@@ -83,7 +81,6 @@ vi.mock("@/lib/api", async () => {
 });
 
 const mockedUseProtectedSession = vi.mocked(useProtectedSession);
-const mockedCreateAccount = vi.mocked(createAccount);
 const mockedCreateTransaction = vi.mocked(createTransaction);
 const mockedGetAlerts = vi.mocked(getAlerts);
 const mockedGetBillsSummary = vi.mocked(getBillsSummary);
@@ -109,6 +106,7 @@ function createFreeMoneyResponse(
   return {
     month: 3,
     year: 2026,
+    isProjection: false,
     totalIncome: 0,
     totalExpense: 0,
     balance: 0,
@@ -262,7 +260,6 @@ function mockDashboardApi(overrides?: {
 describe("DashboardPage", () => {
   beforeEach(() => {
     mockedUseProtectedSession.mockReset();
-    mockedCreateAccount.mockReset();
     mockedCreateTransaction.mockReset();
     mockedGetAlerts.mockReset();
     mockedGetBillsSummary.mockReset();
@@ -305,9 +302,9 @@ describe("DashboardPage", () => {
       screen.getByText(/Sem uma conta financeira/i),
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /criar primeira conta/i })).toBeInTheDocument();
-    expect(await screen.findAllByText("Criar primeira conta")).toHaveLength(2);
-    expect(screen.getByLabelText(/nome da conta/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/^tipo$/i)).toBeInTheDocument();
+    expect(await screen.findAllByText("Criar primeira conta")).toHaveLength(1);
+    expect(screen.queryByLabelText(/nome da conta/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^tipo$/i)).not.toBeInTheDocument();
     expect(screen.queryByText("Resumo financeiro")).not.toBeInTheDocument();
     expect(screen.queryByText("Contas a pagar do mês")).not.toBeInTheDocument();
     expect(screen.queryByText("Leitura por categoria")).not.toBeInTheDocument();
@@ -464,103 +461,49 @@ describe("DashboardPage", () => {
     expect(
       screen.getAllByRole("link", { name: /importar (dados de )?arquivo/i }),
     ).not.toHaveLength(0);
-    expect(screen.getByText("Suas contas financeiras")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /^adicionar conta$/i }),
-    ).toBeInTheDocument();
+    expect(screen.queryByText("Suas contas financeiras")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^adicionar conta$/i })).not.toBeInTheDocument();
     expect(screen.queryByText("Resumo financeiro")).not.toBeInTheDocument();
     expect(screen.queryByText("Contas a pagar do mês")).not.toBeInTheDocument();
     expect(screen.queryByText("Leitura por categoria")).not.toBeInTheDocument();
   });
 
-  it("Dashboard_WithExistingAccount_AllowsCreatingAdditionalAccount", async () => {
-    const user = userEvent.setup();
-
+  it("Dashboard_QuickEntry_UsesOnlyActiveAccounts", async () => {
     mockedUseProtectedSession.mockReturnValue({
       session,
       isLoading: false,
       logout: vi.fn(),
     });
 
-    const primaryAccount = {
-      id: "account-1",
-      name: "Conta principal",
-      type: 2 as const,
-      isActive: true,
-      createdAtUtc: "2026-03-01T00:00:00Z",
-    };
-    const secondaryAccount = {
-      id: "account-2",
-      name: "Cartão do dia a dia",
-      type: 3 as const,
-      isActive: true,
-      createdAtUtc: "2026-03-02T00:00:00Z",
-    };
-
     mockDashboardApi({
-      accounts: [primaryAccount],
+      accounts: [
+        {
+          id: "account-1",
+          name: "Conta principal",
+          type: 2,
+          isActive: true,
+          createdAtUtc: "2026-03-01T00:00:00Z",
+        },
+        {
+          id: "account-2",
+          name: "Cartao antigo",
+          type: 3,
+          isActive: false,
+          createdAtUtc: "2026-03-02T00:00:00Z",
+        },
+      ],
     });
-    mockedListAccounts.mockResolvedValueOnce([primaryAccount]).mockResolvedValue([
-      primaryAccount,
-      secondaryAccount,
-    ]);
-    mockedCreateAccount.mockResolvedValue(secondaryAccount);
 
     render(<DashboardPage />);
 
-    expect(await screen.findByText("Suas contas financeiras")).toBeInTheDocument();
-    expect(screen.getAllByText("Conta principal").length).toBeGreaterThan(0);
+    const accountSelect = await screen.findByLabelText(/conta financeira/i);
 
-    await user.type(screen.getByLabelText(/nome da conta/i), "Cartão do dia a dia");
-    await user.selectOptions(screen.getByLabelText(/tipo da conta/i), "3");
-    await user.click(screen.getByRole("button", { name: /^adicionar conta$/i }));
-
-    await waitFor(() => {
-      expect(mockedCreateAccount).toHaveBeenCalledWith("token", {
-        name: "Cartão do dia a dia",
-        type: 3,
-      });
-    });
-
+    expect(accountSelect).toHaveValue("account-1");
+    expect(accountSelect).toBeDisabled();
+    expect(screen.getByRole("option", { name: "Conta principal" })).toBeInTheDocument();
     expect(
-      await screen.findByText(
-        "Conta adicionada com sucesso. Agora escolha em qual conta deseja registrar a próxima movimentação ou importação.",
-      ),
-    ).toBeInTheDocument();
-    expect(screen.getAllByText("Cartão do dia a dia").length).toBeGreaterThan(0);
-    expect(screen.getByLabelText(/conta financeira/i)).not.toBeDisabled();
-  });
-
-  it("Dashboard_ManyAccounts_ConstrainsAccountListInsideScrollablePanel", async () => {
-    mockedUseProtectedSession.mockReturnValue({
-      session,
-      isLoading: false,
-      logout: vi.fn(),
-    });
-
-    mockDashboardApi({
-      accounts: Array.from({ length: 6 }, (_, index) => ({
-        id: `account-${index + 1}`,
-        name: `Conta ${index + 1}`,
-        type: 2 as const,
-        isActive: true,
-        createdAtUtc: "2026-03-01T00:00:00Z",
-      })),
-    });
-
-    render(<DashboardPage />);
-
-    const accountsList = await screen.findByLabelText("Lista de contas financeiras");
-    const quickEntryLayout = screen.getByTestId("quick-entry-layout");
-    const accountsRail = screen.getByTestId("accounts-rail");
-
-    expect(quickEntryLayout.className).toContain("items-start");
-    expect(accountsRail.className).toContain("xl:max-h-[34rem]");
-    expect(accountsRail.className).toContain("xl:grid-rows-[minmax(0,1fr)_auto]");
-    expect(accountsList.className).toContain("max-h-[22rem]");
-    expect(accountsList.className).toContain("xl:flex-1");
-    expect(accountsList.className).toContain("overflow-y-auto");
-    expect(accountsList).toHaveTextContent("Conta 6");
+      screen.queryByRole("option", { name: /Cartao antigo/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("Dashboard_RegisterNow_SubmitSuccess_RefreshesDataAndClearsForm", async () => {
@@ -979,6 +922,60 @@ describe("DashboardPage", () => {
     expect(screen.queryByText("Alertas do mês")).not.toBeInTheDocument();
   });
 
+  it("Dashboard_UsesConsistentDesktopGridAcrossMonthAndSummarySections", async () => {
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+    mockDashboardApi({
+      accounts: [
+        {
+          id: "account-1",
+          name: "Conta principal",
+          type: 2,
+          isActive: true,
+          createdAtUtc: "2026-03-01T00:00:00Z",
+        },
+      ],
+      transactions: [
+        {
+          id: "transaction-1",
+          financialAccountId: "account-1",
+          categoryId: null,
+          type: 1,
+          amount: 3000,
+          description: "Salario",
+          occurredOn: "2026-03-01",
+          createdAtUtc: "2026-03-01T00:00:00Z",
+        },
+      ],
+      monthHealth: {
+        status: "attention",
+        summary: {
+          message: "Seu mes pede alguns ajustes agora.",
+          cause: "As contas pendentes ja consomem a maior parte da sua folga.",
+          action: "Organize a ordem de pagamento e preserve caixa para o essencial.",
+        },
+        insights: [],
+      },
+    });
+
+    render(<DashboardPage />);
+
+    const monthHealthGrid = await screen.findByTestId("dashboard-month-health-grid");
+    const summaryGrid = screen.getByTestId("dashboard-summary-grid");
+
+    expect(monthHealthGrid.className).toContain("gap-6");
+    expect(summaryGrid.className).toContain("gap-6");
+    expect(monthHealthGrid.className).toContain(
+      "xl:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)]",
+    );
+    expect(summaryGrid.className).toContain(
+      "xl:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)]",
+    );
+  });
+
   it("Dashboard_FreeMoneyComposition_ShowsPlannedAndUnpaidReservesBelowDinheiroLivre", async () => {
     mockedUseProtectedSession.mockReturnValue({
       session,
@@ -1201,6 +1198,10 @@ describe("DashboardPage", () => {
       "/budget",
     );
     expect(screen.queryByRole("link", { name: /continuar acompanhando/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Ver analise do mes" })).toHaveAttribute(
+      "href",
+      "/analysis?month=2026-04",
+    );
   });
 
   it("Dashboard_WithMonthHealth_ShowsActiveInsights", async () => {

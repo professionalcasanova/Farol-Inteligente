@@ -17,4 +17,6 @@ public sealed class UpdateBillRequest
 
     [Required]
     public DateOnly DueOn { get; init; }
+
+    public string? Scope { get; init; }
 }

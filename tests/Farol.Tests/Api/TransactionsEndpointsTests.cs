@@ -313,6 +313,48 @@ public sealed class TransactionsEndpointsTests : IClassFixture<FarolApiFactory>
     }
 
     [Fact]
+    public async Task GetTransactionsHistory_ShouldReturnPaginatedTransactions()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var seed = await SeedOwnedAccountAndSystemCategoryAsync("maria@email.com", "Conta Maria", "Moradia", CategoryType.Expense);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        for (var day = 1; day <= 12; day++)
+        {
+            var response = await client.PostAsJsonAsync("/api/transactions", new CreateTransactionRequest
+            {
+                FinancialAccountId = seed.AccountId,
+                CategoryId = seed.CategoryId,
+                Type = TransactionType.Expense,
+                Amount = 10m + day,
+                Description = $"Despesa {day:00}",
+                OccurredOn = new DateOnly(2026, 3, day)
+            });
+
+            response.EnsureSuccessStatusCode();
+        }
+
+        var history = await client.GetFromJsonAsync<TransactionHistoryResponse>(
+            "/api/transactions/history?page=2&pageSize=5");
+
+        Assert.NotNull(history);
+        Assert.Equal(2, history.Page);
+        Assert.Equal(5, history.PageSize);
+        Assert.Equal(12, history.TotalItems);
+        Assert.Equal(3, history.TotalPages);
+        Assert.Collection(
+            history.Items,
+            item => Assert.Equal("Despesa 07", item.Description),
+            item => Assert.Equal("Despesa 06", item.Description),
+            item => Assert.Equal("Despesa 05", item.Description),
+            item => Assert.Equal("Despesa 04", item.Description),
+            item => Assert.Equal("Despesa 03", item.Description));
+    }
+
+    [Fact]
     public async Task PutTransactions_ShouldUpdateOwnedTransaction()
     {
         await _factory.ResetDatabaseAsync();

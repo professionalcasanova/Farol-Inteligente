@@ -141,10 +141,10 @@ describe("BudgetPage", () => {
     render(<BudgetPage />);
 
     await user.click(
-      await screen.findByRole("button", { name: /salvar orcamento mensal/i }),
+      await screen.findByRole("button", { name: /salvar visao do mes/i }),
     );
 
-    expect(await screen.findByText(/limpo com sucesso/i)).toBeInTheDocument();
+    expect(await screen.findByText(/visao do mes limpa com sucesso/i)).toBeInTheDocument();
 
     await waitFor(() => {
       expect(mockedSaveMonthlyBudget).toHaveBeenCalledTimes(1);
@@ -242,7 +242,9 @@ describe("BudgetPage", () => {
 
     render(<BudgetPage />);
 
-    await user.click(await screen.findByRole("button", { name: /aplicar base ao mes/i }));
+    await user.click(
+      await screen.findByRole("button", { name: /aplicar base a visao do mes/i }),
+    );
 
     await waitFor(() => {
       expect(mockedApplyBudgetTemplate).toHaveBeenCalledWith("token", {
@@ -252,7 +254,7 @@ describe("BudgetPage", () => {
     });
 
     expect(
-      await screen.findByText(/planejamento base aplicado ao mes com sucesso/i),
+      await screen.findByText(/planejamento base aplicado a visao do mes com sucesso/i),
     ).toBeInTheDocument();
   });
 
@@ -262,7 +264,7 @@ describe("BudgetPage", () => {
     render(<BudgetPage />);
 
     expect(
-      await screen.findByText(/Voce esta editando o snapshot de/i),
+      await screen.findByText(/Voce esta editando a visao de/i),
     ).toBeInTheDocument();
     expect(
       screen.getByText(/Salvar aqui substitui apenas este mes/i),
@@ -270,5 +272,87 @@ describe("BudgetPage", () => {
     expect(
       screen.getByRole("link", { name: /movimentacoes/i }),
     ).toHaveAttribute("href", "/transactions");
+  });
+
+  it("Budget_SnapshotSummary_ShowsWhatStayedChangedOrWasLeftOut", async () => {
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+
+    mockedListCategories.mockResolvedValue([
+      {
+        id: "category-1",
+        name: "Alimentacao",
+        type: 2,
+        isSystem: true,
+      },
+      {
+        id: "category-2",
+        name: "Moradia",
+        type: 2,
+        isSystem: true,
+      },
+      {
+        id: "category-3",
+        name: "Internet",
+        type: 2,
+        isSystem: true,
+      },
+    ]);
+
+    mockedGetMonthlyBudget.mockResolvedValue({
+      month: 3,
+      year: 2026,
+      totalPlanned: 1500,
+      totalSpent: 320,
+      totalRemaining: 1180,
+      categories: [
+        {
+          categoryId: "category-1",
+          categoryName: "Alimentacao",
+          planned: 500,
+          spent: 200,
+          remaining: 300,
+        },
+        {
+          categoryId: "category-2",
+          categoryName: "Moradia",
+          planned: 1000,
+          spent: 120,
+          remaining: 880,
+        },
+      ],
+    });
+
+    mockedGetBudgetTemplate.mockResolvedValue({
+      totalPlanned: 610,
+      categories: [
+        {
+          categoryId: "category-1",
+          categoryName: "Alimentacao",
+          planned: 500,
+        },
+        {
+          categoryId: "category-3",
+          categoryName: "Internet",
+          planned: 110,
+        },
+      ],
+    });
+
+    render(<BudgetPage />);
+
+    expect(
+      await screen.findByText(/como a visao de .* ficou/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Igual a base")).toBeInTheDocument();
+    expect(screen.getByText("Somente neste mes")).toBeInTheDocument();
+    expect(screen.getByText("Ficou fora da visao do mes")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Categorias da base que ficaram fora/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Base recorrente:/i)).toBeInTheDocument();
   });
 });

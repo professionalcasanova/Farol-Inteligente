@@ -9,7 +9,7 @@ import {
   deleteTransaction,
   listAccounts,
   listCategories,
-  listTransactions,
+  listTransactionHistory,
   updateTransaction,
 } from "@/lib/api";
 import { useProtectedSession } from "@/lib/use-protected-session";
@@ -53,7 +53,7 @@ vi.mock("@/lib/api", async () => {
     deleteTransaction: vi.fn(),
     listAccounts: vi.fn(),
     listCategories: vi.fn(),
-    listTransactions: vi.fn(),
+    listTransactionHistory: vi.fn(),
     updateTransaction: vi.fn(),
   };
 });
@@ -63,7 +63,7 @@ const mockedCreateTransaction = vi.mocked(createTransaction);
 const mockedDeleteTransaction = vi.mocked(deleteTransaction);
 const mockedListAccounts = vi.mocked(listAccounts);
 const mockedListCategories = vi.mocked(listCategories);
-const mockedListTransactions = vi.mocked(listTransactions);
+const mockedListTransactionHistory = vi.mocked(listTransactionHistory);
 const mockedUpdateTransaction = vi.mocked(updateTransaction);
 
 const session = {
@@ -127,20 +127,26 @@ function mockTransactionsApi(overrides?: {
     ],
   );
 
-  mockedListTransactions.mockResolvedValue(
-    overrides?.transactions ?? [
-      {
-        id: "transaction-1",
-        financialAccountId: "account-1",
-        categoryId: "category-1",
-        type: 2,
-        amount: 85,
-        description: "Mercado",
-        occurredOn: "2026-03-21",
-        createdAtUtc: "2026-03-21T00:00:00Z",
-      },
-    ],
-  );
+  const transactions = overrides?.transactions ?? [
+    {
+      id: "transaction-1",
+      financialAccountId: "account-1",
+      categoryId: "category-1",
+      type: 2,
+      amount: 85,
+      description: "Mercado",
+      occurredOn: "2026-03-21",
+      createdAtUtc: "2026-03-21T00:00:00Z",
+    },
+  ];
+
+  mockedListTransactionHistory.mockResolvedValue({
+    items: transactions,
+    page: 1,
+    pageSize: 10,
+    totalItems: transactions.length,
+    totalPages: 1,
+  });
 }
 
 describe("TransactionsPage", () => {
@@ -150,7 +156,7 @@ describe("TransactionsPage", () => {
     mockedDeleteTransaction.mockReset();
     mockedListAccounts.mockReset();
     mockedListCategories.mockReset();
-    mockedListTransactions.mockReset();
+    mockedListTransactionHistory.mockReset();
     mockedUpdateTransaction.mockReset();
     window.history.replaceState({}, "", "/transactions");
   });
@@ -206,32 +212,44 @@ describe("TransactionsPage", () => {
       createdAtUtc: "2026-03-21T00:00:00Z",
     });
 
-    mockedListTransactions.mockReset();
-    mockedListTransactions
-      .mockResolvedValueOnce([
-        {
-          id: "transaction-1",
-          financialAccountId: "account-2",
-          categoryId: "category-1",
-          type: 2,
-          amount: 85,
-          description: "Mercado",
-          occurredOn: "2026-03-21",
-          createdAtUtc: "2026-03-21T00:00:00Z",
-        },
-      ])
-      .mockResolvedValue([
-        {
-          id: "transaction-1",
-          financialAccountId: "account-2",
-          categoryId: "category-1",
-          type: 2,
-          amount: 120,
-          description: "Mercado da semana",
-          occurredOn: "2026-03-21",
-          createdAtUtc: "2026-03-21T00:00:00Z",
-        },
-      ]);
+    mockedListTransactionHistory.mockReset();
+    mockedListTransactionHistory
+      .mockResolvedValueOnce({
+        items: [
+          {
+            id: "transaction-1",
+            financialAccountId: "account-2",
+            categoryId: "category-1",
+            type: 2,
+            amount: 85,
+            description: "Mercado",
+            occurredOn: "2026-03-21",
+            createdAtUtc: "2026-03-21T00:00:00Z",
+          },
+        ],
+        page: 1,
+        pageSize: 10,
+        totalItems: 1,
+        totalPages: 1,
+      })
+      .mockResolvedValue({
+        items: [
+          {
+            id: "transaction-1",
+            financialAccountId: "account-2",
+            categoryId: "category-1",
+            type: 2,
+            amount: 120,
+            description: "Mercado da semana",
+            occurredOn: "2026-03-21",
+            createdAtUtc: "2026-03-21T00:00:00Z",
+          },
+        ],
+        page: 1,
+        pageSize: 10,
+        totalItems: 1,
+        totalPages: 1,
+      });
 
     render(<TransactionsPage />);
 
@@ -324,20 +342,32 @@ describe("TransactionsPage", () => {
     mockedDeleteTransaction.mockResolvedValue(undefined);
     window.history.replaceState({}, "", "/transactions?edit=transaction-1");
     mockTransactionsApi();
-    mockedListTransactions
-      .mockResolvedValueOnce([
-        {
-          id: "transaction-1",
-          financialAccountId: "account-1",
-          categoryId: "category-1",
-          type: 2,
-          amount: 85,
-          description: "Mercado",
-          occurredOn: "2026-03-21",
-          createdAtUtc: "2026-03-21T00:00:00Z",
-        },
-      ])
-      .mockResolvedValue([]);
+    mockedListTransactionHistory
+      .mockResolvedValueOnce({
+        items: [
+          {
+            id: "transaction-1",
+            financialAccountId: "account-1",
+            categoryId: "category-1",
+            type: 2,
+            amount: 85,
+            description: "Mercado",
+            occurredOn: "2026-03-21",
+            createdAtUtc: "2026-03-21T00:00:00Z",
+          },
+        ],
+        page: 1,
+        pageSize: 10,
+        totalItems: 1,
+        totalPages: 1,
+      })
+      .mockResolvedValue({
+        items: [],
+        page: 1,
+        pageSize: 10,
+        totalItems: 0,
+        totalPages: 1,
+      });
 
     render(<TransactionsPage />);
 
@@ -423,6 +453,218 @@ describe("TransactionsPage", () => {
     ).toBeInTheDocument();
     expect(mockedCreateTransaction).not.toHaveBeenCalled();
     expect(mockedUpdateTransaction).not.toHaveBeenCalled();
+  });
+
+  it("Transactions_HistoryPagination_ChangesPageAndPageSizeInsideHistoryBlock", async () => {
+    const user = userEvent.setup();
+
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+
+    const firstPageItems = Array.from({ length: 10 }, (_, index) => ({
+      id: `transaction-${index + 1}`,
+      financialAccountId: "account-1",
+      categoryId: "category-1",
+      type: 2 as const,
+      amount: 50 + index,
+      description: `Despesa ${index + 1}`,
+      occurredOn: `2026-03-${String(21 - index).padStart(2, "0")}`,
+      createdAtUtc: `2026-03-${String(21 - index).padStart(2, "0")}T00:00:00Z`,
+    }));
+
+    mockTransactionsApi({
+      transactions: firstPageItems,
+    });
+
+    mockedListTransactionHistory
+      .mockResolvedValueOnce({
+        items: firstPageItems,
+        page: 1,
+        pageSize: 10,
+        totalItems: 12,
+        totalPages: 2,
+      })
+      .mockResolvedValueOnce({
+        items: [
+          {
+            id: "transaction-11",
+            financialAccountId: "account-1",
+            categoryId: "category-1",
+            type: 2,
+            amount: 61,
+            description: "Despesa 11",
+            occurredOn: "2026-03-11",
+            createdAtUtc: "2026-03-11T00:00:00Z",
+          },
+          {
+            id: "transaction-12",
+            financialAccountId: "account-1",
+            categoryId: "category-1",
+            type: 2,
+            amount: 62,
+            description: "Despesa 12",
+            occurredOn: "2026-03-10",
+            createdAtUtc: "2026-03-10T00:00:00Z",
+          },
+        ],
+        page: 2,
+        pageSize: 10,
+        totalItems: 12,
+        totalPages: 2,
+      })
+      .mockResolvedValueOnce({
+        items: [
+          ...firstPageItems,
+          {
+            id: "transaction-11",
+            financialAccountId: "account-1",
+            categoryId: "category-1",
+            type: 2,
+            amount: 61,
+            description: "Despesa 11",
+            occurredOn: "2026-03-11",
+            createdAtUtc: "2026-03-11T00:00:00Z",
+          },
+          {
+            id: "transaction-12",
+            financialAccountId: "account-1",
+            categoryId: "category-1",
+            type: 2,
+            amount: 62,
+            description: "Despesa 12",
+            occurredOn: "2026-03-10",
+            createdAtUtc: "2026-03-10T00:00:00Z",
+          },
+        ],
+        page: 1,
+        pageSize: 25,
+        totalItems: 12,
+        totalPages: 1,
+      });
+
+    render(<TransactionsPage />);
+
+    expect(await screen.findByText("Mostrando 1-10 de 12")).toBeInTheDocument();
+    expect(screen.getByText("Página 1 de 2")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /próxima página/i }));
+
+    await waitFor(() => {
+      expect(mockedListTransactionHistory).toHaveBeenLastCalledWith("token", {
+        page: 2,
+        pageSize: 10,
+      });
+    });
+
+    expect(await screen.findByText("Mostrando 11-12 de 12")).toBeInTheDocument();
+    expect(screen.getByText("Página 2 de 2")).toBeInTheDocument();
+    expect(screen.getByText("Despesa 11")).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText(/itens por página/i), "25");
+
+    await waitFor(() => {
+      expect(mockedListTransactionHistory).toHaveBeenLastCalledWith("token", {
+        page: 1,
+        pageSize: 25,
+      });
+    });
+
+    expect(await screen.findByText("Mostrando 1-12 de 12")).toBeInTheDocument();
+    expect(screen.getByText("Página 1 de 1")).toBeInTheDocument();
+  });
+
+  it("Transactions_Create_IgnoresInactiveAccountsInNewSelections", async () => {
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+
+    mockTransactionsApi({
+      accounts: [
+        {
+          id: "account-1",
+          name: "Conta principal",
+          type: 2,
+          isActive: true,
+          createdAtUtc: "2026-03-01T00:00:00Z",
+        },
+        {
+          id: "account-2",
+          name: "Cartao antigo",
+          type: 3,
+          isActive: false,
+          createdAtUtc: "2026-03-02T00:00:00Z",
+        },
+      ],
+    });
+
+    render(<TransactionsPage />);
+
+    const accountSelect = await screen.findByLabelText(/conta financeira/i);
+
+    expect(accountSelect).toHaveValue("account-1");
+    expect(accountSelect).toBeDisabled();
+    expect(screen.getByRole("option", { name: "Conta principal" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("option", { name: /Cartao antigo/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("Transactions_Edit_KeepsInactiveCurrentAccountAvailable", async () => {
+    const user = userEvent.setup();
+
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+
+    mockTransactionsApi({
+      accounts: [
+        {
+          id: "account-1",
+          name: "Conta principal",
+          type: 2,
+          isActive: true,
+          createdAtUtc: "2026-03-01T00:00:00Z",
+        },
+        {
+          id: "account-2",
+          name: "Cartao antigo",
+          type: 3,
+          isActive: false,
+          createdAtUtc: "2026-03-02T00:00:00Z",
+        },
+      ],
+      transactions: [
+        {
+          id: "transaction-1",
+          financialAccountId: "account-2",
+          categoryId: "category-1",
+          type: 2,
+          amount: 85,
+          description: "Mercado",
+          occurredOn: "2026-03-21",
+          createdAtUtc: "2026-03-21T00:00:00Z",
+        },
+      ],
+    });
+
+    render(<TransactionsPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Editar" }));
+
+    expect(screen.getByLabelText(/conta financeira/i)).toHaveValue("account-2");
+    expect(
+      screen.getByRole("option", { name: "Cartao antigo (inativa)" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Esta transação segue vinculada a uma conta inativa/i),
+    ).toBeInTheDocument();
   });
 });
 

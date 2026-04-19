@@ -1,7 +1,4 @@
-using System.Text;
 using Farol.Api.Common;
-using Farol.Domain.Categories;
-using Farol.Domain.Ledger;
 using Farol.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -12,7 +9,9 @@ namespace Farol.Api.Modules.Imports;
 [ApiController]
 [Authorize]
 [Route("api/imports/transactions")]
-public sealed class ImportsController(FarolDbContext dbContext) : ControllerBase
+public sealed class ImportsController(
+    FarolDbContext dbContext,
+    TransactionCsvImportProcessor importProcessor) : ControllerBase
 {
     [HttpPost("csv")]
     [Consumes("multipart/form-data")]
@@ -32,7 +31,7 @@ public sealed class ImportsController(FarolDbContext dbContext) : ControllerBase
 
         if (request.File.Length == 0)
         {
-            return BadRequest(new ErrorResponse("O arquivo CSV está vazio."));
+            return BadRequest(new ErrorResponse("O arquivo CSV esta vazio."));
         }
 
         var financialAccount = await dbContext.FinancialAccounts
@@ -45,133 +44,17 @@ public sealed class ImportsController(FarolDbContext dbContext) : ControllerBase
             return NotFound(new ErrorResponse("Financial account was not found."));
         }
 
-        using var reader = new StreamReader(
-            request.File.OpenReadStream(),
-            Encoding.UTF8,
-            detectEncodingFromByteOrderMarks: true);
-
-        var headerLine = await reader.ReadLineAsync(cancellationToken);
-
-        if (headerLine is null)
+        try
         {
-            return BadRequest(new ErrorResponse("O arquivo CSV está vazio."));
+            return Ok(await importProcessor.ProcessAsync(
+                userId,
+                financialAccount,
+                request.File,
+                cancellationToken));
         }
-
-        if (!TransactionCsvParser.IsExpectedHeader(headerLine))
+        catch (InvalidOperationException exception)
         {
-            return BadRequest(new ErrorResponse("O cabeçalho do CSV é inválido. Use: occurredOn,description,amount,type,categoryName."));
+            return BadRequest(new ErrorResponse(exception.Message));
         }
-
-        var visibleCategories = await dbContext.Categories
-            .AsNoTracking()
-            .Where(category => category.IsSystem || category.UserId == userId)
-            .OrderByDescending(category => category.IsSystem)
-            .ThenBy(category => category.Name)
-            .ToListAsync(cancellationToken);
-
-        var categoryResolver = new TransactionImportCategoryResolver(visibleCategories);
-        var errors = new List<ImportTransactionsCsvErrorResponse>();
-        var importedRows = 0;
-        var totalRows = 0;
-        var rowNumber = 1;
-
-        while (await reader.ReadLineAsync(cancellationToken) is { } line)
-        {
-            rowNumber++;
-
-            if (string.IsNullOrWhiteSpace(line))
-            {
-                continue;
-            }
-
-            totalRows++;
-
-            if (!TransactionCsvParser.TryParseRow(line, rowNumber, out var parsedRow, out var error))
-            {
-                errors.Add(new ImportTransactionsCsvErrorResponse
-                {
-                    RowNumber = rowNumber,
-                    Message = error
-                });
-                continue;
-            }
-
-            Category? category;
-
-            if (!string.IsNullOrWhiteSpace(parsedRow.CategoryName))
-            {
-                if (!categoryResolver.TryResolveExplicit(parsedRow.CategoryName, out category))
-                {
-                    errors.Add(new ImportTransactionsCsvErrorResponse
-                    {
-                        RowNumber = rowNumber,
-                        Message = "A categoria informada não foi encontrada."
-                    });
-                    continue;
-                }
-            }
-            else
-            {
-                category = categoryResolver.ResolveByRule(parsedRow.Description, parsedRow.Type);
-            }
-
-            if (category is not null && !category.CanBeAssignedTo(parsedRow.Type))
-            {
-                errors.Add(new ImportTransactionsCsvErrorResponse
-                {
-                    RowNumber = rowNumber,
-                    Message = "A categoria informada não combina com o tipo da transação."
-                });
-                continue;
-            }
-
-            try
-            {
-                dbContext.Transactions.Add(new Transaction(
-                    financialAccount,
-                    parsedRow.Type,
-                    parsedRow.Amount,
-                    parsedRow.Description,
-                    parsedRow.OccurredOn,
-                    category));
-
-                importedRows++;
-            }
-            catch (Exception exception) when (
-                exception is ArgumentException or
-                ArgumentOutOfRangeException or
-                InvalidOperationException)
-            {
-                errors.Add(new ImportTransactionsCsvErrorResponse
-                {
-                    RowNumber = rowNumber,
-                    Message = exception.Message
-                });
-            }
-        }
-
-        if (totalRows == 0)
-        {
-            return Ok(new ImportTransactionsCsvResponse
-            {
-                TotalRows = 0,
-                ImportedRows = 0,
-                SkippedRows = 0,
-                Errors = Array.Empty<ImportTransactionsCsvErrorResponse>()
-            });
-        }
-
-        if (importedRows > 0)
-        {
-            await dbContext.SaveChangesAsync(cancellationToken);
-        }
-
-        return Ok(new ImportTransactionsCsvResponse
-        {
-            TotalRows = totalRows,
-            ImportedRows = importedRows,
-            SkippedRows = totalRows - importedRows,
-            Errors = errors
-        });
     }
 }

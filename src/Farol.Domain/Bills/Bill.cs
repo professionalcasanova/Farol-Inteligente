@@ -18,6 +18,7 @@ public sealed class Bill
     public int? OccurrenceNumber { get; private set; }
     public int? TotalOccurrences { get; private set; }
     public bool IsPaid { get; private set; }
+    public Guid? PaidTransactionId { get; private set; }
     public DateTimeOffset? PaidAtUtc { get; private set; }
     public DateTimeOffset CreatedAtUtc { get; private set; }
 
@@ -44,11 +45,12 @@ public sealed class Bill
         OccurrenceNumber = EnsureOccurrenceNumber(billSeriesId, occurrenceNumber);
         TotalOccurrences = EnsureTotalOccurrences(billSeriesId, occurrenceNumber, totalOccurrences);
         IsPaid = false;
+        PaidTransactionId = null;
         PaidAtUtc = null;
         CreatedAtUtc = DateTimeOffset.UtcNow;
     }
 
-    public void MarkAsPaid(DateTimeOffset? paidAtUtc = null)
+    public void MarkAsPaid(DateTimeOffset? paidAtUtc = null, Guid? paidTransactionId = null)
     {
         if (IsPaid && PaidAtUtc.HasValue)
         {
@@ -56,12 +58,14 @@ public sealed class Bill
         }
 
         IsPaid = true;
+        PaidTransactionId = EnsurePaidTransactionId(paidTransactionId);
         PaidAtUtc = paidAtUtc?.ToUniversalTime() ?? DateTimeOffset.UtcNow;
     }
 
     public void MarkAsUnpaid()
     {
         IsPaid = false;
+        PaidTransactionId = null;
         PaidAtUtc = null;
     }
 
@@ -70,6 +74,13 @@ public sealed class Bill
         Description = NormalizeDescription(description);
         Amount = EnsureAmount(amount);
         DueOn = EnsureDueOn(dueOn);
+    }
+
+    public void ReassignSeries(Guid billSeriesId, int? occurrenceNumber, int? totalOccurrences)
+    {
+        BillSeriesId = EnsureBillSeriesId(billSeriesId, occurrenceNumber, totalOccurrences);
+        OccurrenceNumber = EnsureOccurrenceNumber(billSeriesId, occurrenceNumber);
+        TotalOccurrences = EnsureTotalOccurrences(billSeriesId, occurrenceNumber, totalOccurrences);
     }
 
     private static Guid EnsureUserId(Guid userId)
@@ -187,5 +198,20 @@ public sealed class Bill
         }
 
         return value;
+    }
+
+    private static Guid? EnsurePaidTransactionId(Guid? value)
+    {
+        if (!value.HasValue)
+        {
+            return null;
+        }
+
+        if (value.Value == Guid.Empty)
+        {
+            throw new ArgumentException("Paid bill transaction is invalid.", nameof(value));
+        }
+
+        return value.Value;
     }
 }

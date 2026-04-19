@@ -1,6 +1,7 @@
 using System.Text;
 using Farol.Api.Common;
 using Farol.Api.Modules.Bills;
+using Farol.Api.Modules.Imports;
 using Farol.Api.Modules.Insights;
 using Farol.Infrastructure.Auth;
 using Farol.Infrastructure.Persistence;
@@ -106,8 +107,13 @@ builder.Services.AddDbContext<FarolDbContext>(options =>
 builder.Services.AddScoped<PasswordService>();
 builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddScoped<BillSeriesExpansionService>();
+builder.Services.AddScoped<BillPaymentService>();
+builder.Services.AddScoped<BillSeriesUpdateService>();
 builder.Services.AddScoped<MonthlyInsightsService>();
 builder.Services.AddScoped<FinancialIntelligenceService>();
+builder.Services.AddScoped<CsvImportFileReader>();
+builder.Services.AddScoped<CsvImportParser>();
+builder.Services.AddScoped<TransactionCsvImportProcessor>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.Configure<FinancialIntelligenceOptions>(
     builder.Configuration.GetSection(FinancialIntelligenceOptions.SectionName));

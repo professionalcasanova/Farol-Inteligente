@@ -12,7 +12,7 @@ import {
   isUnauthorizedApiError,
   listAccounts,
   listCategories,
-  listTransactions,
+  listTransactionHistory,
   transactionTypeOptions,
   updateTransaction,
   type AccountResponse,
@@ -56,6 +56,8 @@ const defaultFormState: TransactionFormState = {
   occurredOn: getCurrentDateInputValue(),
 };
 
+const historyPageSizeOptions = [10, 25, 50] as const;
+
 function buildCreateFormState(financialAccountId = ""): TransactionFormState {
   return {
     ...defaultFormState,
@@ -75,11 +77,21 @@ function buildEditFormState(transaction: TransactionResponse): TransactionFormSt
   };
 }
 
+function getAccountOptionLabel(account: AccountResponse) {
+  return account.isActive ? account.name : `${account.name} (inativa)`;
+}
+
 export default function TransactionsPage() {
   const { session, isLoading, logout } = useProtectedSession();
   const [accounts, setAccounts] = useState<AccountResponse[]>([]);
   const [categories, setCategories] = useState<CategoryResponse[]>([]);
   const [transactions, setTransactions] = useState<TransactionResponse[]>([]);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyPageSize, setHistoryPageSize] = useState<(typeof historyPageSizeOptions)[number]>(
+    historyPageSizeOptions[0],
+  );
+  const [historyTotalItems, setHistoryTotalItems] = useState(0);
+  const [historyTotalPages, setHistoryTotalPages] = useState(1);
   const [form, setForm] = useState<TransactionFormState>(defaultFormState);
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
   const [handledRequestedEditId, setHandledRequestedEditId] = useState<string | null>(null);
@@ -89,20 +101,49 @@ export default function TransactionsPage() {
   const [loadError, setLoadError] = useState("");
   const [formError, setFormError] = useState("");
   const [success, setSuccess] = useState("");
-  const [isFetching, setIsFetching] = useState(true);
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
+  const [isHistoryFetching, setIsHistoryFetching] = useState(true);
+  const [hasLoadedHistory, setHasLoadedHistory] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
 
+  const activeAccounts = useMemo(
+    () => accounts.filter((account) => account.isActive),
+    [accounts],
+  );
   const visibleCategories = useMemo(
     () => categories.filter((category) => category.type === form.type),
     [categories, form.type],
   );
   const editingTransaction =
     transactions.find((transaction) => transaction.id === editingTransactionId) ?? null;
+  const selectableAccounts = useMemo(() => {
+    if (!editingTransaction) {
+      return activeAccounts;
+    }
+
+    const currentAccount = accounts.find(
+      (account) => account.id === editingTransaction.financialAccountId,
+    );
+
+    return currentAccount
+      ? [currentAccount, ...activeAccounts.filter((account) => account.id !== currentAccount.id)]
+      : activeAccounts;
+  }, [accounts, activeAccounts, editingTransaction]);
   const isEditing = editingTransactionId !== null;
   const isDashboardCorrectionFlow =
     Boolean(requestedEditTransactionId) &&
     requestedEditTransactionId === editingTransactionId;
+  const historyStart =
+    historyTotalItems === 0 ? 0 : (historyPage - 1) * historyPageSize + 1;
+  const historyEnd =
+    historyTotalItems === 0
+      ? 0
+      : Math.min(historyTotalItems, historyStart + transactions.length - 1);
+  const showPaginationControls = historyTotalItems > 0;
+  const selectedAccount =
+    selectableAccounts.find((account) => account.id === form.financialAccountId) ?? null;
+  const isSelectedAccountInactive = Boolean(selectedAccount && !selectedAccount.isActive);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -123,16 +164,14 @@ export default function TransactionsPage() {
     let isCancelled = false;
 
     async function load() {
-      setIsFetching(true);
+      setIsBootstrapping(true);
       setLoadError("");
 
       try {
-        const [accountsResponse, categoriesResponse, transactionsResponse] =
-          await Promise.all([
-            listAccounts(accessToken),
-            listCategories(accessToken),
-            listTransactions(accessToken),
-          ]);
+        const [accountsResponse, categoriesResponse] = await Promise.all([
+          listAccounts(accessToken),
+          listCategories(accessToken),
+        ]);
 
         if (isCancelled) {
           return;
@@ -140,7 +179,6 @@ export default function TransactionsPage() {
 
         setAccounts(accountsResponse);
         setCategories(categoriesResponse);
-        setTransactions(transactionsResponse);
       } catch (caughtError) {
         if (isUnauthorizedApiError(caughtError)) {
           logout("session-expired");
@@ -158,7 +196,7 @@ export default function TransactionsPage() {
         }
       } finally {
         if (!isCancelled) {
-          setIsFetching(false);
+          setIsBootstrapping(false);
         }
       }
     }
@@ -171,12 +209,72 @@ export default function TransactionsPage() {
   }, [logout, reloadKey, session]);
 
   useEffect(() => {
+    if (!session) {
+      return;
+    }
+
+    const accessToken = session.accessToken;
+    let isCancelled = false;
+
+    async function loadHistory() {
+      setIsHistoryFetching(true);
+      setLoadError("");
+
+      try {
+        const history = await listTransactionHistory(accessToken, {
+          page: historyPage,
+          pageSize: historyPageSize,
+        });
+
+        if (isCancelled) {
+          return;
+        }
+
+        setTransactions(history.items);
+        setHistoryPage(history.page);
+        setHistoryPageSize(
+          history.pageSize as (typeof historyPageSizeOptions)[number],
+        );
+        setHistoryTotalItems(history.totalItems);
+        setHistoryTotalPages(history.totalPages);
+        setHasLoadedHistory(true);
+      } catch (caughtError) {
+        if (isUnauthorizedApiError(caughtError)) {
+          logout("session-expired");
+          return;
+        }
+
+        if (!isCancelled) {
+          setLoadError(
+            getFriendlyApiMessage(
+              caughtError,
+              "Nao foi possivel carregar as transacoes agora. Tente novamente em alguns instantes.",
+              { messageMap: transactionMessageMap },
+            ),
+          );
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsHistoryFetching(false);
+        }
+      }
+    }
+
+    void loadHistory();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [historyPage, historyPageSize, logout, reloadKey, session]);
+
+  useEffect(() => {
     setForm((current) => {
-      const hasSelectedAccount = accounts.some(
+      const availableAccounts = editingTransactionId ? selectableAccounts : activeAccounts;
+      const hasSelectedAccount = availableAccounts.some(
         (account) => account.id === current.financialAccountId,
       );
 
-      if (accounts.length === 0) {
+      if (availableAccounts.length === 0) {
         return current.financialAccountId
           ? { ...current, financialAccountId: "" }
           : current;
@@ -186,10 +284,10 @@ export default function TransactionsPage() {
         return current;
       }
 
-      if (accounts.length === 1) {
+      if (!editingTransactionId && activeAccounts.length === 1) {
         return {
           ...current,
-          financialAccountId: accounts[0].id,
+          financialAccountId: activeAccounts[0].id,
         };
       }
 
@@ -197,7 +295,7 @@ export default function TransactionsPage() {
         ? { ...current, financialAccountId: "" }
         : current;
     });
-  }, [accounts]);
+  }, [activeAccounts, editingTransactionId, selectableAccounts]);
 
   useEffect(() => {
     if (
@@ -232,7 +330,7 @@ export default function TransactionsPage() {
     startEditing(transactionToEdit);
   }, [editingTransactionId, handledRequestedEditId, requestedEditTransactionId, transactions]);
 
-  function resetForm(financialAccountId = accounts.length === 1 ? accounts[0].id : "") {
+  function resetForm(financialAccountId = activeAccounts.length === 1 ? activeAccounts[0].id : "") {
     setEditingTransactionId(null);
     setForm(buildCreateFormState(financialAccountId));
   }
@@ -271,8 +369,15 @@ export default function TransactionsPage() {
 
     try {
       await deleteTransaction(accessToken, editingTransactionId);
-      const transactionsResponse = await listTransactions(accessToken);
-      setTransactions(transactionsResponse);
+      const history = await listTransactionHistory(accessToken, {
+        page: historyPage,
+        pageSize: historyPageSize,
+      });
+      setTransactions(history.items);
+      setHistoryPage(history.page);
+      setHistoryPageSize(history.pageSize as (typeof historyPageSizeOptions)[number]);
+      setHistoryTotalItems(history.totalItems);
+      setHistoryTotalPages(history.totalPages);
       setSuccess("Transação excluída com sucesso.");
       resetForm(form.financialAccountId);
     } catch (caughtError) {
@@ -297,6 +402,11 @@ export default function TransactionsPage() {
     event.preventDefault();
 
     if (!session) {
+      return;
+    }
+
+    if (!isEditing && activeAccounts.length === 0) {
+      setFormError("Reative ao menos uma conta em Contas para registrar novas transações.");
       return;
     }
 
@@ -326,8 +436,15 @@ export default function TransactionsPage() {
         await createTransaction(accessToken, payload);
       }
 
-      const transactionsResponse = await listTransactions(accessToken);
-      setTransactions(transactionsResponse);
+      const history = await listTransactionHistory(accessToken, {
+        page: editingTransactionId ? historyPage : 1,
+        pageSize: historyPageSize,
+      });
+      setTransactions(history.items);
+      setHistoryPage(history.page);
+      setHistoryPageSize(history.pageSize as (typeof historyPageSizeOptions)[number]);
+      setHistoryTotalItems(history.totalItems);
+      setHistoryTotalPages(history.totalPages);
       setSuccess(
         editingTransactionId
           ? "Transação atualizada com sucesso."
@@ -357,6 +474,8 @@ export default function TransactionsPage() {
   if (isLoading || !session) {
     return <LoadingScreen />;
   }
+
+  const isFetching = (isBootstrapping || !hasLoadedHistory) && !loadError;
 
   return (
     <AppShell
@@ -417,6 +536,14 @@ export default function TransactionsPage() {
                 </Link>{" "}
                 e volte aqui.
               </div>
+            ) : activeAccounts.length === 0 && !isEditing ? (
+              <div className="mt-6 rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
+                Todas as suas contas estao inativas. Reative ao menos uma em{" "}
+                <Link className="font-semibold text-[var(--color-accent)]" href="/accounts">
+                  Contas
+                </Link>{" "}
+                para registrar novas transações.
+              </div>
             ) : (
               <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
                 {isEditing ? (
@@ -443,6 +570,7 @@ export default function TransactionsPage() {
                   <span>Conta financeira</span>
                   <select
                     className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3 text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)]"
+                    disabled={!isEditing && activeAccounts.length === 1}
                     onChange={(event) =>
                       setForm((current) => ({
                         ...current,
@@ -451,16 +579,27 @@ export default function TransactionsPage() {
                     }
                     value={form.financialAccountId}
                   >
-                    {accounts.length > 1 ? (
+                    {!isEditing && activeAccounts.length > 1 ? (
                       <option value="">Escolha a conta para continuar</option>
                     ) : null}
-                    {accounts.map((account) => (
+                    {selectableAccounts.map((account) => (
                       <option key={account.id} value={account.id}>
-                        {account.name}
+                        {getAccountOptionLabel(account)}
                       </option>
                     ))}
                   </select>
                 </label>
+
+                {isSelectedAccountInactive ? (
+                  <div className="rounded-[20px] border border-[color:rgba(217,119,6,0.18)] bg-[color:rgba(255,247,237,0.95)] px-4 py-3 text-xs leading-5 text-[var(--color-warm)]">
+                    Esta transação segue vinculada a uma conta inativa. Voce pode corrigir a
+                    conta aqui ou reativar a conta em{" "}
+                    <Link className="font-semibold" href="/accounts">
+                      Contas
+                    </Link>
+                    .
+                  </div>
+                ) : null}
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
@@ -608,9 +747,62 @@ export default function TransactionsPage() {
                 </h2>
               </div>
               <div className="text-sm text-[var(--color-muted)]">
-                {transactions.length} itens
+                {historyTotalItems} {historyTotalItems === 1 ? "item" : "itens"}
               </div>
             </div>
+
+            {showPaginationControls ? (
+              <div className="mt-4 flex flex-col gap-3 rounded-[24px] border border-[var(--color-line)] bg-white px-4 py-4 text-sm text-[var(--color-muted)] md:flex-row md:items-center md:justify-between">
+                <div>
+                  Mostrando {historyStart}-{historyEnd} de {historyTotalItems}
+                </div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <label className="flex items-center gap-2">
+                    <span>Itens por página</span>
+                    <select
+                      className="rounded-full border border-[var(--color-line)] bg-[var(--color-panel)] px-3 py-2 text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)]"
+                      onChange={(event) => {
+                        setHistoryPage(1);
+                        setHistoryPageSize(
+                          Number(event.target.value) as (typeof historyPageSizeOptions)[number],
+                        );
+                      }}
+                      value={historyPageSize}
+                    >
+                      {historyPageSizeOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="rounded-full border border-[var(--color-line)] px-3 py-2 text-xs font-semibold text-[var(--color-foreground)] transition hover:bg-[var(--color-panel)] disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={isHistoryFetching || historyPage <= 1}
+                      onClick={() => setHistoryPage((current) => Math.max(1, current - 1))}
+                      type="button"
+                    >
+                      Página anterior
+                    </button>
+                    <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--color-muted)]">
+                      Página {historyPage} de {historyTotalPages}
+                    </span>
+                    <button
+                      className="rounded-full border border-[var(--color-line)] px-3 py-2 text-xs font-semibold text-[var(--color-foreground)] transition hover:bg-[var(--color-panel)] disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={isHistoryFetching || historyPage >= historyTotalPages}
+                      onClick={() =>
+                        setHistoryPage((current) => Math.min(historyTotalPages, current + 1))
+                      }
+                      type="button"
+                    >
+                      Próxima página
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
 
             <div className="mt-6 space-y-3">
               {transactions.length === 0 ? (
@@ -679,6 +871,12 @@ export default function TransactionsPage() {
                 })
               )}
             </div>
+
+            {isHistoryFetching && hasLoadedHistory ? (
+              <div className="mt-4 text-xs font-medium text-[var(--color-muted)]">
+                Atualizando histórico...
+              </div>
+            ) : null}
           </section>
         </div>
       )}

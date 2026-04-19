@@ -14,6 +14,8 @@ const testFiles = [
   "app/login/page.test.tsx",
   "app/register/page.test.tsx",
   "app/bills/page.test.tsx",
+  "app/accounts/page.test.tsx",
+  "app/analysis/page.test.tsx",
   "app/dashboard/page.test.tsx",
   "app/transactions/page.test.tsx",
   "app/budget/page.test.tsx",

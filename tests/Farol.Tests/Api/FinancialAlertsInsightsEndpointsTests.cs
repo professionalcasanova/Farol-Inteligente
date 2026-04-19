@@ -70,7 +70,7 @@ public sealed class FinancialAlertsInsightsEndpointsTests : IClassFixture<FarolA
         await _factory.ResetDatabaseAsync();
         using var client = _factory.CreateClient();
         var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = _factory.Today;
         var seed = await SeedAccountAndCategoriesAsync(
             "maria@email.com",
             ("Salario", CategoryType.Income),
@@ -104,7 +104,7 @@ public sealed class FinancialAlertsInsightsEndpointsTests : IClassFixture<FarolA
         await _factory.ResetDatabaseAsync();
         using var client = _factory.CreateClient();
         var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = _factory.Today;
         var seed = await SeedAccountAndCategoriesAsync(
             "maria@email.com",
             ("Salario", CategoryType.Income),
@@ -142,7 +142,7 @@ public sealed class FinancialAlertsInsightsEndpointsTests : IClassFixture<FarolA
         await _factory.ResetDatabaseAsync();
         using var client = _factory.CreateClient();
         var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = _factory.Today;
         var seed = await SeedAccountAndCategoriesAsync(
             "maria@email.com",
             ("Salario", CategoryType.Income),
@@ -182,7 +182,7 @@ public sealed class FinancialAlertsInsightsEndpointsTests : IClassFixture<FarolA
         await _factory.ResetDatabaseAsync();
         using var client = _factory.CreateClient();
         var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = _factory.Today;
         var seed = await SeedAccountAndCategoriesAsync(
             "maria@email.com",
             ("Salario", CategoryType.Income));
@@ -216,7 +216,7 @@ public sealed class FinancialAlertsInsightsEndpointsTests : IClassFixture<FarolA
         await _factory.ResetDatabaseAsync();
         using var client = _factory.CreateClient();
         var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = _factory.Today;
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
@@ -234,7 +234,7 @@ public sealed class FinancialAlertsInsightsEndpointsTests : IClassFixture<FarolA
         using var client = _factory.CreateClient();
         await RegisterAndGetTokenAsync(client, "maria@email.com");
         var joaoToken = await RegisterAndGetTokenAsync(client, "joao@email.com");
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = _factory.Today;
 
         await SeedBillAsync("maria@email.com", "Energia", 300m, today.AddDays(-2));
 

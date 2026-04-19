@@ -55,7 +55,7 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
         await _factory.ResetDatabaseAsync();
         using var client = _factory.CreateClient();
         var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = _factory.Today;
 
         _factory.FinancialIntelligenceClient.Handler = (_, _) =>
             Task.FromResult(new FinancialAnalysisResponse
@@ -121,7 +121,7 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
         await _factory.ResetDatabaseAsync();
         using var client = _factory.CreateClient();
         var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = _factory.Today;
 
         _factory.FinancialIntelligenceClient.Handler = (_, _) =>
             Task.FromResult(new FinancialAnalysisResponse
@@ -184,7 +184,7 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
         await _factory.ResetDatabaseAsync();
         using var client = _factory.CreateClient();
         var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = _factory.Today;
 
         _factory.FinancialIntelligenceClient.Handler = (_, _) =>
             Task.FromResult(new FinancialAnalysisResponse
@@ -273,7 +273,7 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
     }
 
     [Fact]
-    public async Task GetMonthHealth_ShouldSendPredictableObligationsSnapshotToFinancialIntelligenceService()
+    public async Task GetMonthHealth_FutureMonth_ShouldReturnProjectionWithoutCallingFinancialIntelligenceService()
     {
         await _factory.ResetDatabaseAsync();
         using var client = _factory.CreateClient();
@@ -297,19 +297,15 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-        var response = await client.GetAsync($"/api/insights/month-health?month={nextMonthStart.Month}&year={nextMonthStart.Year}");
+        var response = await client.GetFromJsonAsync<MonthHealthResponse>(
+            $"/api/insights/month-health?month={nextMonthStart.Month}&year={nextMonthStart.Year}");
 
-        response.EnsureSuccessStatusCode();
-        var request = _factory.FinancialIntelligenceClient.LastRequest;
-
-        Assert.NotNull(request);
-        Assert.Equal(660m, request.Bills.PendingAmount);
-        Assert.Equal(660m, request.Bills.PredictableAmount);
-        Assert.Equal(2, request.Bills.PredictableCount);
-        Assert.Equal(160m, request.Bills.RecurringAmount);
-        Assert.Equal(1, request.Bills.RecurringCount);
-        Assert.Equal(500m, request.Bills.InstallmentAmount);
-        Assert.Equal(1, request.Bills.InstallmentCount);
+        Assert.NotNull(response);
+        Assert.Equal("attention", response.Status);
+        Assert.Contains("projecao", response.Message ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(response.Actions, item => item.Contains("Confirme as entradas esperadas", StringComparison.Ordinal));
+        Assert.Contains(response.RecommendedActions, item => item.Id == "review_next_bills");
+        Assert.Null(_factory.FinancialIntelligenceClient.LastRequest);
     }
 
     [Fact]
@@ -318,7 +314,7 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
         await _factory.ResetDatabaseAsync();
         using var client = _factory.CreateClient();
         var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = _factory.Today;
         var seed = await SeedAccountAndCategoriesAsync(
             "maria@email.com",
             ("Salário", CategoryType.Income),
@@ -358,7 +354,7 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
         await _factory.ResetDatabaseAsync();
         using var client = _factory.CreateClient();
         var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = _factory.Today;
         var seed = await SeedAccountAndCategoriesAsync(
             "maria@email.com",
             ("Salário", CategoryType.Income),
@@ -400,7 +396,7 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
         using var client = _factory.CreateClient();
         await RegisterAndGetTokenAsync(client, "maria@email.com");
         var joaoToken = await RegisterAndGetTokenAsync(client, "joao@email.com");
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = _factory.Today;
 
         await SeedBillAsync("maria@email.com", "Energia", 300m, today.AddDays(-2));
 
@@ -422,7 +418,7 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
         await _factory.ResetDatabaseAsync();
         using var client = _factory.CreateClient();
         var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = _factory.Today;
 
         _factory.FinancialIntelligenceClient.Handler = (_, _) =>
             throw new FinancialIntelligenceUnavailableException("Service unavailable.");
@@ -443,7 +439,7 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
         await _factory.ResetDatabaseAsync();
         using var client = _factory.CreateClient();
         var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = _factory.Today;
 
         _factory.FinancialIntelligenceClient.Handler = (_, _) =>
             Task.FromResult(new FinancialAnalysisResponse

@@ -3,8 +3,12 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { BoundedList } from "@/components/bounded-list";
+import { CollapsibleHelp } from "@/components/collapsible-help";
 import { LoadErrorState } from "@/components/load-error-state";
 import { LoadingScreen } from "@/components/loading-screen";
+import { PrimaryActionCard } from "@/components/primary-action-card";
+import { SecondarySupportPanel } from "@/components/secondary-support-panel";
 import {
   getFriendlyApiMessage,
   importTransactionsCsv,
@@ -26,6 +30,7 @@ export default function ImportsPage() {
   const [isFetching, setIsFetching] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const activeAccounts = accounts.filter((account) => account.isActive);
 
   useEffect(() => {
     if (!session) {
@@ -47,7 +52,7 @@ export default function ImportsPage() {
         }
 
         setAccounts(response);
-        setAccountId(response[0]?.id ?? "");
+        setAccountId(response.find((account) => account.isActive)?.id ?? "");
       } catch (caughtError) {
         if (isUnauthorizedApiError(caughtError)) {
           logout("session-expired");
@@ -85,7 +90,7 @@ export default function ImportsPage() {
     }
 
     if (!accountId) {
-      setImportError("Selecione uma conta financeira para a importação.");
+      setImportError("Selecione uma conta financeira para a importacao.");
       return;
     }
 
@@ -109,7 +114,7 @@ export default function ImportsPage() {
       setImportError(
         getFriendlyApiMessage(
           caughtError,
-          "Não foi possível importar o arquivo agora. Revise o CSV e tente novamente.",
+          "Nao foi possivel importar o arquivo agora. Revise o CSV e tente novamente.",
         ),
       );
     } finally {
@@ -123,10 +128,10 @@ export default function ImportsPage() {
 
   return (
     <AppShell
-      description="Envie um CSV simples para uma conta existente e veja na hora quantas linhas entraram, quantas foram ignoradas e por quê."
+      description="Escolha a conta, envie o arquivo e veja em seguida o que entrou."
       onLogout={logout}
       session={session}
-      title="Importação CSV"
+      title="Importacao CSV"
     >
       {importError ? (
         <div className="mb-6 rounded-[24px] border border-[color:rgba(185,28,28,0.14)] bg-[color:rgba(254,226,226,0.8)] px-5 py-4 text-sm text-red-700">
@@ -135,108 +140,107 @@ export default function ImportsPage() {
       ) : null}
 
       {isFetching ? (
-        <LoadingScreen message="Carregando contas para importação..." />
+        <LoadingScreen message="Carregando contas para importacao..." />
       ) : loadError ? (
         <LoadErrorState
           message={loadError}
           onRetry={() => setReloadKey((current) => current + 1)}
-          title="Não foi possível abrir a importação"
+          title="Nao foi possivel abrir a importacao"
         />
       ) : (
-        <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,0.94fr)_minmax(0,1.06fr)]">
-          <section className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
-            <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
-              Upload
-            </div>
-            <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
-              Importar transações
-            </h2>
-
-            {accounts.length === 0 ? (
-              <div className="mt-6 rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
-                Nenhuma conta financeira encontrada. Crie uma conta no dashboard
-                antes de importar. Se precisar, volte para{" "}
-                <Link
-                  className="font-semibold text-[var(--color-accent)]"
-                  href="/dashboard#quick-account"
-                >
-                  Dashboard
-                </Link>
-                .
-              </div>
-            ) : (
-              <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-                <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
-                  <span>Conta de destino</span>
-                  <select
-                    className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3 text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)]"
-                    onChange={(event) => setAccountId(event.target.value)}
-                    value={accountId}
+        <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,0.98fr)_minmax(320px,0.88fr)]">
+          <div className="space-y-6">
+            <PrimaryActionCard
+              description="Escolha para qual conta o arquivo deve ir e envie o CSV. O Farol mostra depois o que entrou e o que precisa de revisao."
+              eyebrow="Upload"
+              title="Importar transacoes"
+            >
+              {accounts.length === 0 ? (
+                <div className="rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
+                  Nenhuma conta financeira encontrada. Crie uma conta no dashboard
+                  antes de importar. Se precisar, volte para{" "}
+                  <Link
+                    className="font-semibold text-[var(--color-accent)]"
+                    href="/dashboard#quick-account"
                   >
-                    {accounts.map((account) => (
-                      <option key={account.id} value={account.id}>
-                        {account.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                    Dashboard
+                  </Link>
+                  .
+                </div>
+              ) : activeAccounts.length === 0 ? (
+                <div className="rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
+                  Todas as suas contas estao inativas. Reative ao menos uma em{" "}
+                  <Link
+                    className="font-semibold text-[var(--color-accent)]"
+                    href="/accounts"
+                  >
+                    Contas
+                  </Link>{" "}
+                  para importar novas transacoes.
+                </div>
+              ) : (
+                <form className="space-y-4" onSubmit={handleSubmit}>
+                  <div className="rounded-[24px] border border-[var(--color-line)] bg-white px-4 py-4 text-sm leading-6 text-[var(--color-muted)]">
+                    Se a conta certa nao aparecer aqui, reative em{" "}
+                    <Link className="font-semibold text-[var(--color-accent)]" href="/accounts">
+                      Contas
+                    </Link>{" "}
+                    e volte para importar.
+                  </div>
 
-                <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
-                  <span>Arquivo CSV</span>
-                  <input
-                    accept=".csv,text/csv"
-                    className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3 text-[var(--color-foreground)] file:mr-4 file:rounded-full file:border-0 file:bg-[var(--color-accent-soft)] file:px-3 file:py-2 file:text-sm file:font-medium file:text-[var(--color-foreground)]"
-                    onChange={(event) =>
-                      setFile(event.target.files?.[0] ?? null)
-                    }
-                    type="file"
-                  />
-                </label>
+                  <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
+                    <span>Conta de destino</span>
+                    <select
+                      className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3 text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)]"
+                      onChange={(event) => setAccountId(event.target.value)}
+                      value={accountId}
+                    >
+                      {activeAccounts.map((account) => (
+                        <option key={account.id} value={account.id}>
+                          {account.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
-                <button
-                  className="w-full rounded-2xl bg-[var(--color-foreground)] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-70"
-                  disabled={isSubmitting}
-                  type="submit"
-                >
-                  {isSubmitting ? "Importando..." : "Enviar CSV"}
-                </button>
-              </form>
-            )}
-          </section>
+                  <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
+                    <span>Arquivo CSV</span>
+                    <span className="text-xs leading-5 text-[var(--color-muted)]">
+                      Use o arquivo exportado do seu banco ou da sua planilha.
+                    </span>
+                    <input
+                      accept=".csv,text/csv"
+                      className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3 text-[var(--color-foreground)] file:mr-4 file:rounded-full file:border-0 file:bg-[var(--color-accent-soft)] file:px-3 file:py-2 file:text-sm file:font-medium file:text-[var(--color-foreground)]"
+                      onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+                      type="file"
+                    />
+                  </label>
 
-          <section className="min-w-0 space-y-6">
-            <article className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
-              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
-                Formato esperado
-              </div>
-              <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
-                CSV simples e explícito
-              </h2>
-              <pre className="mt-6 overflow-x-auto rounded-[24px] border border-[var(--color-line)] bg-white p-4 text-sm leading-7 text-[var(--color-foreground)]">
-occurredOn,description,amount,type,categoryName
-2026-03-01,Salario,3000.00,Income,Salario
-2026-03-02,Mercado,120.50,Expense,Alimentacao
-2026-03-03,Uber viagem,42.00,Expense,
-              </pre>
-            </article>
+                  <button
+                    className="w-full rounded-2xl bg-[var(--color-foreground)] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-70"
+                    disabled={isSubmitting}
+                    type="submit"
+                  >
+                    {isSubmitting ? "Importando..." : "Importar arquivo"}
+                  </button>
+                </form>
+              )}
+            </PrimaryActionCard>
+          </div>
 
-            <article className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
-              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
-                Resultado
-              </div>
-              <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
-                Resumo da importação
-              </h2>
-
+          <div className="min-w-0 space-y-6">
+            <SecondarySupportPanel
+              description="Quando a importacao terminar, o resumo aparece aqui para voce entender rapidamente o que entrou e se algo precisa de ajuste."
+              eyebrow="Resultado"
+              title="Resumo da importacao"
+            >
               {!result ? (
-                <div className="mt-6 rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
-                  O resumo aparece aqui depois do primeiro upload. Assim que a
-                  importação terminar, você já pode revisar as transações e
-                  voltar ao dashboard.
+                <div className="rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm text-[var(--color-muted)]">
+                  O resumo aparece aqui logo depois do envio do arquivo.
                 </div>
               ) : (
                 <>
-                  <div className="mt-6 grid gap-4 md:grid-cols-3">
+                  <div className="grid gap-4 sm:grid-cols-3">
                     <article className="rounded-[24px] border border-[var(--color-line)] bg-white p-4">
                       <div className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted)]">
                         Linhas totais
@@ -263,25 +267,31 @@ occurredOn,description,amount,type,categoryName
                     </article>
                   </div>
 
-                  <div className="mt-6 space-y-3">
+                  <div className="mt-6">
                     {result.totalRows === 0 ? (
                       <div className="rounded-[24px] border border-[color:rgba(15,118,110,0.16)] bg-[color:rgba(204,251,241,0.7)] px-5 py-4 text-sm text-[var(--color-foreground)]">
-                        O arquivo foi recebido, mas ele só tinha o cabeçalho.
-                        Adicione linhas de transação para importar dados reais.
+                        O arquivo foi recebido, mas veio sem movimentacoes.
+                        Adicione linhas com dados reais e tente de novo.
                       </div>
                     ) : result.errors.length === 0 ? (
                       <div className="rounded-[24px] border border-[color:rgba(29,130,93,0.16)] bg-[color:rgba(220,252,231,0.8)] px-5 py-4 text-sm text-green-700">
-                        Importação concluída sem erros.
+                        Importacao concluida. Seus dados ja podem ser revisados.
                       </div>
                     ) : (
-                      result.errors.map((item) => (
-                        <div
-                          className="rounded-[24px] border border-[color:rgba(185,28,28,0.14)] bg-[color:rgba(254,226,226,0.8)] px-5 py-4 text-sm text-red-700"
-                          key={`${item.rowNumber}-${item.message}`}
-                        >
-                          Linha {item.rowNumber}: {item.message}
-                        </div>
-                      ))
+                      <BoundedList
+                        hasItems={result.errors.length > 0}
+                        maxHeightClassName="max-h-[16rem]"
+                        testId="import-errors-list"
+                      >
+                        {result.errors.map((item) => (
+                          <div
+                            className="rounded-[24px] border border-[color:rgba(185,28,28,0.14)] bg-[color:rgba(254,226,226,0.8)] px-5 py-4 text-sm text-red-700"
+                            key={`${item.rowNumber}-${item.message}`}
+                          >
+                            Linha {item.rowNumber}: {item.message}
+                          </div>
+                        ))}
+                      </BoundedList>
                     )}
                   </div>
 
@@ -290,7 +300,7 @@ occurredOn,description,amount,type,categoryName
                       className="rounded-full border border-[var(--color-line)] px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-white"
                       href="/transactions"
                     >
-                      Revisar transações
+                      Revisar transacoes
                     </Link>
                     <Link
                       className="rounded-full border border-[var(--color-line)] px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-white"
@@ -301,8 +311,31 @@ occurredOn,description,amount,type,categoryName
                   </div>
                 </>
               )}
-            </article>
-          </section>
+            </SecondarySupportPanel>
+
+            <CollapsibleHelp
+              summary="Abra so se precisar de ajuda com o arquivo."
+              title="Ajuda com o arquivo"
+            >
+              <div className="space-y-3">
+                <p>
+                  Se a importacao nao funcionar, confira se voce enviou um CSV exportado
+                  do banco ou da sua planilha.
+                </p>
+                <p>
+                  Quando houver linhas com problema, o Farol mostra abaixo quais pontos
+                  precisam de revisao.
+                </p>
+                <p>
+                  Se a conta certa nao aparecer para selecao, reative em{" "}
+                  <Link className="font-semibold text-[var(--color-accent)]" href="/accounts">
+                    Contas
+                  </Link>
+                  .
+                </p>
+              </div>
+            </CollapsibleHelp>
+          </div>
         </div>
       )}
     </AppShell>

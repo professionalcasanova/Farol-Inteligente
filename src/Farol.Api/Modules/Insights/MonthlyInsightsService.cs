@@ -1,3 +1,4 @@
+using Farol.Api.Common;
 using Farol.Api.Modules.Bills;
 using Farol.Domain.Bills;
 using Farol.Domain.Ledger;
@@ -19,8 +20,12 @@ public sealed class MonthlyInsightsService(
         DateOnly periodStart,
         CancellationToken cancellationToken)
     {
-        var periodEnd = periodStart.AddMonths(1);
-        var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var period = new MonthlyPeriodContext(
+            periodStart,
+            periodStart.AddMonths(1),
+            DateOnly.FromDateTime(now),
+            new DateOnly(now.Year, now.Month, 1));
 
         await billSeriesExpansionService.ExpandForMonthAsync(
             userId,
@@ -32,7 +37,7 @@ public sealed class MonthlyInsightsService(
             .Where(transaction =>
                 transaction.UserId == userId &&
                 transaction.OccurredOn >= periodStart &&
-                transaction.OccurredOn < periodEnd)
+                transaction.OccurredOn < period.End)
             .Select(transaction => new
             {
                 transaction.Type,
@@ -104,7 +109,7 @@ public sealed class MonthlyInsightsService(
             .Where(bill =>
                 bill.UserId == userId &&
                 bill.DueOn >= periodStart &&
-                bill.DueOn < periodEnd)
+                bill.DueOn < period.End)
             .Select(bill => new
             {
                 bill.Amount,
@@ -126,18 +131,19 @@ public sealed class MonthlyInsightsService(
                 .ToDictionaryAsync(series => series.Id, series => series.Kind, cancellationToken);
 
         var pendingBills = bills
-            .Where(bill => !bill.IsPaid && bill.DueOn >= today)
+            .Where(bill => period.IsPendingBill(bill.IsPaid, bill.DueOn))
             .ToList();
 
-        var upcoming7DaysBills = bills
-            .Where(bill =>
-                !bill.IsPaid &&
-                bill.DueOn >= today &&
-                bill.DueOn <= today.AddDays(7))
-            .ToList();
+        var upcoming7DaysBills = period.IsFuturePeriod
+            ? []
+            : bills
+                .Where(bill =>
+                    period.IsPendingBill(bill.IsPaid, bill.DueOn) &&
+                    bill.DueOn <= period.Today.AddDays(7))
+                .ToList();
 
         var overdueBills = bills
-            .Where(bill => !bill.IsPaid && bill.DueOn < today)
+            .Where(bill => period.IsOverdueBill(bill.IsPaid, bill.DueOn))
             .ToList();
         var predictableBills = bills
             .Where(bill => !bill.IsPaid && bill.BillSeriesId.HasValue)
@@ -156,7 +162,7 @@ public sealed class MonthlyInsightsService(
             .ToList();
         var maxOverdueDays = overdueBills.Count == 0
             ? 0
-            : overdueBills.Max(bill => today.DayNumber - bill.DueOn.DayNumber);
+            : overdueBills.Max(bill => period.Today.DayNumber - bill.DueOn.DayNumber);
 
         var totalBudgetRemaining = totalPlannedBudget - totalBudgetSpent;
         var plannedRemaining = Math.Max(totalBudgetRemaining, 0m);
@@ -189,6 +195,7 @@ public sealed class MonthlyInsightsService(
             .ToList();
 
         return new MonthlyInsightSnapshot(
+            period.IsFuturePeriod,
             totalIncome,
             totalExpense,
             balance,
@@ -221,6 +228,7 @@ public sealed class MonthlyInsightsService(
         {
             Month = month,
             Year = year,
+            IsProjection = snapshot.IsFuturePeriod,
             TotalIncome = snapshot.TotalIncome,
             TotalExpense = snapshot.TotalExpense,
             Balance = snapshot.Balance,
@@ -242,6 +250,14 @@ public sealed class MonthlyInsightsService(
     public AlertsResponse BuildAlertsResponse(MonthlyInsightSnapshot snapshot)
     {
         var alerts = new List<AlertResponse>();
+
+        if (snapshot.IsFuturePeriod)
+        {
+            return new AlertsResponse
+            {
+                Alerts = alerts
+            };
+        }
 
         if (snapshot.TotalOverdueBills > 0)
         {
@@ -299,6 +315,7 @@ public sealed class MonthlyInsightsService(
 }
 
 public sealed record MonthlyInsightSnapshot(
+    bool IsFuturePeriod,
     decimal TotalIncome,
     decimal TotalExpense,
     decimal Balance,

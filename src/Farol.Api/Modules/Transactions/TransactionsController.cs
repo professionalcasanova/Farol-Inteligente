@@ -21,15 +21,44 @@ public sealed class TransactionsController(FarolDbContext dbContext) : Controlle
             return Unauthorized(new ErrorResponse("Invalid access token."));
         }
 
-        var transactions = await dbContext.Transactions
-            .AsNoTracking()
-            .Where(transaction => transaction.UserId == userId)
-            .OrderByDescending(transaction => transaction.OccurredOn)
-            .ThenByDescending(transaction => transaction.CreatedAtUtc)
+        var transactions = await QueryOwnedTransactions(userId)
             .Select(transaction => ToResponse(transaction))
             .ToListAsync(cancellationToken);
 
         return Ok(transactions);
+    }
+
+    [HttpGet("history")]
+    public async Task<ActionResult<TransactionHistoryResponse>> ListHistory(
+        [FromQuery] ListTransactionsHistoryRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!AuthenticatedUser.TryGetUserId(User, out var userId))
+        {
+            return Unauthorized(new ErrorResponse("Invalid access token."));
+        }
+
+        var pageSize = request.NormalizedPageSize;
+        var totalItems = await QueryOwnedTransactions(userId).CountAsync(cancellationToken);
+        var totalPages = totalItems == 0
+            ? 1
+            : (int)Math.Ceiling(totalItems / (double)pageSize);
+        var page = Math.Min(request.NormalizedPage, totalPages);
+
+        var items = await QueryOwnedTransactions(userId)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(transaction => ToResponse(transaction))
+            .ToListAsync(cancellationToken);
+
+        return Ok(new TransactionHistoryResponse
+        {
+            Items = items,
+            Page = page,
+            PageSize = pageSize,
+            TotalItems = totalItems,
+            TotalPages = totalPages
+        });
     }
 
     [HttpPost]
@@ -187,6 +216,15 @@ public sealed class TransactionsController(FarolDbContext dbContext) : Controlle
             .SingleOrDefaultAsync(
                 category => category.Id == categoryId.Value && (category.IsSystem || category.UserId == userId),
                 cancellationToken);
+    }
+
+    private IQueryable<Transaction> QueryOwnedTransactions(Guid userId)
+    {
+        return dbContext.Transactions
+            .AsNoTracking()
+            .Where(transaction => transaction.UserId == userId)
+            .OrderByDescending(transaction => transaction.OccurredOn)
+            .ThenByDescending(transaction => transaction.CreatedAtUtc);
     }
 
     private static TransactionResponse ToResponse(Transaction transaction)

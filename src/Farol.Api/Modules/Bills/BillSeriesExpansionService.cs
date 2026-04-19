@@ -1,3 +1,4 @@
+using Farol.Domain.Bills;
 using Farol.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -31,14 +32,12 @@ public sealed class BillSeriesExpansionService(FarolDbContext dbContext)
                 seriesIds.Contains(bill.BillSeriesId.Value) &&
                 bill.DueOn >= periodStart &&
                 bill.DueOn < periodEnd)
-            .Select(bill => new { bill.BillSeriesId, bill.DueOn })
+            .Select(bill => bill.BillSeriesId!.Value)
             .ToListAsync(cancellationToken);
 
-        var existingKeys = existingOccurrences
-            .Select(item => $"{item.BillSeriesId:N}:{item.DueOn:yyyy-MM-dd}")
-            .ToHashSet(StringComparer.Ordinal);
+        var existingSeriesIds = existingOccurrences.ToHashSet();
 
-        var created = false;
+        var createdSeriesIds = new List<Guid>();
 
         foreach (var item in series)
         {
@@ -51,21 +50,63 @@ public sealed class BillSeriesExpansionService(FarolDbContext dbContext)
                 continue;
             }
 
-            var key = $"{item.Id:N}:{dueOn:yyyy-MM-dd}";
-
-            if (existingKeys.Contains(key))
+            if (existingSeriesIds.Contains(item.Id))
             {
                 continue;
             }
 
             dbContext.Bills.Add(item.CreateOccurrenceForMonth(periodStart));
-            existingKeys.Add(key);
-            created = true;
+            existingSeriesIds.Add(item.Id);
+            createdSeriesIds.Add(item.Id);
         }
 
-        if (created)
+        if (createdSeriesIds.Count == 0)
+        {
+            return;
+        }
+
+        try
         {
             await dbContext.SaveChangesAsync(cancellationToken);
         }
+        catch (DbUpdateException)
+        {
+            await DetachAddedBillsAsync();
+
+            var persistedSeriesIds = await dbContext.Bills
+                .AsNoTracking()
+                .Where(bill =>
+                    bill.UserId == userId &&
+                    bill.BillSeriesId.HasValue &&
+                    seriesIds.Contains(bill.BillSeriesId.Value) &&
+                    bill.DueOn >= periodStart &&
+                    bill.DueOn < periodEnd)
+                .Select(bill => bill.BillSeriesId!.Value)
+                .ToListAsync(cancellationToken);
+
+            var persistedSeriesIdSet = persistedSeriesIds.ToHashSet();
+
+            if (createdSeriesIds.All(persistedSeriesIdSet.Contains))
+            {
+                return;
+            }
+
+            throw;
+        }
+    }
+
+    private Task DetachAddedBillsAsync()
+    {
+        foreach (var entry in dbContext.ChangeTracker.Entries())
+        {
+            if (entry.Entity is not Bill || entry.State != EntityState.Added)
+            {
+                continue;
+            }
+
+            entry.State = EntityState.Detached;
+        }
+
+        return Task.CompletedTask;
     }
 }

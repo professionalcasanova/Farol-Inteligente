@@ -55,6 +55,9 @@ namespace Farol.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("PaidAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("PaidTransactionId")
+                        .HasColumnType("uuid");
+
                     b.Property<int?>("TotalOccurrences")
                         .HasColumnType("integer");
 
@@ -63,7 +66,11 @@ namespace Farol.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("BillSeriesId", "DueOn");
+                    b.HasIndex("PaidTransactionId");
+
+                    b.HasIndex("BillSeriesId", "DueOn")
+                        .IsUnique()
+                        .HasFilter("\"BillSeriesId\" IS NOT NULL");
 
                     b.HasIndex("UserId", "DueOn");
 
@@ -364,6 +371,11 @@ namespace Farol.Infrastructure.Persistence.Migrations
                     b.HasOne("Farol.Domain.Bills.BillSeries", null)
                         .WithMany()
                         .HasForeignKey("BillSeriesId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Farol.Domain.Ledger.Transaction", null)
+                        .WithMany()
+                        .HasForeignKey("PaidTransactionId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("Farol.Domain.Users.User", null)
