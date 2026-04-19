@@ -85,7 +85,7 @@ describe("ImportsPage", () => {
 
     render(<ImportsPage />);
 
-    await user.click(await screen.findByRole("button", { name: /enviar csv/i }));
+    await user.click(await screen.findByRole("button", { name: /importar arquivo/i }));
 
     expect(
       await screen.findByText("Selecione um arquivo CSV antes de importar."),
@@ -128,9 +128,9 @@ describe("ImportsPage", () => {
     );
 
     await user.upload(input, file);
-    await user.click(screen.getByRole("button", { name: /enviar csv/i }));
+    await user.click(screen.getByRole("button", { name: /importar arquivo/i }));
 
-    expect(await screen.findByText(/importar dados reais/i)).toBeInTheDocument();
+    expect(await screen.findByText(/dados reais/i)).toBeInTheDocument();
 
     await waitFor(() => {
       expect(mockedImportTransactionsCsv).toHaveBeenCalledTimes(1);
@@ -182,7 +182,7 @@ describe("ImportsPage", () => {
 
     await user.selectOptions(accountSelect, "account-2");
     await user.upload(fileInput, file);
-    await user.click(screen.getByRole("button", { name: /enviar csv/i }));
+    await user.click(screen.getByRole("button", { name: /importar arquivo/i }));
 
     await waitFor(() => {
       expect(mockedImportTransactionsCsv).toHaveBeenCalledWith("token", {
@@ -245,6 +245,77 @@ describe("ImportsPage", () => {
     render(<ImportsPage />);
 
     expect(await screen.findByText(/Todas as suas contas estao inativas/i)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Contas" })).toHaveAttribute("href", "/accounts");
+    expect(screen.getAllByRole("link", { name: "Contas" })[0]).toHaveAttribute(
+      "href",
+      "/accounts",
+    );
+  });
+
+  it("Imports_ShowsSecondaryHelpAsCollapsibleContent", async () => {
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+
+    mockedListAccounts.mockResolvedValue([
+      {
+        id: "account-1",
+        name: "Conta principal",
+        type: 2,
+        isActive: true,
+        createdAtUtc: "2026-03-01T00:00:00Z",
+      },
+    ]);
+
+    render(<ImportsPage />);
+
+    expect(await screen.findByText("Ajuda com o arquivo")).toBeInTheDocument();
+    expect(screen.getByText(/Abra so se precisar de ajuda/i)).toBeInTheDocument();
+  });
+
+  it("Imports_WhenImportReturnsManyErrors_UsesBoundedErrorList", async () => {
+    const user = userEvent.setup();
+
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+
+    mockedListAccounts.mockResolvedValue([
+      {
+        id: "account-1",
+        name: "Conta principal",
+        type: 2,
+        isActive: true,
+        createdAtUtc: "2026-03-01T00:00:00Z",
+      },
+    ]);
+
+    mockedImportTransactionsCsv.mockResolvedValue({
+      totalRows: 12,
+      importedRows: 2,
+      skippedRows: 10,
+      errors: Array.from({ length: 10 }, (_, index) => ({
+        rowNumber: index + 2,
+        message: `Erro ${index + 1}`,
+      })),
+    });
+
+    render(<ImportsPage />);
+
+    const input = (await screen.findByLabelText(/arquivo csv/i)) as HTMLInputElement;
+    const file = new File(
+      ["date,description\n2026-03-01,teste\n"],
+      "transactions.csv",
+      { type: "text/csv" },
+    );
+
+    await user.upload(input, file);
+    await user.click(screen.getByRole("button", { name: /importar arquivo/i }));
+
+    expect(await screen.findByText("Linha 2: Erro 1")).toBeInTheDocument();
+    expect(screen.getByTestId("import-errors-list")).toHaveClass("max-h-[16rem]");
   });
 });

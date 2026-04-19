@@ -18,6 +18,7 @@ import {
   type BillResponse,
   type BillSeriesKind,
   type BillStatus,
+  type BillUpdateScope,
   unpayBill,
   updateBill,
 } from "@/lib/api";
@@ -54,6 +55,14 @@ const billMessageMap = {
     "Contas recorrentes e parceladas precisam ser encerradas como serie.",
   "Financial account was not found.":
     "A conta usada para dar baixa no pagamento nao foi encontrada.",
+  "Bill update scope is invalid. Use single, forward or series.":
+    "Escolha como a edicao deve ser aplicada antes de salvar.",
+  "Recurring occurrences can only change due date inside the same month when scope=single.":
+    "Ao editar apenas esta ocorrencia, o vencimento deve continuar no mesmo mes.",
+  "Paid recurring occurrences can only be edited with scope=single.":
+    "Uma ocorrencia ja paga so pode ser editada isoladamente.",
+  "Recurring series with paid occurrences can only be edited with scope=single or scope=forward.":
+    "Series com ocorrencias pagas podem ser ajustadas apenas nesta ocorrencia ou desta em diante.",
 } as const;
 
 type BillFormKind = "single" | "recurring" | "installment";
@@ -64,6 +73,7 @@ type BillFormState = {
   amount: string;
   dueOn: string;
   kind: BillFormKind;
+  editScope: BillUpdateScope;
   recurrenceEndMode: RecurrenceEndMode;
   recurrenceUntilDate: string;
   recurrenceCount: string;
@@ -121,6 +131,7 @@ function createEmptyForm(
     amount: "",
     dueOn: getDefaultDueOn(monthValue),
     kind: currentKind ?? "single",
+    editScope: "single",
     recurrenceEndMode: "open_ended",
     recurrenceUntilDate: "",
     recurrenceCount: "",
@@ -172,6 +183,7 @@ function buildEditFormState(bill: BillResponse): BillFormState {
     amount: String(bill.amount),
     dueOn: bill.dueOn,
     kind: getBillKind(bill),
+    editScope: "single",
     recurrenceEndMode: "open_ended",
     recurrenceUntilDate: "",
     recurrenceCount: "",
@@ -406,6 +418,7 @@ export default function BillsPage() {
           description: form.description,
           amount: Number(form.amount),
           dueOn: form.dueOn,
+          scope: editingBill?.billSeriesId ? form.editScope : undefined,
         });
       } else {
         await createBill(session.accessToken, {
@@ -420,7 +433,11 @@ export default function BillsPage() {
       setSuccess(
         editingBillId
           ? editingBill?.billSeriesId
-            ? "Ocorrencia atualizada com sucesso. As proximas continuam seguindo a serie."
+            ? form.editScope === "single"
+              ? "Ocorrencia atualizada com sucesso."
+              : form.editScope === "forward"
+                ? "Ocorrencia atual e futuras atualizadas com sucesso."
+                : "Serie inteira atualizada com sucesso."
             : "Conta a pagar atualizada com sucesso."
           : "Conta a pagar criada com sucesso.",
       );
@@ -659,7 +676,7 @@ export default function BillsPage() {
                   </div>
                   <div className="mt-1 text-[var(--color-muted)]">
                     {editingBill?.billSeriesId
-                      ? "Salvar aqui corrige apenas esta ocorrencia ja criada. As proximas parcelas ou recorrencias continuam como estao."
+                      ? "Escolha se a mudanca vale apenas aqui, desta ocorrencia em diante ou para toda a serie."
                       : "Ajuste descricao, valor ou vencimento e salve quando terminar."}
                   </div>
                 </div>
@@ -668,17 +685,71 @@ export default function BillsPage() {
               {editingBill?.billSeriesId ? (
                 <div className="rounded-[24px] border border-[var(--color-line)] bg-white px-4 py-4 text-sm leading-6 text-[var(--color-muted)]">
                   <div className="font-medium text-[var(--color-foreground)]">
-                    Contrato de edicao da serie
+                    Como aplicar a edicao
                   </div>
-                  <div className="mt-2">
-                    Editar corrige descricao, valor e vencimento desta ocorrencia.
-                  </div>
-                  <div>
-                    Marcar como paga ou desmarcar pagamento altera so o status desta ocorrencia.
-                  </div>
-                  <div>
-                    Para impedir cobrancas futuras, use <span className="font-semibold text-[var(--color-foreground)]">Encerrar serie</span> na agenda.
-                  </div>
+                  <fieldset className="mt-4 space-y-3">
+                    <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-[var(--color-line)] px-4 py-3">
+                      <input
+                        checked={form.editScope === "single"}
+                        className="mt-1"
+                        name="edit-scope"
+                        onChange={() =>
+                          setForm((current) => ({ ...current, editScope: "single" }))
+                        }
+                        type="radio"
+                        value="single"
+                      />
+                      <span>
+                        <span className="block font-medium text-[var(--color-foreground)]">
+                          Apenas esta ocorrencia
+                        </span>
+                        <span className="block text-xs leading-5 text-[var(--color-muted)]">
+                          Corrige so este mes. O vencimento precisa continuar dentro do mesmo mes.
+                        </span>
+                      </span>
+                    </label>
+                    <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-[var(--color-line)] px-4 py-3">
+                      <input
+                        checked={form.editScope === "forward"}
+                        className="mt-1"
+                        name="edit-scope"
+                        onChange={() =>
+                          setForm((current) => ({ ...current, editScope: "forward" }))
+                        }
+                        type="radio"
+                        value="forward"
+                      />
+                      <span>
+                        <span className="block font-medium text-[var(--color-foreground)]">
+                          Esta e futuras
+                        </span>
+                        <span className="block text-xs leading-5 text-[var(--color-muted)]">
+                          Mantem o historico antigo e muda a recorrencia daqui para frente.
+                        </span>
+                      </span>
+                    </label>
+                    <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-[var(--color-line)] px-4 py-3">
+                      <input
+                        checked={form.editScope === "series"}
+                        className="mt-1"
+                        disabled={editingBill?.isPaid ?? false}
+                        name="edit-scope"
+                        onChange={() =>
+                          setForm((current) => ({ ...current, editScope: "series" }))
+                        }
+                        type="radio"
+                        value="series"
+                      />
+                      <span>
+                        <span className="block font-medium text-[var(--color-foreground)]">
+                          Toda a serie
+                        </span>
+                        <span className="block text-xs leading-5 text-[var(--color-muted)]">
+                          Reescreve todas as ocorrencias ainda coerentes com a serie. Se houver pagamento, use apenas esta ocorrencia ou esta e futuras.
+                        </span>
+                      </span>
+                    </label>
+                  </fieldset>
                 </div>
               ) : null}
 
@@ -874,7 +945,7 @@ export default function BillsPage() {
                   Contas encontradas
                 </h2>
                 <p className="mt-3 text-sm leading-6 text-[var(--color-muted)]">
-                  Em series recorrentes ou parceladas, editar e pagar atuam na ocorrencia atual. Encerrar serie impede as proximas nao pagas.
+                  Em series recorrentes ou parceladas, voce pode editar so este mes, desta ocorrencia em diante ou a serie inteira. Encerrar serie impede as proximas nao pagas.
                 </p>
               </div>
               <div className="text-sm text-[var(--color-muted)]">

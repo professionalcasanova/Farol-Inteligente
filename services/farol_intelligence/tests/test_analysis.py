@@ -64,17 +64,36 @@ class FinancialAnalysisTests(unittest.TestCase):
         self.assertEqual("healthy_month", result["insights"][0]["type"])
         self.assertEqual("keep_tracking", result["recommendedActions"][0]["id"])
 
-    def test_analyze_should_return_critical_when_bill_is_overdue(self) -> None:
+    def test_analyze_should_return_attention_when_bill_is_overdue_but_impact_is_moderate(self) -> None:
         payload = make_payload()
         payload["bills"]["overdueCount"] = 1
         payload["bills"]["overdueAmount"] = 220.0
 
         result = analyze_financial_snapshot(payload)
 
-        self.assertEqual("critical", result["status"])
+        self.assertEqual("attention", result["status"])
         self.assertEqual("overdue_bills", result["insights"][0]["type"])
-        self.assertLess(result["score"], 100)
+        self.assertEqual("medium", result["insights"][0]["severity"])
+        self.assertEqual(82, result["score"])
         self.assertEqual("review_overdue_bills", result["recommendedActions"][0]["id"])
+
+    def test_analyze_should_return_attention_when_high_balance_makes_small_debt_low_impact(self) -> None:
+        payload = make_payload()
+        payload["totals"]["income"] = 18000.0
+        payload["totals"]["expense"] = 3000.0
+        payload["totals"]["balance"] = 15000.0
+        payload["totals"]["freeToSpend"] = 8800.0
+        payload["bills"]["overdueCount"] = 1
+        payload["bills"]["overdueAmount"] = 200.0
+        payload["bills"]["maxOverdueDays"] = 2
+
+        result = analyze_financial_snapshot(payload)
+
+        self.assertEqual("attention", result["status"])
+        self.assertEqual("overdue_bills", result["insights"][0]["type"])
+        self.assertEqual("low", result["insights"][0]["severity"])
+        self.assertEqual(92, result["score"])
+        self.assertIn("impacto pequeno", result["insights"][0]["cause"])
 
     def test_analyze_should_return_critical_when_free_money_is_negative(self) -> None:
         payload = make_payload()
@@ -97,6 +116,7 @@ class FinancialAnalysisTests(unittest.TestCase):
         payload = make_payload()
         payload["totals"]["income"] = 5000.0
         payload["totals"]["expense"] = 4200.0
+        payload["totals"]["balance"] = 800.0
         payload["totals"]["freeToSpend"] = -100.0
         payload["bills"]["upcoming7DaysCount"] = 0
         payload["bills"]["upcoming7DaysAmount"] = 0.0
@@ -114,28 +134,35 @@ class FinancialAnalysisTests(unittest.TestCase):
         self.assertIn("Corte ou adie despesas variaveis", result["summary"]["action"])
         self.assertTrue(
             any(
-                "Saldo do m" in reason or "despesas vari" in reason
+                "Saldo do mes" in reason or "despesas variaveis" in reason
                 for reason in result["reasons"]
             )
         )
         self.assertEqual("review_expenses", result["recommendedActions"][0]["id"])
 
-    def test_analyze_should_return_critical_when_max_overdue_days_is_7_or_more(self) -> None:
+    def test_analyze_should_return_attention_when_small_debt_has_long_delay_but_low_impact(self) -> None:
         payload = make_payload()
-        payload["bills"]["maxOverdueDays"] = 8
+        payload["totals"]["income"] = 18000.0
+        payload["totals"]["expense"] = 3000.0
+        payload["totals"]["balance"] = 15000.0
+        payload["totals"]["freeToSpend"] = 8800.0
         payload["bills"]["overdueCount"] = 1
+        payload["bills"]["overdueAmount"] = 200.0
+        payload["bills"]["maxOverdueDays"] = 8
 
         result = analyze_financial_snapshot(payload)
 
-        self.assertEqual("critical", result["status"])
+        self.assertEqual("attention", result["status"])
         self.assertEqual("overdue_bills_long", result["insights"][0]["type"])
+        self.assertEqual("medium", result["insights"][0]["severity"])
+        self.assertEqual(82, result["score"])
         self.assertTrue(any("8 dias" in reason for reason in result["reasons"]))
-        self.assertEqual("review_overdue_bills", result["recommendedActions"][0]["id"])
 
     def test_analyze_should_prioritize_expense_review_when_negative_cash_and_overdue_bills_overlap(self) -> None:
         payload = make_payload()
         payload["totals"]["income"] = 5000.0
         payload["totals"]["expense"] = 4200.0
+        payload["totals"]["balance"] = 800.0
         payload["totals"]["freeToSpend"] = -180.0
         payload["bills"]["overdueCount"] = 1
         payload["bills"]["overdueAmount"] = 220.0
@@ -256,6 +283,42 @@ class FinancialAnalysisTests(unittest.TestCase):
         self.assertIn("contas recorrentes", result["summary"]["cause"])
         self.assertIn("compromissos previsiveis", result["summary"]["action"])
 
+    def test_analyze_should_return_critical_when_balance_is_low_and_debt_is_relevant(self) -> None:
+        payload = make_payload()
+        payload["totals"]["income"] = 4000.0
+        payload["totals"]["expense"] = 3100.0
+        payload["totals"]["balance"] = 900.0
+        payload["totals"]["freeToSpend"] = 300.0
+        payload["bills"]["overdueCount"] = 1
+        payload["bills"]["overdueAmount"] = 450.0
+        payload["bills"]["maxOverdueDays"] = 2
+
+        result = analyze_financial_snapshot(payload)
+
+        self.assertEqual("critical", result["status"])
+        self.assertEqual("overdue_bills", result["insights"][0]["type"])
+        self.assertEqual("high", result["insights"][0]["severity"])
+        self.assertEqual(65, result["score"])
+
+    def test_analyze_should_return_critical_when_multiple_relevant_debts_keep_pressure_high(self) -> None:
+        payload = make_payload()
+        payload["totals"]["income"] = 7000.0
+        payload["totals"]["expense"] = 5200.0
+        payload["totals"]["balance"] = 1800.0
+        payload["totals"]["freeToSpend"] = 900.0
+        payload["bills"]["overdueCount"] = 3
+        payload["bills"]["overdueAmount"] = 900.0
+        payload["bills"]["pendingCount"] = 5
+        payload["bills"]["pendingAmount"] = 2400.0
+        payload["bills"]["maxOverdueDays"] = 6
+
+        result = analyze_financial_snapshot(payload)
+
+        self.assertEqual("critical", result["status"])
+        self.assertEqual("overdue_bills", result["insights"][0]["type"])
+        self.assertEqual("high", result["insights"][0]["severity"])
+        self.assertEqual(50, result["score"])
+
     def test_analyze_should_limit_insights_to_top_three(self) -> None:
         payload = make_payload()
         payload["bills"]["overdueCount"] = 1
@@ -279,9 +342,9 @@ class FinancialAnalysisTests(unittest.TestCase):
         result = analyze_financial_snapshot(payload)
 
         self.assertEqual(3, len(result["insights"]))
-        self.assertEqual("overdue_bills", result["insights"][0]["type"])
-        self.assertEqual("negative_free_money", result["insights"][1]["type"])
-        self.assertEqual("short_term_bills_pressure", result["insights"][2]["type"])
+        self.assertEqual("negative_free_money", result["insights"][0]["type"])
+        self.assertEqual("short_term_bills_pressure", result["insights"][1]["type"])
+        self.assertEqual("overdue_bills", result["insights"][2]["type"])
         self.assertEqual("Seu dinheiro livre ficou negativo neste mes.", result["message"])
         self.assertIn("dinheiro livre ficou negativo", result["summary"]["cause"])
 

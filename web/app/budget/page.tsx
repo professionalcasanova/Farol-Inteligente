@@ -173,7 +173,7 @@ function getSnapshotStatusCopy(status: SnapshotComparisonStatus) {
       };
     case "base-only":
       return {
-        label: "Ficou fora do snapshot",
+        label: "Ficou fora da visao do mes",
         className:
           "border-[color:rgba(217,119,6,0.18)] bg-[color:rgba(255,247,237,0.95)] text-[var(--color-warm)]",
       };
@@ -392,8 +392,8 @@ export default function BudgetPage() {
       resetMonthlyRows(response);
       setSuccess(
         response.categories.length === 0
-          ? "Snapshot do mes limpo com sucesso. Voce pode montar um novo planejamento quando quiser."
-          : "Snapshot do mes salvo com sucesso.",
+          ? "Visao do mes limpa com sucesso. Voce pode montar um novo planejamento quando quiser."
+          : "Visao do mes salva com sucesso.",
       );
     } catch (caughtError) {
       if (isUnauthorizedApiError(caughtError)) {
@@ -478,7 +478,7 @@ export default function BudgetPage() {
 
       setBudget(response);
       resetMonthlyRows(response);
-      setSuccess("Planejamento base aplicado ao snapshot do mes com sucesso.");
+      setSuccess("Planejamento base aplicado a visao do mes com sucesso.");
     } catch (caughtError) {
       if (isUnauthorizedApiError(caughtError)) {
         logout("session-expired");
@@ -570,7 +570,7 @@ export default function BudgetPage() {
               Como usar
             </div>
             <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
-              Base recorrente e snapshot do mes sao coisas diferentes
+              Base recorrente e visao do mes sao coisas diferentes
             </h2>
             <div className="mt-6 grid gap-4 lg:grid-cols-2">
               <article className="rounded-[24px] border border-[var(--color-line)] bg-white p-5">
@@ -587,13 +587,13 @@ export default function BudgetPage() {
 
               <article className="rounded-[24px] border border-[color:rgba(15,118,110,0.14)] bg-[var(--color-accent-soft)] p-5">
                 <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-accent)]">
-                  2. Snapshot de {monthReference}
+                  2. Visao de {monthReference}
                 </div>
                 <div className="mt-3 text-lg font-semibold text-[var(--color-foreground)]">
                   O que realmente vale para este mes
                 </div>
                 <p className="mt-3 text-sm leading-6 text-[var(--color-muted)]">
-                  Salvar o snapshot substitui apenas {monthReference}. Os proximos meses continuam seguindo a sua base recorrente.
+                  Salvar a visao do mes substitui apenas {monthReference}. Os proximos meses continuam seguindo a sua base recorrente.
                 </p>
               </article>
             </div>
@@ -656,7 +656,7 @@ export default function BudgetPage() {
                   onClick={handleApplyTemplate}
                   type="button"
                 >
-                  {isApplyingTemplate ? "Aplicando..." : "Aplicar base ao snapshot"}
+                  {isApplyingTemplate ? "Aplicando..." : "Aplicar base a visao do mes"}
                 </button>
               </div>
 
@@ -762,7 +762,7 @@ export default function BudgetPage() {
                   Edicao do mes
                 </div>
                 <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
-                  Montar o snapshot do mes
+                  Montar a visao do mes
                 </h2>
                 <p className="mt-3 text-sm leading-6 text-[var(--color-muted)]">
                   Aqui voce decide o que ficou valendo em {monthReference}, mesmo que seja diferente da base recorrente.
@@ -779,7 +779,7 @@ export default function BudgetPage() {
 
             <div className="mt-6 rounded-[24px] border border-[color:rgba(15,118,110,0.14)] bg-[var(--color-accent-soft)] px-5 py-4 text-sm text-[var(--color-foreground)]">
               <div className="font-medium">
-                Voce esta editando o snapshot de {monthReference}.
+                Voce esta editando a visao de {monthReference}.
               </div>
               <div className="mt-1 text-[var(--color-muted)]">
                 Salvar aqui substitui apenas este mes. A base recorrente continua intacta. Para corrigir lancamentos individuais, use{" "}
@@ -866,7 +866,7 @@ export default function BudgetPage() {
                   disabled={isSubmitting}
                   type="submit"
                 >
-                  {isSubmitting ? "Salvando snapshot..." : "Salvar snapshot mensal"}
+                  {isSubmitting ? "Salvando visao..." : "Salvar visao do mes"}
                 </button>
               </form>
             )}
@@ -878,14 +878,14 @@ export default function BudgetPage() {
                     Leitura rapida
                   </div>
                   <h3 className="mt-2 text-xl font-semibold text-[var(--color-foreground)]">
-                    Como o snapshot de {monthReference} ficou
+                    Como a visao de {monthReference} ficou
                   </h3>
                   <p className="mt-2 text-sm leading-6 text-[var(--color-muted)]">
                     Este quadro mostra o que seguiu igual a base, o que foi ajustado e o que ficou so neste mes.
                   </p>
                 </div>
                 <div className="text-sm text-[var(--color-muted)]">
-                  Snapshot salvo:{" "}
+                  Visao salva:{" "}
                   <span className="font-semibold text-[var(--color-foreground)]">
                     {budget.categories.length} categoria{budget.categories.length === 1 ? "" : "s"}
                   </span>
@@ -919,7 +919,7 @@ export default function BudgetPage() {
                 </article>
                 <article className="rounded-[20px] border border-[var(--color-line)] bg-[var(--color-panel)] p-4">
                   <div className="text-xs uppercase tracking-[0.16em] text-[var(--color-muted)]">
-                    Fora do snapshot
+                    Fora da visao do mes
                   </div>
                   <div className="mt-2 text-2xl font-semibold text-[var(--color-foreground)]">
                     {snapshotComparison?.baseOnlyCount ?? 0}
@@ -929,7 +929,7 @@ export default function BudgetPage() {
 
               {budget.categories.length === 0 ? (
                 <div className="mt-5 rounded-[20px] border border-dashed border-[var(--color-line)] px-4 py-5 text-sm leading-6 text-[var(--color-muted)]">
-                  Ainda nao existe snapshot salvo para {monthReference}. Se fizer sentido, aplique a base recorrente e ajuste so o que mudou neste mes.
+                  Ainda nao existe visao salva para {monthReference}. Se fizer sentido, aplique a base recorrente e ajuste so o que mudou neste mes.
                 </div>
               ) : (
                 <div className="mt-5 space-y-3">
@@ -947,7 +947,7 @@ export default function BudgetPage() {
                               {item.categoryName}
                             </div>
                             <div className="mt-1 text-sm text-[var(--color-muted)]">
-                              Snapshot: {formatCurrency(item.monthPlanned ?? 0)}
+                              Visao do mes: {formatCurrency(item.monthPlanned ?? 0)}
                               {item.templatePlanned !== null ? (
                                 <> • Base: {formatCurrency(item.templatePlanned)}</>
                               ) : (
@@ -970,7 +970,7 @@ export default function BudgetPage() {
                             </span>
                           </div>
                           <div>
-                            Restante no snapshot:{" "}
+                            Restante na visao do mes:{" "}
                             <span className="font-semibold text-[var(--color-foreground)]">
                               {formatCurrency(item.remaining ?? 0)}
                             </span>

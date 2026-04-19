@@ -3,8 +3,11 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
+import { BoundedList } from "@/components/bounded-list";
 import { LoadErrorState } from "@/components/load-error-state";
 import { LoadingScreen } from "@/components/loading-screen";
+import { PrimaryActionCard } from "@/components/primary-action-card";
+import { SecondarySupportPanel } from "@/components/secondary-support-panel";
 import {
   accountTypeOptions,
   createAccount,
@@ -283,52 +286,166 @@ export default function AccountsPage() {
           title="Nao foi possivel carregar as contas"
         />
       ) : (
-        <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,0.96fr)_minmax(320px,0.84fr)]">
-          <section className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
-            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
-                  Gestao de contas
+        <div className="space-y-6">
+          <SecondarySupportPanel
+            description="Veja rapido quantas contas seguem ativas, quantas ja foram pausadas e quantas existem no total antes de fazer qualquer ajuste."
+            eyebrow="Resumo"
+            title="Visao das contas"
+          >
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-[20px] border border-[var(--color-line)] bg-white px-4 py-3 text-sm">
+                <div className="text-xs uppercase tracking-[0.16em] text-[var(--color-muted)]">
+                  Total
                 </div>
-                <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
-                  Suas contas hoje
-                </h2>
-                <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--color-muted)]">
-                  Aqui voce controla quais contas seguem disponiveis para novos lancamentos e
-                  importacoes. O historico continua preservado mesmo quando uma conta fica
-                  inativa.
-                </p>
+                <div className="mt-2 text-xl font-semibold text-[var(--color-foreground)]">
+                  {accounts.length}
+                </div>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-[20px] border border-[var(--color-line)] bg-white px-4 py-3 text-sm">
-                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--color-muted)]">
-                    Ativas
-                  </div>
-                  <div className="mt-2 text-xl font-semibold text-[var(--color-foreground)]">
-                    {activeCount}
-                  </div>
+              <div className="rounded-[20px] border border-[var(--color-line)] bg-white px-4 py-3 text-sm">
+                <div className="text-xs uppercase tracking-[0.16em] text-[var(--color-muted)]">
+                  Ativas
                 </div>
-                <div className="rounded-[20px] border border-[var(--color-line)] bg-white px-4 py-3 text-sm">
-                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--color-muted)]">
-                    Inativas
-                  </div>
-                  <div className="mt-2 text-xl font-semibold text-[var(--color-foreground)]">
-                    {inactiveCount}
-                  </div>
+                <div className="mt-2 text-xl font-semibold text-[var(--color-foreground)]">
+                  {activeCount}
+                </div>
+              </div>
+              <div className="rounded-[20px] border border-[var(--color-line)] bg-white px-4 py-3 text-sm">
+                <div className="text-xs uppercase tracking-[0.16em] text-[var(--color-muted)]">
+                  Inativas
+                </div>
+                <div className="mt-2 text-xl font-semibold text-[var(--color-foreground)]">
+                  {inactiveCount}
                 </div>
               </div>
             </div>
+          </SecondarySupportPanel>
 
-            {accounts.length === 0 ? (
-              <div className="mt-6 rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm leading-6 text-[var(--color-muted)]">
-                Voce ainda nao tem contas cadastradas. Crie a primeira aqui e depois volte ao{" "}
-                <Link className="font-semibold text-[var(--color-accent)]" href="/dashboard">
-                  dashboard
-                </Link>{" "}
-                para registrar movimentacoes.
-              </div>
-            ) : (
-              <div className="mt-6 space-y-4">
+          <div className="grid items-start gap-6 xl:grid-cols-[minmax(320px,0.92fr)_minmax(0,1.08fr)]">
+            <PrimaryActionCard
+              description={
+                isEditing
+                  ? "Revise nome, tipo e estado ativo. Contas inativas deixam de aparecer em novos lancamentos e importacoes."
+                  : "Crie outra conta para separar caixa, conta bancaria, cartao ou outros contextos do mes."
+              }
+              eyebrow={isEditing ? "Editar conta" : "Nova conta"}
+              footer={
+                editingAccount ? (
+                  <div className="rounded-[24px] border border-[var(--color-line)] bg-white px-5 py-4 text-sm leading-6 text-[var(--color-muted)]">
+                    Voce esta ajustando{" "}
+                    <strong className="text-[var(--color-foreground)]">
+                      {editingAccount.name}
+                    </strong>
+                    . Se esta conta ficar inativa, novos lancamentos e importacoes deixam de
+                    usa-la, mas o historico continua preservado.
+                  </div>
+                ) : (
+                  <div className="rounded-[24px] border border-[var(--color-line)] bg-white px-4 py-4 text-sm leading-6 text-[var(--color-muted)]">
+                    Novas contas entram ativas. Se precisar pausar uma conta depois, voce pode
+                    desativar sem perder o historico.
+                  </div>
+                )
+              }
+              title={isEditing ? "Ajustar conta existente" : "Adicionar conta"}
+            >
+              <form className="space-y-4" onSubmit={handleSubmit}>
+                <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
+                  <span>Nome da conta</span>
+                  <input
+                    className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3 text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)]"
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        name: event.target.value,
+                      }))
+                    }
+                    placeholder="Conta corrente, cartao, reserva..."
+                    value={form.name}
+                  />
+                </label>
+
+                <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
+                  <span>Tipo da conta</span>
+                  <select
+                    className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3 text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)]"
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        type: Number(event.target.value) as FinancialAccountType,
+                      }))
+                    }
+                    value={form.type}
+                  >
+                    {accountTypeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                {isEditing ? (
+                  <label className="flex items-start gap-3 rounded-[24px] border border-[var(--color-line)] bg-white px-4 py-4 text-sm text-[var(--color-muted)]">
+                    <input
+                      checked={form.isActive}
+                      className="mt-1 h-4 w-4 rounded border-[var(--color-line)] text-[var(--color-accent)] focus:ring-[var(--color-accent)]"
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          isActive: event.target.checked,
+                        }))
+                      }
+                      type="checkbox"
+                    />
+                    <span>
+                      Manter esta conta ativa para novos lancamentos e importacoes.
+                    </span>
+                  </label>
+                ) : null}
+
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    className="rounded-2xl bg-[var(--color-foreground)] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-70"
+                    disabled={isSubmitting}
+                    type="submit"
+                  >
+                    {isSubmitting
+                      ? "Salvando..."
+                      : isEditing
+                        ? "Salvar conta"
+                        : "Criar conta"}
+                  </button>
+                  {isEditing ? (
+                    <button
+                      className="rounded-2xl border border-[var(--color-line)] px-5 py-3 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-white"
+                      onClick={resetForm}
+                      type="button"
+                    >
+                      Cancelar edicao
+                    </button>
+                  ) : null}
+                </div>
+              </form>
+            </PrimaryActionCard>
+
+            <SecondarySupportPanel
+              description="A lista fica contida para a pagina continuar controlada mesmo quando voce cadastrar muitas contas."
+              eyebrow="Contas cadastradas"
+              title={accounts.length === 0 ? "Nenhuma conta por aqui" : "Suas contas hoje"}
+            >
+              <BoundedList
+                emptyState={
+                  <div className="rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm leading-6 text-[var(--color-muted)]">
+                    Voce ainda nao tem contas cadastradas. Crie a primeira aqui e depois volte ao{" "}
+                    <Link className="font-semibold text-[var(--color-accent)]" href="/dashboard">
+                      dashboard
+                    </Link>{" "}
+                    para registrar movimentacoes.
+                  </div>
+                }
+                hasItems={accounts.length > 0}
+                maxHeightClassName="max-h-[34rem] md:max-h-[38rem]"
+                testId="accounts-bounded-list"
+              >
                 {accounts.map((account) => {
                   const isBusy = actionAccountId === account.id;
 
@@ -385,115 +502,9 @@ export default function AccountsPage() {
                     </article>
                   );
                 })}
-              </div>
-            )}
-          </section>
-
-          <section className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
-            <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
-              {isEditing ? "Editar conta" : "Nova conta"}
-            </div>
-            <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
-              {isEditing ? "Ajustar conta existente" : "Adicionar conta"}
-            </h2>
-            <p className="mt-3 text-sm leading-6 text-[var(--color-muted)]">
-              {isEditing
-                ? "Revise nome, tipo e estado ativo. Contas inativas deixam de aparecer em novos lancamentos e importacoes."
-                : "Crie outra conta para separar caixa, conta bancaria, cartao ou outros contextos do mes."}
-            </p>
-
-            <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-              <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
-                <span>Nome da conta</span>
-                <input
-                  className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3 text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)]"
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      name: event.target.value,
-                    }))
-                  }
-                  placeholder="Conta corrente, cartao, reserva..."
-                  value={form.name}
-                />
-              </label>
-
-              <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
-                <span>Tipo da conta</span>
-                <select
-                  className="rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3 text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-accent)]"
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      type: Number(event.target.value) as FinancialAccountType,
-                    }))
-                  }
-                  value={form.type}
-                >
-                  {accountTypeOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              {isEditing ? (
-                <label className="flex items-start gap-3 rounded-[24px] border border-[var(--color-line)] bg-white px-4 py-4 text-sm text-[var(--color-muted)]">
-                  <input
-                    checked={form.isActive}
-                    className="mt-1 h-4 w-4 rounded border-[var(--color-line)] text-[var(--color-accent)] focus:ring-[var(--color-accent)]"
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        isActive: event.target.checked,
-                      }))
-                    }
-                    type="checkbox"
-                  />
-                  <span>
-                    Manter esta conta ativa para novos lancamentos e importacoes.
-                  </span>
-                </label>
-              ) : (
-                <div className="rounded-[24px] border border-[var(--color-line)] bg-white px-4 py-4 text-sm leading-6 text-[var(--color-muted)]">
-                  Novas contas entram ativas. Se precisar pausar uma conta depois, voce pode
-                  desativar sem perder o historico.
-                </div>
-              )}
-
-              <div className="flex flex-wrap gap-3">
-                <button
-                  className="rounded-2xl bg-[var(--color-foreground)] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-70"
-                  disabled={isSubmitting}
-                  type="submit"
-                >
-                  {isSubmitting
-                    ? "Salvando..."
-                    : isEditing
-                      ? "Salvar conta"
-                      : "Criar conta"}
-                </button>
-                {isEditing ? (
-                  <button
-                    className="rounded-2xl border border-[var(--color-line)] px-5 py-3 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-white"
-                    onClick={resetForm}
-                    type="button"
-                  >
-                    Cancelar edicao
-                  </button>
-                ) : null}
-              </div>
-            </form>
-
-            {editingAccount ? (
-              <div className="mt-6 rounded-[24px] border border-[var(--color-line)] bg-white px-5 py-4 text-sm leading-6 text-[var(--color-muted)]">
-                Voce esta ajustando <strong className="text-[var(--color-foreground)]">{editingAccount.name}</strong>.
-                {" "}Se esta conta ficar inativa, novos lancamentos e importacoes deixam de usa-la,
-                mas o historico continua preservado.
-              </div>
-            ) : null}
-          </section>
+              </BoundedList>
+            </SecondarySupportPanel>
+          </div>
         </div>
       )}
     </AppShell>

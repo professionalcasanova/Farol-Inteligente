@@ -167,9 +167,7 @@ public sealed class MonthlyInsightsService(
         var totalBudgetRemaining = totalPlannedBudget - totalBudgetSpent;
         var plannedRemaining = Math.Max(totalBudgetRemaining, 0m);
         var unpaidBillsReserve = pendingBills.Sum(bill => bill.Amount) + overdueBills.Sum(bill => bill.Amount);
-        var freeToSpend = period.IsFuturePeriod
-            ? balance
-            : balance - plannedRemaining - unpaidBillsReserve;
+        var freeToSpend = balance - plannedRemaining - unpaidBillsReserve;
 
         var categoryIdsForSummary = transactions
             .Where(transaction => transaction.CategoryId.HasValue)

@@ -21,6 +21,24 @@ namespace Farol.Infrastructure.Persistence.Migrations
                 type: "uuid",
                 nullable: true);
 
+            migrationBuilder.Sql(
+                """
+                WITH ranked_duplicates AS (
+                    SELECT
+                        "Id",
+                        ROW_NUMBER() OVER (
+                            PARTITION BY "BillSeriesId", "DueOn"
+                            ORDER BY "IsPaid" DESC, "PaidAtUtc" DESC NULLS LAST, "CreatedAtUtc", "Id"
+                        ) AS row_number
+                    FROM bills
+                    WHERE "BillSeriesId" IS NOT NULL
+                )
+                DELETE FROM bills AS duplicate_bill
+                USING ranked_duplicates
+                WHERE duplicate_bill."Id" = ranked_duplicates."Id"
+                  AND ranked_duplicates.row_number > 1;
+                """);
+
             migrationBuilder.CreateIndex(
                 name: "IX_bills_BillSeriesId_DueOn",
                 table: "bills",

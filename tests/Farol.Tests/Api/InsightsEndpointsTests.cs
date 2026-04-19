@@ -41,7 +41,7 @@ public sealed class InsightsEndpointsTests : IClassFixture<FarolApiFactory>
         Assert.Equal(0m, response.Balance);
         Assert.Equal(200m, response.PlannedReserve);
         Assert.Equal(160m, response.UnpaidBillsReserve);
-        Assert.Equal(0m, response.FreeToSpend);
+        Assert.Equal(-360m, response.FreeToSpend);
     }
 
     [Fact]

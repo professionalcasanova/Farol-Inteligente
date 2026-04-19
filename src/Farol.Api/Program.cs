@@ -108,8 +108,11 @@ builder.Services.AddScoped<PasswordService>();
 builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddScoped<BillSeriesExpansionService>();
 builder.Services.AddScoped<BillPaymentService>();
+builder.Services.AddScoped<BillSeriesUpdateService>();
 builder.Services.AddScoped<MonthlyInsightsService>();
 builder.Services.AddScoped<FinancialIntelligenceService>();
+builder.Services.AddScoped<CsvImportFileReader>();
+builder.Services.AddScoped<CsvImportParser>();
 builder.Services.AddScoped<TransactionCsvImportProcessor>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.Configure<FinancialIntelligenceOptions>(

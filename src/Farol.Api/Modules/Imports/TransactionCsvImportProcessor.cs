@@ -1,4 +1,3 @@
-using System.Text;
 using Farol.Domain.Categories;
 using Farol.Domain.Ledger;
 using Farol.Infrastructure.Persistence;
@@ -7,7 +6,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Farol.Api.Modules.Imports;
 
-public sealed class TransactionCsvImportProcessor(FarolDbContext dbContext)
+public sealed class TransactionCsvImportProcessor(
+    FarolDbContext dbContext,
+    CsvImportFileReader fileReader,
+    CsvImportParser parser)
 {
     public async Task<ImportTransactionsCsvResponse> ProcessAsync(
         Guid userId,
@@ -15,17 +17,14 @@ public sealed class TransactionCsvImportProcessor(FarolDbContext dbContext)
         IFormFile file,
         CancellationToken cancellationToken)
     {
-        var lines = await ReadLinesAsync(file, cancellationToken);
+        var lines = await fileReader.ReadLinesAsync(file, cancellationToken);
 
         if (lines.Count == 0)
         {
             return BuildEmptyResponse();
         }
 
-        if (!TryResolveLayout(lines, out var layout, out var headerLineNumber))
-        {
-            throw new InvalidOperationException(TransactionCsvParser.InvalidHeaderMessage);
-        }
+        var parseResult = parser.Parse(lines);
 
         var visibleCategories = await dbContext.Categories
             .AsNoTracking()
@@ -35,42 +34,21 @@ public sealed class TransactionCsvImportProcessor(FarolDbContext dbContext)
             .ToListAsync(cancellationToken);
 
         var categoryResolver = new TransactionImportCategoryResolver(visibleCategories);
-        var errors = new List<ImportTransactionsCsvErrorResponse>();
+        var errors = parseResult.Errors.ToList();
         var importedRows = 0;
-        var totalRows = 0;
 
-        for (var index = headerLineNumber; index < lines.Count; index++)
+        foreach (var parsedLine in parseResult.ParsedLines)
         {
-            var rowNumber = index + 1;
-            var line = lines[index];
-
-            if (string.IsNullOrWhiteSpace(line))
-            {
-                continue;
-            }
-
-            totalRows++;
-
-            if (!TransactionCsvParser.TryParseRow(line, layout, rowNumber, out var parsedRow, out var error))
-            {
-                errors.Add(new ImportTransactionsCsvErrorResponse
-                {
-                    RowNumber = rowNumber,
-                    Message = error
-                });
-                continue;
-            }
-
-            if (!TryResolveCategory(parsedRow, categoryResolver, rowNumber, errors, out var category))
+            if (!TryResolveCategory(parsedLine.Row, categoryResolver, parsedLine.RowNumber, errors, out var category))
             {
                 continue;
             }
 
             if (!TryQueueTransaction(
                     financialAccount,
-                    parsedRow,
+                    parsedLine.Row,
                     category,
-                    rowNumber,
+                    parsedLine.RowNumber,
                     errors))
             {
                 continue;
@@ -86,59 +64,11 @@ public sealed class TransactionCsvImportProcessor(FarolDbContext dbContext)
 
         return new ImportTransactionsCsvResponse
         {
-            TotalRows = totalRows,
+            TotalRows = parseResult.TotalRows,
             ImportedRows = importedRows,
-            SkippedRows = totalRows - importedRows,
+            SkippedRows = parseResult.TotalRows - importedRows,
             Errors = errors
         };
-    }
-
-    private async Task<List<string>> ReadLinesAsync(
-        IFormFile file,
-        CancellationToken cancellationToken)
-    {
-        using var reader = new StreamReader(
-            file.OpenReadStream(),
-            Encoding.UTF8,
-            detectEncodingFromByteOrderMarks: true);
-
-        var lines = new List<string>();
-
-        while (await reader.ReadLineAsync(cancellationToken) is { } line)
-        {
-            lines.Add(line);
-        }
-
-        return lines;
-    }
-
-    private static bool TryResolveLayout(
-        IReadOnlyList<string> lines,
-        out TransactionCsvLayout layout,
-        out int headerLineNumber)
-    {
-        layout = null!;
-        headerLineNumber = 0;
-
-        for (var index = 0; index < lines.Count; index++)
-        {
-            var candidate = lines[index];
-
-            if (string.IsNullOrWhiteSpace(candidate))
-            {
-                continue;
-            }
-
-            if (!TransactionCsvParser.TryParseHeader(candidate, out layout, out _))
-            {
-                continue;
-            }
-
-            headerLineNumber = index + 1;
-            return true;
-        }
-
-        return false;
     }
 
     private static bool TryResolveCategory(

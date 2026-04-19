@@ -14,6 +14,10 @@ SEVERITY_LOW = "low"
 SEVERITY_MEDIUM = "medium"
 SEVERITY_HIGH = "high"
 
+OVERDUE_IMPACT_LOW = "low"
+OVERDUE_IMPACT_MODERATE = "moderate"
+OVERDUE_IMPACT_HIGH = "high"
+
 LOW_PRIORITY_CATEGORY_NAMES = {
     "bares",
     "compras",
@@ -36,9 +40,9 @@ LOW_PRIORITY_CATEGORY_NAMES = {
 }
 
 HEALTHY_SUMMARY = {
-    "message": "Seu mês está sob controle até aqui.",
-    "cause": "Você não tem sinais fortes de pressão financeira imediata neste período.",
-    "action": "Continue registrando o mês para manter essa clareza.",
+    "message": "Seu mes esta sob controle ate aqui.",
+    "cause": "Voce nao tem sinais fortes de pressao financeira imediata neste periodo.",
+    "action": "Continue registrando o mes para manter essa clareza.",
 }
 
 
@@ -58,28 +62,44 @@ def analyze_financial_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
     categories = snapshot.get("categories", [])
 
     income = _to_decimal(totals.get("income", 0.0))
+    expense = _to_decimal(totals["expense"])
+    balance = _to_decimal(totals.get("balance", 0.0))
     free_to_spend = _to_decimal(totals["freeToSpend"])
     planned_budget = _to_decimal(totals["plannedBudget"])
     budget_spent = _to_decimal(totals["budgetSpent"])
-    total_expense = _to_decimal(totals["expense"])
+    overdue_amount = _to_decimal(bills.get("overdueAmount", 0.0))
+    overdue_count = int(bills["overdueCount"])
+    max_overdue_days = int(bills.get("maxOverdueDays", 0))
 
     budget_overrun = max(budget_spent - planned_budget, 0.0)
     non_essential_expense_amount = _calculate_non_essential_expense(categories)
     non_essential_expense_ratio = (
-        non_essential_expense_amount / total_expense if total_expense > 0 else 0.0
+        non_essential_expense_amount / expense if expense > 0 else 0.0
     )
+    variable_expense_ratio = expense / income if income > 0 else 0.0
 
-    variable_expense_ratio = (
-        total_expense / income if income > 0 else 0.0
+    overdue_amount_vs_balance = _calculate_relative_impact(overdue_amount, balance)
+    overdue_amount_vs_income = _calculate_relative_impact(overdue_amount, income)
+    overdue_impact = _resolve_overdue_impact(
+        overdue_count=overdue_count,
+        overdue_amount=overdue_amount,
+        balance=balance,
+        income=income,
+        max_overdue_days=max_overdue_days,
     )
-    max_overdue_days = int(bills.get("maxOverdueDays", 0))
 
     facts = {
         "income": income,
+        "expense": expense,
+        "balance": balance,
         "free_to_spend": free_to_spend,
         "budget_overrun": budget_overrun,
-        "overdue_count": int(bills["overdueCount"]),
+        "overdue_count": overdue_count,
+        "overdue_amount": overdue_amount,
         "max_overdue_days": max_overdue_days,
+        "overdue_impact": overdue_impact,
+        "overdue_amount_vs_balance": overdue_amount_vs_balance,
+        "overdue_amount_vs_income": overdue_amount_vs_income,
         "pending_count": int(bills["pendingCount"]),
         "pending_amount": _to_decimal(bills["pendingAmount"]),
         "upcoming_7_days_count": int(bills["upcoming7DaysCount"]),
@@ -119,19 +139,16 @@ def analyze_financial_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
 
 
 def _resolve_status(facts: dict[str, Any]) -> str:
-    if facts.get("max_overdue_days", 0) >= 7:
-        return STATUS_CRITICAL
-
     if (
         facts["free_to_spend"] < 0
         and facts.get("variable_expense_ratio", 0.0) > 0.8
     ):
         return STATUS_CRITICAL
 
-    if facts["overdue_count"] > 0:
+    if facts["free_to_spend"] < 0:
         return STATUS_CRITICAL
 
-    if facts["free_to_spend"] < 0:
+    if facts.get("overdue_impact") == OVERDUE_IMPACT_HIGH:
         return STATUS_CRITICAL
 
     if (
@@ -149,6 +166,9 @@ def _resolve_status(facts: dict[str, Any]) -> str:
     ):
         return STATUS_ATTENTION
 
+    if facts["overdue_count"] > 0:
+        return STATUS_ATTENTION
+
     if facts["pending_count"] >= 2 and facts["pending_amount"] > facts["free_to_spend"]:
         return STATUS_ATTENTION
 
@@ -163,12 +183,7 @@ def _resolve_status(facts: dict[str, Any]) -> str:
 
 def _calculate_score(facts: dict[str, Any]) -> int:
     score = 100
-
-    if facts.get("max_overdue_days", 0) >= 7:
-        score -= 40
-
-    if facts["overdue_count"] > 0:
-        score -= 35
+    score -= _resolve_overdue_score_penalty(facts)
 
     if facts["free_to_spend"] < 0 and facts.get("variable_expense_ratio", 0.0) > 0.8:
         score -= 35
@@ -205,16 +220,21 @@ def _calculate_score(facts: dict[str, Any]) -> int:
 
 def _resolve_insights(facts: dict[str, Any]) -> list[InsightDefinition]:
     insights: list[InsightDefinition] = []
+    overdue_severity = _resolve_overdue_severity(facts)
+    overdue_priority = _resolve_overdue_priority(facts)
 
     if facts.get("max_overdue_days", 0) >= 7:
         insights.append(
             InsightDefinition(
                 type="overdue_bills_long",
-                severity=SEVERITY_HIGH,
-                priority=110,
-                message="Você tem uma conta com mais de 7 dias de atraso.",
-                cause=f"Conta está atrasada há {facts['max_overdue_days']} dias, aumentando risco de juros.",
-                action="Priorize o pagamento das contas fixas vencidas.",
+                severity=overdue_severity,
+                priority=overdue_priority + 5,
+                message="Voce tem uma conta com atraso prolongado.",
+                cause=(
+                    f"Existe uma conta atrasada ha {facts['max_overdue_days']} dias e "
+                    "isso aumenta o risco de juros mesmo quando o valor ainda e pequeno."
+                ),
+                action="Revise as contas vencidas e resolva primeiro o que evita juros ou bloqueios.",
             )
         )
 
@@ -224,12 +244,12 @@ def _resolve_insights(facts: dict[str, Any]) -> list[InsightDefinition]:
                 type="negative_balance_high_variable_expense",
                 severity=SEVERITY_HIGH,
                 priority=105,
-                message="Saldo negativo e despesas variáveis muito altas em relação à renda.",
+                message="Saldo negativo e despesas variaveis muito altas em relacao a renda.",
                 cause=(
-                    f"Saldo do mês está em {facts['free_to_spend']:.2f} e "
-                    f"despesas variáveis representam {facts['variable_expense_ratio'] * 100:.1f}% da renda."
+                    f"Saldo do mes esta em {facts['free_to_spend']:.2f} e "
+                    f"despesas variaveis representam {facts['variable_expense_ratio'] * 100:.1f}% da renda."
                 ),
-                action="Suspenda despesas não essenciais até estabilizar o saldo.",
+                action="Suspenda despesas nao essenciais ate estabilizar o saldo.",
             )
         )
 
@@ -237,10 +257,10 @@ def _resolve_insights(facts: dict[str, Any]) -> list[InsightDefinition]:
         insights.append(
             InsightDefinition(
                 type="overdue_bills",
-                severity=SEVERITY_HIGH,
-                priority=100,
-                message="Você tem contas vencidas que precisam de atenção imediata.",
-                cause="Existem vencimentos atrasados pressionando seu mês.",
+                severity=overdue_severity,
+                priority=overdue_priority,
+                message=_build_overdue_message(facts),
+                cause=_build_overdue_cause(facts),
                 action="Priorize quitar ou renegociar as contas vencidas primeiro.",
             )
         )
@@ -251,9 +271,9 @@ def _resolve_insights(facts: dict[str, Any]) -> list[InsightDefinition]:
                 type="negative_free_money",
                 severity=SEVERITY_HIGH,
                 priority=90,
-                message="Seu dinheiro livre ficou negativo neste mês.",
-                cause="Depois dos gastos e do que ainda está reservado, faltou folga no mês.",
-                action="Evite novos gastos agora e revise as maiores saídas do período.",
+                message="Seu dinheiro livre ficou negativo neste mes.",
+                cause="Depois dos gastos e do que ainda esta reservado, faltou folga no mes.",
+                action="Evite novos gastos agora e revise as maiores saidas do periodo.",
             )
         )
 
@@ -266,9 +286,9 @@ def _resolve_insights(facts: dict[str, Any]) -> list[InsightDefinition]:
                 type="short_term_bills_pressure",
                 severity=SEVERITY_HIGH,
                 priority=80,
-                message="Os próximos vencimentos já pressionam sua folga imediata.",
-                cause="O que vence nos próximos dias está acima do dinheiro livre disponível.",
-                action="Organize os próximos pagamentos antes de assumir novos gastos.",
+                message="Os proximos vencimentos ja pressionam sua folga imediata.",
+                cause="O que vence nos proximos dias esta acima do dinheiro livre disponivel.",
+                action="Organize os proximos pagamentos antes de assumir novos gastos.",
             )
         )
 
@@ -278,9 +298,9 @@ def _resolve_insights(facts: dict[str, Any]) -> list[InsightDefinition]:
                 type="budget_overspent",
                 severity=SEVERITY_MEDIUM,
                 priority=60,
-                message="Seu planejamento do mês já foi ultrapassado.",
-                cause="Você gastou acima do que tinha planejado nas categorias acompanhadas.",
-                action="Revise o planejamento e reduza gastos ajustáveis no restante do mês.",
+                message="Seu planejamento do mes ja foi ultrapassado.",
+                cause="Voce gastou acima do que tinha planejado nas categorias acompanhadas.",
+                action="Revise o planejamento e reduza gastos ajustaveis no restante do mes.",
             )
         )
 
@@ -308,8 +328,8 @@ def _resolve_insights(facts: dict[str, Any]) -> list[InsightDefinition]:
                 type="period_financial_pressure",
                 severity=SEVERITY_MEDIUM,
                 priority=50,
-                message="As contas do período já pressionam seu mês.",
-                cause="O total ainda pendente está acima da sua folga financeira atual.",
+                message="As contas do periodo ja pressionam seu mes.",
+                cause="O total ainda pendente esta acima da sua folga financeira atual.",
                 action="Veja as contas a pagar e organize a ordem de prioridade.",
             )
         )
@@ -323,9 +343,9 @@ def _resolve_insights(facts: dict[str, Any]) -> list[InsightDefinition]:
                 type="high_non_essential_spending",
                 severity=SEVERITY_MEDIUM,
                 priority=40,
-                message="Uma parte alta das suas saídas está em gastos não essenciais.",
-                cause="Lazer, compras e outros gastos ajustáveis estão pesando acima do ideal.",
-                action="Comece cortando gastos menos urgentes para recuperar folga no mês.",
+                message="Uma parte alta das suas saidas esta em gastos nao essenciais.",
+                cause="Lazer, compras e outros gastos ajustaveis estao pesando acima do ideal.",
+                action="Comece cortando gastos menos urgentes para recuperar folga no mes.",
             )
         )
 
@@ -454,14 +474,14 @@ def _resolve_recommended_actions(
             },
             {
                 "id": "review_cash_flow",
-                "label": "Ver resumo do mês",
+                "label": "Ver resumo do mes",
                 "target": "/dashboard",
             },
         ],
         "negative_free_money": [
             {
                 "id": "review_expenses",
-                "label": "Ver saídas do mês",
+                "label": "Ver saidas do mes",
                 "target": "/transactions",
             },
             {
@@ -473,12 +493,12 @@ def _resolve_recommended_actions(
         "short_term_bills_pressure": [
             {
                 "id": "review_upcoming_bills",
-                "label": "Ver próximos vencimentos",
+                "label": "Ver proximos vencimentos",
                 "target": "/bills",
             },
             {
                 "id": "review_cash_flow",
-                "label": "Ver resumo do mês",
+                "label": "Ver resumo do mes",
                 "target": "/dashboard",
             },
         ],
@@ -490,7 +510,7 @@ def _resolve_recommended_actions(
             },
             {
                 "id": "review_expenses",
-                "label": "Ver saídas do mês",
+                "label": "Ver saidas do mes",
                 "target": "/transactions",
             },
         ],
@@ -502,7 +522,7 @@ def _resolve_recommended_actions(
             },
             {
                 "id": "review_expenses",
-                "label": "Ver saídas do mês",
+                "label": "Ver saidas do mes",
                 "target": "/transactions",
             },
         ],
@@ -526,7 +546,7 @@ def _resolve_recommended_actions(
             },
             {
                 "id": "review_expenses",
-                "label": "Ver saídas do mês",
+                "label": "Ver saidas do mes",
                 "target": "/transactions",
             },
         ],
@@ -570,6 +590,106 @@ def _resolve_recommended_actions(
     return actions
 
 
+def _resolve_overdue_impact(
+    *,
+    overdue_count: int,
+    overdue_amount: float,
+    balance: float,
+    income: float,
+    max_overdue_days: int,
+) -> str:
+    if overdue_count <= 0:
+        return OVERDUE_IMPACT_LOW
+
+    if overdue_amount <= 0:
+        base_impact = OVERDUE_IMPACT_MODERATE if max_overdue_days >= 7 else OVERDUE_IMPACT_LOW
+    elif balance <= 0 or income <= 0:
+        base_impact = OVERDUE_IMPACT_HIGH
+    else:
+        impact_on_balance = overdue_amount / balance
+        impact_on_income = overdue_amount / income
+
+        if impact_on_balance < 0.10 and impact_on_income < 0.05:
+            base_impact = OVERDUE_IMPACT_LOW
+        elif impact_on_balance < 0.30 and impact_on_income < 0.15:
+            base_impact = OVERDUE_IMPACT_MODERATE
+        else:
+            base_impact = OVERDUE_IMPACT_HIGH
+
+    if max_overdue_days >= 7:
+        if base_impact == OVERDUE_IMPACT_LOW:
+            return OVERDUE_IMPACT_MODERATE
+        if base_impact == OVERDUE_IMPACT_MODERATE:
+            return OVERDUE_IMPACT_HIGH
+
+    return base_impact
+
+
+def _resolve_overdue_score_penalty(facts: dict[str, Any]) -> int:
+    if facts["overdue_count"] <= 0:
+        return 0
+
+    impact = facts.get("overdue_impact")
+
+    if impact == OVERDUE_IMPACT_HIGH:
+        return 35
+    if impact == OVERDUE_IMPACT_MODERATE:
+        return 18
+    return 8
+
+
+def _resolve_overdue_severity(facts: dict[str, Any]) -> str:
+    impact = facts.get("overdue_impact")
+
+    if impact == OVERDUE_IMPACT_HIGH:
+        return SEVERITY_HIGH
+    if impact == OVERDUE_IMPACT_MODERATE:
+        return SEVERITY_MEDIUM
+    return SEVERITY_LOW
+
+
+def _resolve_overdue_priority(facts: dict[str, Any]) -> int:
+    impact = facts.get("overdue_impact")
+
+    if impact == OVERDUE_IMPACT_HIGH:
+        return 100
+    if impact == OVERDUE_IMPACT_MODERATE:
+        return 70
+    return 45
+
+
+def _build_overdue_message(facts: dict[str, Any]) -> str:
+    impact = facts.get("overdue_impact")
+
+    if impact == OVERDUE_IMPACT_HIGH:
+        return "Voce tem contas vencidas com impacto alto no mes."
+    if impact == OVERDUE_IMPACT_MODERATE:
+        return "Voce tem contas vencidas que pedem atencao."
+    return "Voce tem contas vencidas de baixo impacto por enquanto."
+
+
+def _build_overdue_cause(facts: dict[str, Any]) -> str:
+    overdue_amount = facts.get("overdue_amount", 0.0)
+    balance_ratio = facts.get("overdue_amount_vs_balance", 0.0) * 100
+    income_ratio = facts.get("overdue_amount_vs_income", 0.0) * 100
+    impact = facts.get("overdue_impact")
+
+    if impact == OVERDUE_IMPACT_HIGH:
+        return (
+            f"As contas vencidas somam {overdue_amount:.2f}, consumindo uma parte relevante "
+            f"do saldo ({balance_ratio:.1f}%) ou da renda ({income_ratio:.1f}%)."
+        )
+    if impact == OVERDUE_IMPACT_MODERATE:
+        return (
+            f"As contas vencidas somam {overdue_amount:.2f} e ja merecem atencao para nao "
+            f"pressionar mais o saldo ({balance_ratio:.1f}%) no restante do mes."
+        )
+    return (
+        f"As contas vencidas somam {overdue_amount:.2f}, com impacto pequeno sobre o saldo "
+        f"({balance_ratio:.1f}%) e a renda ({income_ratio:.1f}%)."
+    )
+
+
 def _calculate_non_essential_expense(categories: list[dict[str, Any]]) -> float:
     total = 0.0
 
@@ -599,6 +719,13 @@ def _serialize_insight(insight: InsightDefinition) -> dict[str, Any]:
         "cause": insight.cause,
         "action": insight.action,
     }
+
+
+def _calculate_relative_impact(amount: float, reference: float) -> float:
+    if amount <= 0 or reference <= 0:
+        return 0.0
+
+    return amount / reference
 
 
 def _to_decimal(value: Any) -> float:

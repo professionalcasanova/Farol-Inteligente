@@ -225,7 +225,7 @@ describe("BillsPage", () => {
     expect(scoped.getByText("Parcela 3/12")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /editar ocorrencia/i })).toHaveLength(2);
     expect(
-      screen.getByText(/editar e pagar atuam na ocorrencia atual/i),
+      screen.getByText(/voce pode editar so este mes, desta ocorrencia em diante ou a serie inteira/i),
     ).toBeInTheDocument();
   });
 
@@ -290,6 +290,7 @@ describe("BillsPage", () => {
         description: "Internet fibra",
         amount: 119.9,
         dueOn: "2026-03-12",
+        scope: undefined,
       });
     });
   });
@@ -330,7 +331,7 @@ describe("BillsPage", () => {
     });
   });
 
-  it("Bills_EditRecurringOccurrence_ShowsOccurrenceOnlyContract", async () => {
+  it("Bills_EditRecurringOccurrence_DefaultsToSingleScope", async () => {
     const user = userEvent.setup();
 
     mockedUseProtectedSession.mockReturnValue({
@@ -377,13 +378,13 @@ describe("BillsPage", () => {
     );
 
     expect(
-      await screen.findByText(/contrato de edicao da serie/i),
+      await screen.findByText(/como aplicar a edicao/i),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/corrige apenas esta ocorrencia ja criada/i),
+      screen.getByText(/corrige so este mes/i),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/desmarcar pagamento altera so o status desta ocorrencia/i),
+      screen.getByText(/mantem o historico antigo e muda a recorrencia daqui para frente/i),
     ).toBeInTheDocument();
 
     const descriptionInput = screen.getByLabelText("Descricao");
@@ -403,6 +404,131 @@ describe("BillsPage", () => {
         description: "Academia premium",
         amount: 150,
         dueOn: "2026-03-14",
+        scope: "single",
+      });
+    });
+  });
+
+  it("Bills_EditRecurringOccurrence_CanUseForwardScope", async () => {
+    const user = userEvent.setup();
+
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+
+    mockedListBills.mockResolvedValue([
+      {
+        id: "bill-2",
+        description: "Academia",
+        amount: 120,
+        dueOn: "2026-03-12",
+        billSeriesId: "series-2",
+        seriesKind: "recurring",
+        occurrenceNumber: 2,
+        totalOccurrences: 6,
+        isPaid: false,
+        paidAtUtc: null,
+        createdAtUtc: "2026-03-01T00:00:00Z",
+        status: "pending",
+      },
+    ]);
+    mockedUpdateBill.mockResolvedValue({
+      id: "bill-2",
+      description: "Academia premium",
+      amount: 150,
+      dueOn: "2026-03-14",
+      billSeriesId: "series-4",
+      seriesKind: "recurring",
+      occurrenceNumber: 1,
+      totalOccurrences: 5,
+      isPaid: false,
+      paidAtUtc: null,
+      createdAtUtc: "2026-03-01T00:00:00Z",
+      status: "pending",
+    });
+
+    render(<BillsPage />);
+
+    await user.click(
+      await screen.findByRole("button", { name: /editar ocorrencia/i }),
+    );
+
+    await user.click(screen.getAllByRole("radio")[1]);
+    await user.clear(screen.getByLabelText("Descricao"));
+    await user.type(screen.getByLabelText("Descricao"), "Academia premium");
+    await user.clear(screen.getByLabelText("Valor"));
+    await user.type(screen.getByLabelText("Valor"), "150");
+    await user.clear(screen.getByLabelText("Vencimento"));
+    await user.type(screen.getByLabelText("Vencimento"), "2026-03-14");
+    await user.click(screen.getByRole("button", { name: /salvar alteracao/i }));
+
+    await waitFor(() => {
+      expect(mockedUpdateBill).toHaveBeenCalledWith("token", "bill-2", {
+        description: "Academia premium",
+        amount: 150,
+        dueOn: "2026-03-14",
+        scope: "forward",
+      });
+    });
+  });
+
+  it("Bills_EditRecurringOccurrence_CanUseSeriesScope", async () => {
+    const user = userEvent.setup();
+
+    mockedUseProtectedSession.mockReturnValue({
+      session,
+      isLoading: false,
+      logout: vi.fn(),
+    });
+
+    mockedListBills.mockResolvedValue([
+      {
+        id: "bill-2",
+        description: "Academia",
+        amount: 120,
+        dueOn: "2026-03-12",
+        billSeriesId: "series-2",
+        seriesKind: "recurring",
+        occurrenceNumber: 2,
+        totalOccurrences: 6,
+        isPaid: false,
+        paidAtUtc: null,
+        createdAtUtc: "2026-03-01T00:00:00Z",
+        status: "pending",
+      },
+    ]);
+    mockedUpdateBill.mockResolvedValue({
+      id: "bill-2",
+      description: "Academia premium",
+      amount: 150,
+      dueOn: "2026-03-14",
+      billSeriesId: "series-2",
+      seriesKind: "recurring",
+      occurrenceNumber: 2,
+      totalOccurrences: 6,
+      isPaid: false,
+      paidAtUtc: null,
+      createdAtUtc: "2026-03-01T00:00:00Z",
+      status: "pending",
+    });
+
+    render(<BillsPage />);
+
+    await user.click(
+      await screen.findByRole("button", { name: /editar ocorrencia/i }),
+    );
+
+    await user.click(screen.getAllByRole("radio")[2]);
+    await user.click(screen.getByRole("button", { name: /salvar alteracao/i }));
+
+    await waitFor(() => {
+      expect(mockedUpdateBill).toHaveBeenCalledWith("token", "bill-2", {
+        description: "Academia",
+        amount: 120,
+        dueOn: "2026-03-12",
+        scope: "series",
       });
     });
   });

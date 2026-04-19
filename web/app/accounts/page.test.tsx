@@ -97,12 +97,16 @@ describe("AccountsPage", () => {
 
     render(<AccountsPage />);
 
-    expect(await screen.findByText("Suas contas hoje")).toBeInTheDocument();
+    expect(await screen.findByText("Visao das contas")).toBeInTheDocument();
+    expect(screen.getByText("Total")).toBeInTheDocument();
+    expect(screen.getByText("Ativas")).toBeInTheDocument();
+    expect(screen.getByText("Inativas")).toBeInTheDocument();
+    expect(screen.getByTestId("accounts-bounded-list")).toBeInTheDocument();
     expect(screen.getByText("Conta principal")).toBeInTheDocument();
     expect(screen.getByText("Cartao do dia a dia")).toBeInTheDocument();
     expect(screen.getByText("Ativa")).toBeInTheDocument();
     expect(screen.getByText("Inativa")).toBeInTheDocument();
-    expect(screen.getByText("1")).toBeInTheDocument();
+    expect(screen.getAllByText("1")).toHaveLength(2);
   });
 
   it("Accounts_CreateAccount_AddsNewAccountAndShowsSuccess", async () => {

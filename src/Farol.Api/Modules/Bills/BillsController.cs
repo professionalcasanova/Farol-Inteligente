@@ -14,7 +14,8 @@ public sealed class BillsController(
     FarolDbContext dbContext,
     TimeProvider timeProvider,
     BillSeriesExpansionService billSeriesExpansionService,
-    BillPaymentService billPaymentService) : ControllerBase
+    BillPaymentService billPaymentService,
+    BillSeriesUpdateService billSeriesUpdateService) : ControllerBase
 {
     private const string PendingStatus = "pending";
     private const string PaidStatus = "paid";
@@ -229,18 +230,38 @@ public sealed class BillsController(
             return NotFound(new ErrorResponse("Bill was not found."));
         }
 
+        var normalizedScope = BillSeriesUpdateService.NormalizeScope(request.Scope);
+
+        if (!BillSeriesUpdateService.IsSupportedScope(normalizedScope))
+        {
+            return BadRequest(new ErrorResponse("Bill update scope is invalid. Use single, forward or series."));
+        }
+
+        BillSeries? series = null;
+
+        if (bill.BillSeriesId.HasValue)
+        {
+            series = await dbContext.BillSeries
+                .SingleOrDefaultAsync(
+                    candidate => candidate.Id == bill.BillSeriesId.Value && candidate.UserId == userId,
+                    cancellationToken);
+        }
+
         try
         {
-            bill.UpdateDetails(request.Description, request.Amount, request.DueOn);
+            await billSeriesUpdateService.ApplyUpdateAsync(
+                bill,
+                series,
+                request,
+                cancellationToken);
         }
         catch (Exception exception) when (
             exception is ArgumentException or
-            ArgumentOutOfRangeException)
+            ArgumentOutOfRangeException or
+            InvalidOperationException)
         {
             return BadRequest(new ErrorResponse(NormalizeDomainErrorMessage(exception.Message)));
         }
-
-        await dbContext.SaveChangesAsync(cancellationToken);
 
         return Ok(ToResponse(
             bill,

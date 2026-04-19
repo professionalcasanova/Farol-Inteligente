@@ -5,6 +5,7 @@ export type CategoryType = 1 | 2;
 export type FinancialAccountType = 1 | 2 | 3 | 4;
 export type BillStatus = "pending" | "paid" | "overdue";
 export type BillSeriesKind = "recurring" | "installment";
+export type BillUpdateScope = "single" | "forward" | "series";
 
 export type AuthResponse = StoredSession;
 
@@ -708,6 +709,7 @@ export async function updateBill(
     description: string;
     amount: number;
     dueOn: string;
+    scope?: BillUpdateScope;
   },
 ) {
   return apiRequest<BillResponse>(`/api/bills/${billId}`, {

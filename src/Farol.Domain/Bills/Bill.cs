@@ -76,6 +76,13 @@ public sealed class Bill
         DueOn = EnsureDueOn(dueOn);
     }
 
+    public void ReassignSeries(Guid billSeriesId, int? occurrenceNumber, int? totalOccurrences)
+    {
+        BillSeriesId = EnsureBillSeriesId(billSeriesId, occurrenceNumber, totalOccurrences);
+        OccurrenceNumber = EnsureOccurrenceNumber(billSeriesId, occurrenceNumber);
+        TotalOccurrences = EnsureTotalOccurrences(billSeriesId, occurrenceNumber, totalOccurrences);
+    }
+
     private static Guid EnsureUserId(Guid userId)
     {
         if (userId == Guid.Empty)

@@ -141,10 +141,10 @@ describe("BudgetPage", () => {
     render(<BudgetPage />);
 
     await user.click(
-      await screen.findByRole("button", { name: /salvar snapshot mensal/i }),
+      await screen.findByRole("button", { name: /salvar visao do mes/i }),
     );
 
-    expect(await screen.findByText(/limpo com sucesso/i)).toBeInTheDocument();
+    expect(await screen.findByText(/visao do mes limpa com sucesso/i)).toBeInTheDocument();
 
     await waitFor(() => {
       expect(mockedSaveMonthlyBudget).toHaveBeenCalledTimes(1);
@@ -243,7 +243,7 @@ describe("BudgetPage", () => {
     render(<BudgetPage />);
 
     await user.click(
-      await screen.findByRole("button", { name: /aplicar base ao snapshot/i }),
+      await screen.findByRole("button", { name: /aplicar base a visao do mes/i }),
     );
 
     await waitFor(() => {
@@ -254,7 +254,7 @@ describe("BudgetPage", () => {
     });
 
     expect(
-      await screen.findByText(/planejamento base aplicado ao snapshot do mes com sucesso/i),
+      await screen.findByText(/planejamento base aplicado a visao do mes com sucesso/i),
     ).toBeInTheDocument();
   });
 
@@ -264,7 +264,7 @@ describe("BudgetPage", () => {
     render(<BudgetPage />);
 
     expect(
-      await screen.findByText(/Voce esta editando o snapshot de/i),
+      await screen.findByText(/Voce esta editando a visao de/i),
     ).toBeInTheDocument();
     expect(
       screen.getByText(/Salvar aqui substitui apenas este mes/i),
@@ -345,11 +345,11 @@ describe("BudgetPage", () => {
     render(<BudgetPage />);
 
     expect(
-      await screen.findByText(/como o snapshot de .* ficou/i),
+      await screen.findByText(/como a visao de .* ficou/i),
     ).toBeInTheDocument();
     expect(screen.getByText("Igual a base")).toBeInTheDocument();
     expect(screen.getByText("Somente neste mes")).toBeInTheDocument();
-    expect(screen.getByText("Ficou fora do snapshot")).toBeInTheDocument();
+    expect(screen.getByText("Ficou fora da visao do mes")).toBeInTheDocument();
     expect(
       screen.getByText(/Categorias da base que ficaram fora/i),
     ).toBeInTheDocument();

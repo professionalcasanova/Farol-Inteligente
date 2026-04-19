@@ -32,14 +32,12 @@ public sealed class BillSeriesExpansionService(FarolDbContext dbContext)
                 seriesIds.Contains(bill.BillSeriesId.Value) &&
                 bill.DueOn >= periodStart &&
                 bill.DueOn < periodEnd)
-            .Select(bill => new { bill.BillSeriesId, bill.DueOn })
+            .Select(bill => bill.BillSeriesId!.Value)
             .ToListAsync(cancellationToken);
 
-        var existingKeys = existingOccurrences
-            .Select(item => $"{item.BillSeriesId:N}:{item.DueOn:yyyy-MM-dd}")
-            .ToHashSet(StringComparer.Ordinal);
+        var existingSeriesIds = existingOccurrences.ToHashSet();
 
-        var createdKeys = new List<string>();
+        var createdSeriesIds = new List<Guid>();
 
         foreach (var item in series)
         {
@@ -52,19 +50,17 @@ public sealed class BillSeriesExpansionService(FarolDbContext dbContext)
                 continue;
             }
 
-            var key = $"{item.Id:N}:{dueOn:yyyy-MM-dd}";
-
-            if (existingKeys.Contains(key))
+            if (existingSeriesIds.Contains(item.Id))
             {
                 continue;
             }
 
             dbContext.Bills.Add(item.CreateOccurrenceForMonth(periodStart));
-            existingKeys.Add(key);
-            createdKeys.Add(key);
+            existingSeriesIds.Add(item.Id);
+            createdSeriesIds.Add(item.Id);
         }
 
-        if (createdKeys.Count == 0)
+        if (createdSeriesIds.Count == 0)
         {
             return;
         }
@@ -77,7 +73,7 @@ public sealed class BillSeriesExpansionService(FarolDbContext dbContext)
         {
             await DetachAddedBillsAsync();
 
-            var persistedKeys = await dbContext.Bills
+            var persistedSeriesIds = await dbContext.Bills
                 .AsNoTracking()
                 .Where(bill =>
                     bill.UserId == userId &&
@@ -85,14 +81,12 @@ public sealed class BillSeriesExpansionService(FarolDbContext dbContext)
                     seriesIds.Contains(bill.BillSeriesId.Value) &&
                     bill.DueOn >= periodStart &&
                     bill.DueOn < periodEnd)
-                .Select(bill => new { bill.BillSeriesId, bill.DueOn })
+                .Select(bill => bill.BillSeriesId!.Value)
                 .ToListAsync(cancellationToken);
 
-            var persistedKeySet = persistedKeys
-                .Select(item => $"{item.BillSeriesId:N}:{item.DueOn:yyyy-MM-dd}")
-                .ToHashSet(StringComparer.Ordinal);
+            var persistedSeriesIdSet = persistedSeriesIds.ToHashSet();
 
-            if (createdKeys.All(persistedKeySet.Contains))
+            if (createdSeriesIds.All(persistedSeriesIdSet.Contains))
             {
                 return;
             }

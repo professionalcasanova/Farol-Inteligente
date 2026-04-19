@@ -68,6 +68,85 @@ public sealed class BillSeries
         IsActive = false;
     }
 
+    public void UpdateRule(string description, decimal amount, DateOnly dueOn)
+    {
+        var preservedTotalOccurrences = ResolveTotalOccurrences();
+
+        Description = NormalizeDescription(description);
+        Amount = EnsureAmount(amount);
+
+        var updatedFirstDueOn = new DateOnly(
+            FirstDueOn.Year,
+            FirstDueOn.Month,
+            Math.Min(dueOn.Day, DateTime.DaysInMonth(FirstDueOn.Year, FirstDueOn.Month)));
+
+        FirstDueOn = EnsureDueOn(updatedFirstDueOn);
+        UntilDate = ResolveUpdatedUntilDate(preservedTotalOccurrences);
+        EnsureKindMatchesSchedule(Kind, EndMode, OccurrenceCount);
+    }
+
+    public BillSeries CreateSuccessor(string description, decimal amount, DateOnly firstDueOn, int? currentOccurrenceNumber)
+    {
+        var remainingOccurrences = ResolveRemainingOccurrences(currentOccurrenceNumber);
+
+        return new BillSeries(
+            UserId,
+            description,
+            amount,
+            firstDueOn,
+            Kind,
+            Frequency,
+            EndMode,
+            ResolveSuccessorUntilDate(firstDueOn, remainingOccurrences),
+            ResolveSuccessorOccurrenceCount(remainingOccurrences));
+    }
+
+    private int? ResolveRemainingOccurrences(int? currentOccurrenceNumber)
+    {
+        var totalOccurrences = ResolveTotalOccurrences();
+
+        if (!totalOccurrences.HasValue)
+        {
+            return null;
+        }
+
+        if (!currentOccurrenceNumber.HasValue || currentOccurrenceNumber.Value <= 0)
+        {
+            return totalOccurrences.Value;
+        }
+
+        var remainingOccurrences = totalOccurrences.Value - currentOccurrenceNumber.Value + 1;
+        return remainingOccurrences > 0 ? remainingOccurrences : 1;
+    }
+
+    private int? ResolveSuccessorOccurrenceCount(int? remainingOccurrences)
+    {
+        if (EndMode != OccurrenceCountEndMode)
+        {
+            return null;
+        }
+
+        return remainingOccurrences;
+    }
+
+    private DateOnly? ResolveSuccessorUntilDate(DateOnly successorFirstDueOn, int? remainingOccurrences)
+    {
+        if (EndMode != UntilDateEndMode)
+        {
+            return null;
+        }
+
+        if (!remainingOccurrences.HasValue)
+        {
+            throw new InvalidOperationException("Recurring bill end date is invalid for successor generation.");
+        }
+
+        var lastPeriodStart = new DateOnly(successorFirstDueOn.Year, successorFirstDueOn.Month, 1)
+            .AddMonths(remainingOccurrences.Value - 1);
+
+        return ResolveDueOnForDay(lastPeriodStart, successorFirstDueOn.Day);
+    }
+
     public Bill CreateOccurrenceForMonth(DateOnly periodStart)
     {
         if (!TryResolveOccurrenceForMonth(periodStart, out var dueOn, out var occurrenceNumber, out var totalOccurrences))
@@ -157,7 +236,30 @@ public sealed class BillSeries
 
     private DateOnly ResolveDueOn(DateOnly periodStart)
     {
-        var day = Math.Min(FirstDueOn.Day, DateTime.DaysInMonth(periodStart.Year, periodStart.Month));
+        return ResolveDueOnForDay(periodStart, FirstDueOn.Day);
+    }
+
+    private DateOnly? ResolveUpdatedUntilDate(int? preservedTotalOccurrences)
+    {
+        if (EndMode != UntilDateEndMode)
+        {
+            return EnsureUntilDate(FirstDueOn, EndMode, UntilDate);
+        }
+
+        if (!preservedTotalOccurrences.HasValue)
+        {
+            throw new InvalidOperationException("Recurring bill end date is invalid.");
+        }
+
+        var lastPeriodStart = new DateOnly(FirstDueOn.Year, FirstDueOn.Month, 1)
+            .AddMonths(preservedTotalOccurrences.Value - 1);
+
+        return ResolveDueOn(lastPeriodStart);
+    }
+
+    private static DateOnly ResolveDueOnForDay(DateOnly periodStart, int dueDay)
+    {
+        var day = Math.Min(dueDay, DateTime.DaysInMonth(periodStart.Year, periodStart.Month));
         return new DateOnly(periodStart.Year, periodStart.Month, day);
     }
 
