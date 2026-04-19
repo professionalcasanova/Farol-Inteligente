@@ -506,7 +506,6 @@ describe("DashboardPage", () => {
     ).not.toBeInTheDocument();
   });
 
-
   it("Dashboard_RegisterNow_SubmitSuccess_RefreshesDataAndClearsForm", async () => {
     const user = userEvent.setup();
 
