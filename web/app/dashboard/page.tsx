@@ -74,7 +74,7 @@ const alertSeverityStyles = {
 const dashboardStandardGridClass =
   "grid items-start gap-6 xl:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)]";
 const dashboardHeroGridClass =
-  "grid items-start gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]";
+  "grid items-start gap-5 xl:grid-cols-[minmax(0,2.4fr)_minmax(260px,0.8fr)]";
 const dashboardSectionStackClass = "space-y-6";
 
 export default function DashboardPage() {
