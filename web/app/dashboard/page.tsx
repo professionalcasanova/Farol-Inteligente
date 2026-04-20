@@ -71,25 +71,10 @@ const alertSeverityStyles = {
     "bg-[color:rgba(217,119,6,0.12)] text-[var(--color-warm)] border-[color:rgba(217,119,6,0.14)]",
 } as const;
 
-const monthHealthStatusLabels = {
-  healthy: "Saudável",
-  attention: "Atenção",
-  critical: "Crítico",
-} as const;
-
-const monthHealthStatusStyles = {
-  healthy:
-    "border-[color:rgba(29,130,93,0.18)] bg-[color:rgba(220,252,231,0.82)] text-[var(--color-success)]",
-  attention:
-    "border-[color:rgba(217,119,6,0.16)] bg-[color:rgba(255,247,237,0.9)] text-[var(--color-warm)]",
-  critical:
-    "border-[color:rgba(185,28,28,0.16)] bg-[color:rgba(254,226,226,0.82)] text-red-700",
-} as const;
-
 const dashboardStandardGridClass =
   "grid items-start gap-6 xl:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)]";
 const dashboardHeroGridClass =
-  "grid items-start gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]";
+  "grid items-start gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]";
 const dashboardSectionStackClass = "space-y-6";
 
 export default function DashboardPage() {
@@ -120,10 +105,6 @@ export default function DashboardPage() {
   );
   const firstUseState = data ? isFirstUseState(data) : false;
   const monthHealth = data?.monthHealth;
-  const monthHealthStatus = monthHealth?.status;
-  const shouldShowMonthHealthSection = data
-    ? Boolean(data.monthHealth) && (!firstUseState || monthHealthStatus !== "healthy")
-    : false;
   const showSecondarySections = data ? !firstUseState || !data.monthHealth : false;
   const activationMessage = data ? getActivationMessage(data) : null;
   const prioritizedRecommendedActions = data?.monthHealth?.recommendedActions?.slice(0, 3) ?? [];
@@ -533,18 +514,18 @@ export default function DashboardPage() {
         <div className="space-y-8">
           <section className={dashboardHeroGridClass} data-testid="dashboard-hero-grid">
             <article
-              className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6"
+              className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-5 xl:p-6"
               id="quick-account"
             >
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
                   Ação rápida
                 </div>
-                <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-[var(--color-foreground)]">
+                <h2 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-[var(--color-foreground)]">
                   O que você fez hoje com seu dinheiro?
                 </h2>
-                <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--color-muted)]">
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--color-muted)]">
                   Digite o valor, diga se entrou ou saiu e registre na hora.
                 </p>
               </div>
@@ -561,13 +542,13 @@ export default function DashboardPage() {
             </div>
 
             {quickEntryError ? (
-              <div className="mt-5 rounded-[24px] border border-[color:rgba(185,28,28,0.14)] bg-[color:rgba(254,226,226,0.8)] px-5 py-4 text-sm text-red-700">
+              <div className="mt-4 rounded-[24px] border border-[color:rgba(185,28,28,0.14)] bg-[color:rgba(254,226,226,0.8)] px-5 py-4 text-sm text-red-700">
                 {quickEntryError}
               </div>
             ) : null}
 
             {quickEntrySuccess ? (
-              <div className="mt-5 rounded-[24px] border border-[color:rgba(29,130,93,0.16)] bg-[color:rgba(220,252,231,0.8)] px-5 py-4 text-sm text-green-700">
+              <div className="mt-4 rounded-[24px] border border-[color:rgba(29,130,93,0.16)] bg-[color:rgba(220,252,231,0.8)] px-5 py-4 text-sm text-green-700">
                 <div>{quickEntrySuccess}</div>
                 {quickEntryCreatedTransactionId ? (
                   <div className="mt-3 flex flex-wrap gap-3">
@@ -583,7 +564,7 @@ export default function DashboardPage() {
             ) : null}
 
             {data.accounts.length === 0 ? (
-              <div className="mt-6 rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-6 text-sm leading-6 text-[var(--color-muted)]">
+              <div className="mt-5 rounded-[24px] border border-dashed border-[var(--color-line)] px-5 py-5 text-sm leading-6 text-[var(--color-muted)]">
                 Você ainda não tem uma conta cadastrada. Para usar a ação rápida,
                 crie sua primeira conta em{" "}
                 <Link className="font-semibold text-[var(--color-accent)]" href="/accounts">
@@ -593,7 +574,7 @@ export default function DashboardPage() {
                 </div>
             ) : (
               <div
-                className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1.28fr)_minmax(320px,0.92fr)]"
+                className="mt-5 grid items-start gap-5 xl:grid-cols-[minmax(0,1.28fr)_minmax(320px,0.92fr)]"
                 data-testid="quick-entry-layout"
               >
                 {activeAccounts.length === 0 ? (
@@ -605,7 +586,7 @@ export default function DashboardPage() {
                     para registrar novas movimentacoes ou importar dados.
                   </div>
                 ) : (
-                  <form className="self-start space-y-5 rounded-[24px] border border-[var(--color-line)] bg-white p-5" onSubmit={handleQuickEntrySubmit}>
+                  <form className="self-start space-y-4 rounded-[24px] border border-[var(--color-line)] bg-white p-5" onSubmit={handleQuickEntrySubmit}>
                     <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
                       <label className="flex flex-col gap-2 text-sm text-[var(--color-muted)]">
                         <span>Conta financeira</span>
@@ -697,7 +678,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
 
-                    <div className="space-y-3">
+                    <div className="space-y-2.5">
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="text-sm font-medium text-[var(--color-foreground)]">
                           Categoria
@@ -709,7 +690,7 @@ export default function DashboardPage() {
                       <div className="text-xs leading-5 text-[var(--color-muted)]">
                         Categoria responde ao motivo da movimentação. PIX, boleto e cartão ficam para um campo futuro de meio de pagamento.
                       </div>
-                      <div className="flex gap-2 overflow-x-auto pb-2">
+                      <div className="flex gap-2 overflow-x-auto pb-1">
                         <button
                           className={`shrink-0 rounded-full border px-4 py-2 text-sm font-medium transition ${quickEntryForm.categoryId === "" ? "border-[var(--color-foreground)] bg-[var(--color-foreground)] text-white" : "border-[var(--color-line)] bg-white text-[var(--color-foreground)] hover:bg-[var(--color-accent-soft)]"}`}
                           onClick={() =>
@@ -782,15 +763,15 @@ export default function DashboardPage() {
             )}
             </article>
 
-            <article className="min-w-0 self-start rounded-[24px] border border-[var(--color-line)] bg-[color:rgba(255,255,255,0.72)] p-4 xl:p-5">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-muted)]">
-                Bloco secundário
+            <article className="min-w-0 self-start rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-4 xl:p-5">
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-accent)]">
+                Resumo do mês
               </div>
               <h2 className="mt-2 text-xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
                 Detalhes do mês
               </h2>
 
-              <div className="mt-4 grid gap-3 xl:grid-cols-2" data-testid="dashboard-month-details-content">
+              <div className="mt-3 grid gap-3 xl:grid-cols-2" data-testid="dashboard-month-details-content">
                 <article className="rounded-[20px] border border-[var(--color-line)] bg-white px-4 py-3">
                   <div className="text-sm font-semibold text-[var(--color-foreground)]">
                     Entradas x saídas
@@ -1063,9 +1044,7 @@ export default function DashboardPage() {
             </section>
           ) : null}
 
-          {shouldShowMonthHealthSection && monthHealth ? (
-            <>
-              {isCriticalHealth ? (
+          {isCriticalHealth && monthHealth ? (
                 <section
                   className="rounded-[28px] border border-[color:rgba(185,28,28,0.3)] bg-[color:rgba(254,226,226,0.82)] p-6"
                   id="foco-do-mes"
@@ -1206,137 +1185,7 @@ export default function DashboardPage() {
                     </div>
                   ) : null}
                 </section>
-              ) : null}
-
-              <section className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
-                <div
-                  className={dashboardStandardGridClass}
-                  data-testid="dashboard-month-health-grid"
-                >
-                  <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
-                      {firstUseState ? "Primeiro uso" : "Visão do mês"}
-                    </div>
-                    <span
-                      className={`rounded-full border px-3 py-1 text-xs font-semibold ${monthHealthStatusStyles[monthHealth.status]}`}
-                    >
-                      {monthHealthStatusLabels[monthHealth.status]}
-                    </span>
-                  </div>
-
-                  <h2 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-[var(--color-foreground)]">
-                    {firstUseState && activationMessage
-                      ? activationMessage.message
-                      : monthHealth.summary.message}
-                  </h2>
-                  <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--color-muted)]">
-                    {firstUseState && activationMessage
-                      ? activationMessage.cause
-                      : monthHealth.summary.cause}
-                  </p>
-                </div>
-
-                <div className="rounded-[24px] border border-[color:rgba(15,118,110,0.14)] bg-[var(--color-accent-soft)] px-5 py-5">
-                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-accent)]">
-                    O que fazer agora
-                  </div>
-                  <div className="mt-3 text-sm leading-6 text-[var(--color-foreground)]">
-                    {firstUseState && activationMessage
-                      ? activationMessage.action
-                      : monthHealth.summary.action}
-                  </div>
-                  {!firstUseState && prioritizedRecommendedActions.length > 0 ? (
-                    <div className="mt-4">
-                      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-accent)]">
-                        Prioridades do momento
-                      </div>
-                      <div className="mt-3 space-y-2">
-                        {prioritizedRecommendedActions.map((action, index) => (
-                          <Link
-                            className="flex items-center justify-between gap-3 rounded-[18px] border border-[var(--color-line)] bg-white px-4 py-3 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-[var(--color-panel)]"
-                            href={action.target}
-                            key={action.id}
-                          >
-                            <span className="min-w-0">
-                              {index + 1}. {action.label}
-                            </span>
-                            <span className="shrink-0 text-[var(--color-accent)]">
-                              Abrir
-                            </span>
-                          </Link>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-                  {firstUseState ? (
-                    <div className="mt-4 flex flex-wrap gap-3">
-                      {!data.onboarding.hasAccount ? (
-                        <Link
-                          className="rounded-full border border-[var(--color-line)] bg-white px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-[var(--color-panel)]"
-                          href="/dashboard#quick-account"
-                        >
-                          Criar primeira conta
-                        </Link>
-                      ) : (
-                        <>
-                          <Link
-                            className="rounded-full border border-[var(--color-line)] bg-white px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-[var(--color-panel)]"
-                            href="/dashboard#quick-account"
-                          >
-                            Registrar agora
-                          </Link>
-                          <Link
-                            className="rounded-full border border-[var(--color-line)] bg-white px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-[var(--color-panel)]"
-                            href="/imports"
-                          >
-                            Importar dados de arquivo
-                          </Link>
-                        </>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="mt-4">
-                      <Link
-                        className="inline-flex rounded-full border border-[var(--color-line)] bg-white px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition hover:bg-[var(--color-panel)]"
-                        href={`/analysis?month=${monthValue}`}
-                      >
-                        Ver analise do mes
-                      </Link>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {monthHealth.insights.length > 0 && !firstUseState ? (
-                <div className="mt-6 grid gap-3 md:grid-cols-3">
-                  {monthHealth.insights.map((insight) => (
-                    <article
-                      className="rounded-[24px] border border-[var(--color-line)] bg-white px-5 py-4"
-                      key={insight.type}
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <span
-                          className={`rounded-full border px-3 py-1 text-xs font-semibold ${alertSeverityStyles[insight.severity]}`}
-                        >
-                          Prioridade {alertSeverityLabels[insight.severity]}
-                        </span>
-                        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-muted)]">
-                          #{insight.priority}
-                        </div>
-                      </div>
-                      <div className="mt-4 text-sm font-semibold leading-6 text-[var(--color-foreground)]">
-                        {insight.message}
-                      </div>
-                      <div className="mt-2 text-sm leading-6 text-[var(--color-muted)]">
-                        {insight.action}
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              ) : null}
-            </section>
-          </>
+              
           ) : null}
 
           {showSecondarySections ? (
@@ -1421,15 +1270,9 @@ export default function DashboardPage() {
                   {projectionSupportMessage}
                 </div>
               ) : null}
-
             </article>
-              </section>
 
-              <section
-                className={dashboardStandardGridClass}
-                data-testid="dashboard-summary-grid"
-              >
-            <article className="min-w-0 self-start rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-5 xl:p-6">
+            <article className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-5 xl:p-6">
               <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
                 Contas a pagar do mês
               </div>
@@ -1537,7 +1380,6 @@ export default function DashboardPage() {
                 </details>
               ) : null}
             </article>
-
               </section>
 
               {data.summary.byCategory.length > 0 ? (
