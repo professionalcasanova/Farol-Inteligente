@@ -88,6 +88,8 @@ const monthHealthStatusStyles = {
 
 const dashboardStandardGridClass =
   "grid items-start gap-6 xl:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)]";
+const dashboardHeroGridClass =
+  "grid items-start gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]";
 const dashboardSectionStackClass = "space-y-6";
 
 export default function DashboardPage() {
@@ -529,10 +531,11 @@ export default function DashboardPage() {
         />
       ) : (
         <div className="space-y-8">
-          <section
-            className="rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6"
-            id="quick-account"
-          >
+          <section className={dashboardHeroGridClass} data-testid="dashboard-hero-grid">
+            <article
+              className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6"
+              id="quick-account"
+            >
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
@@ -777,6 +780,167 @@ export default function DashboardPage() {
 
               </div>
             )}
+            </article>
+
+            <article className="min-w-0 self-start rounded-[24px] border border-[var(--color-line)] bg-[color:rgba(255,255,255,0.72)] p-4 xl:p-5">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-muted)]">
+                Bloco secundário
+              </div>
+              <h2 className="mt-2 text-xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
+                Detalhes do mês
+              </h2>
+
+              <div className="mt-4 grid gap-3 xl:grid-cols-2" data-testid="dashboard-month-details-content">
+                <article className="rounded-[20px] border border-[var(--color-line)] bg-white px-4 py-3">
+                  <div className="text-sm font-semibold text-[var(--color-foreground)]">
+                    Entradas x saídas
+                  </div>
+                  <div className="mt-3 space-y-3">
+                    <div>
+                      <div className="flex items-center justify-between gap-3 text-sm">
+                        <span className="text-[var(--color-muted)]">Entradas</span>
+                        <span className="font-semibold text-[var(--color-foreground)]">
+                          {formatCurrency(data.freeMoney.totalIncome)}
+                        </span>
+                      </div>
+                      <div className="mt-2 h-2 rounded-full bg-[color:rgba(15,118,110,0.08)]">
+                        <div
+                          className="h-2 rounded-full bg-[var(--color-accent)]"
+                          style={{
+                            width: getComparisonBarWidth(
+                              data.freeMoney.totalIncome,
+                              monthlyFlowMax,
+                            ),
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between gap-3 text-sm">
+                        <span className="text-[var(--color-muted)]">Saídas</span>
+                        <span className="font-semibold text-[var(--color-foreground)]">
+                          {formatCurrency(data.freeMoney.totalExpense)}
+                        </span>
+                      </div>
+                      <div className="mt-2 h-2 rounded-full bg-[color:rgba(217,119,6,0.12)]">
+                        <div
+                          className="h-2 rounded-full bg-[var(--color-warm)]"
+                          style={{
+                            width: getComparisonBarWidth(
+                              data.freeMoney.totalExpense,
+                              monthlyFlowMax,
+                            ),
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </article>
+
+                <article className="rounded-[20px] border border-[var(--color-line)] bg-white px-4 py-3">
+                  <div className="text-sm font-semibold text-[var(--color-foreground)]">
+                    Planejado x gasto
+                  </div>
+                  <div className="mt-3 space-y-3">
+                    <div>
+                      <div className="flex items-center justify-between gap-3 text-sm">
+                        <span className="text-[var(--color-muted)]">Planejado</span>
+                        <span className="font-semibold text-[var(--color-foreground)]">
+                          {formatCurrency(data.budget.totalPlanned)}
+                        </span>
+                      </div>
+                      <div className="mt-2 h-2 rounded-full bg-[color:rgba(15,118,110,0.08)]">
+                        <div
+                          className="h-2 rounded-full bg-[var(--color-accent)]"
+                          style={{
+                            width: getComparisonBarWidth(
+                              data.budget.totalPlanned,
+                              budgetFlowMax,
+                            ),
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between gap-3 text-sm">
+                        <span className="text-[var(--color-muted)]">Gasto</span>
+                        <span className="font-semibold text-[var(--color-foreground)]">
+                          {formatCurrency(data.budget.totalSpent)}
+                        </span>
+                      </div>
+                      <div className="mt-2 h-2 rounded-full bg-[color:rgba(217,119,6,0.12)]">
+                        <div
+                          className="h-2 rounded-full bg-[var(--color-warm)]"
+                          style={{
+                            width: getComparisonBarWidth(
+                              data.budget.totalSpent,
+                              budgetFlowMax,
+                            ),
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </article>
+
+                <article className="rounded-[20px] border border-[var(--color-line)] bg-white px-4 py-3 xl:col-span-2">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <div className="text-sm font-semibold text-[var(--color-foreground)]">
+                      Próximas contas
+                    </div>
+                    <div className="text-[11px] leading-5 text-[var(--color-muted)]">
+                      Até 5 vencimentos
+                    </div>
+                  </div>
+
+                  <div className="mt-3 space-y-2.5">
+                    {data.billsSummary.upcoming.length === 0 ? (
+                      <div className="rounded-[18px] border border-dashed border-[var(--color-line)] px-3 py-4 text-sm text-[var(--color-muted)]">
+                        Nenhuma conta pendente para este mês. Se quiser demonstrar
+                        vencimentos e alertas, crie uma nova conta a pagar em{" "}
+                        <Link className="font-semibold text-[var(--color-accent)]" href="/bills">
+                          Contas a pagar
+                        </Link>
+                        .
+                      </div>
+                    ) : (
+                      data.billsSummary.upcoming.map((bill) => (
+                        <div
+                          className="rounded-[18px] border border-[var(--color-line)] bg-[var(--color-panel)] px-3 py-3"
+                          key={bill.id}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="text-sm font-semibold text-[var(--color-foreground)]">
+                                {bill.description}
+                              </div>
+                              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-muted)]">
+                                <span>Vence em {formatDate(bill.dueOn)}</span>
+                                {getPredictableBillLabel(bill) ? (
+                                  <span className="rounded-full border border-[var(--color-line)] bg-white px-2 py-1 font-semibold text-[var(--color-foreground)]">
+                                    {getPredictableBillLabel(bill)}
+                                  </span>
+                                ) : null}
+                              </div>
+                            </div>
+                            <div className="flex shrink-0 flex-col items-end gap-2">
+                              <span className="rounded-full border border-[color:rgba(217,119,6,0.14)] bg-[color:rgba(217,119,6,0.12)] px-2.5 py-1 text-[11px] font-semibold text-[var(--color-warm)]">
+                                Pendente
+                              </span>
+                              <div className="text-sm font-semibold text-[var(--color-foreground)]">
+                                {formatCurrency(bill.amount)}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </article>
+              </div>
+            </article>
           </section>
 
           {firstUseState && activationMessage ? (
@@ -1265,52 +1429,64 @@ export default function DashboardPage() {
                 className={dashboardStandardGridClass}
                 data-testid="dashboard-summary-grid"
               >
-            <article className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
+            <article className="min-w-0 self-start rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-5 xl:p-6">
               <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
                 Contas a pagar do mês
               </div>
-              <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
+              <h2 className="mt-2 text-xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
                 Compromissos do mês
               </h2>
+              <p className="mt-2 max-w-xl text-sm leading-5 text-[var(--color-muted)]">
+                Leitura rápida do que ainda pressiona o caixa neste mês.
+              </p>
 
-              <div className="mt-6 grid gap-4 md:grid-cols-2">
-                {[
-                  {
-                    label: "A pagar",
-                    total: data.billsSummary.totalPending,
-                    count: data.billsSummary.countPending,
-                    tone: "bg-[color:rgba(217,119,6,0.12)] text-[var(--color-warm)]",
-                  },
-                  {
-                    label: "Vencido",
-                    total: data.billsSummary.totalOverdue,
-                    count: data.billsSummary.countOverdue,
-                    tone: "bg-[color:rgba(185,28,28,0.1)] text-red-700",
-                  },
-                ].map((item) => (
-                  <article
-                    className="rounded-[24px] border border-[var(--color-line)] bg-white p-4"
-                    key={item.label}
-                  >
-                    <div className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${item.tone}`}>
-                      {item.label}
-                    </div>
-                    <div className="mt-4 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
-                      {formatCurrency(item.total)}
-                    </div>
-                    <div className="mt-2 text-xs text-[var(--color-muted)]">
-                      {item.count} {item.count === 1 ? "conta" : "contas"}
-                    </div>
-                  </article>
-                ))}
+              <div
+                className="mt-4 rounded-[24px] border border-[var(--color-line)] bg-white p-3"
+                data-testid="dashboard-bills-compact-block"
+              >
+                <div className="grid gap-3 md:grid-cols-2">
+                  {[
+                    {
+                      label: "A pagar",
+                      total: data.billsSummary.totalPending,
+                      count: data.billsSummary.countPending,
+                      tone: "bg-[color:rgba(217,119,6,0.12)] text-[var(--color-warm)]",
+                    },
+                    {
+                      label: "Vencido",
+                      total: data.billsSummary.totalOverdue,
+                      count: data.billsSummary.countOverdue,
+                      tone: "bg-[color:rgba(185,28,28,0.1)] text-red-700",
+                    },
+                  ].map((item) => (
+                    <article
+                      className="rounded-[20px] border border-[var(--color-line)] bg-[var(--color-panel)] px-4 py-3"
+                      key={item.label}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${item.tone}`}>
+                            {item.label}
+                          </div>
+                          <div className="mt-3 text-xs text-[var(--color-muted)]">
+                            {item.count} {item.count === 1 ? "conta" : "contas"}
+                          </div>
+                        </div>
+                        <div className="text-right text-lg font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
+                          {formatCurrency(item.total)}
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
               </div>
 
               {data.billsSummary.countPredictable > 0 ? (
-                <details className="mt-6 rounded-[24px] border border-[var(--color-line)] bg-white p-5">
+                <details className="mt-4 rounded-[24px] border border-[var(--color-line)] bg-white p-4">
                   <summary className="cursor-pointer list-none text-sm font-semibold text-[var(--color-foreground)]">
                     Ver detalhe de compromissos previsiveis
                   </summary>
-                  <div className="mt-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+                  <div className="mt-3 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
                     <div>
                       <div className="text-sm font-semibold text-[var(--color-foreground)]">
                         Compromissos previsiveis em aberto
@@ -1324,7 +1500,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
 
-                  <div className="mt-4 grid gap-3 md:grid-cols-3">
+                  <div className="mt-3 grid gap-3 md:grid-cols-3">
                     {[
                       {
                         label: "Previsiveis",
@@ -1343,13 +1519,13 @@ export default function DashboardPage() {
                       },
                     ].map((item) => (
                       <div
-                        className="rounded-[20px] border border-[var(--color-line)] bg-[var(--color-panel)] px-4 py-3"
+                        className="rounded-[20px] border border-[var(--color-line)] bg-[var(--color-panel)] px-3 py-3"
                         key={item.label}
                       >
                         <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--color-muted)]">
                           {item.label}
                         </div>
-                        <div className="mt-3 text-lg font-semibold text-[var(--color-foreground)]">
+                        <div className="mt-2 text-lg font-semibold text-[var(--color-foreground)]">
                           {formatCurrency(item.total)}
                         </div>
                         <div className="mt-1 text-xs text-[var(--color-muted)]">
@@ -1362,161 +1538,6 @@ export default function DashboardPage() {
               ) : null}
             </article>
 
-            <article className="min-w-0 rounded-[28px] border border-[var(--color-line)] bg-[var(--color-panel)] p-6">
-              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
-                Bloco secundário
-              </div>
-              <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-foreground)]">
-                Detalhes do mês
-              </h2>
-
-              <div className="mt-6 space-y-4">
-                <article className="rounded-[24px] border border-[var(--color-line)] bg-white p-5">
-                  <div className="text-sm font-semibold text-[var(--color-foreground)]">
-                    Entradas x saídas
-                  </div>
-                  <div className="mt-4 space-y-4">
-                    <div>
-                      <div className="flex items-center justify-between gap-3 text-sm">
-                        <span className="text-[var(--color-muted)]">Entradas</span>
-                        <span className="font-semibold text-[var(--color-foreground)]">
-                          {formatCurrency(data.freeMoney.totalIncome)}
-                        </span>
-                      </div>
-                      <div className="mt-2 h-3 rounded-full bg-[color:rgba(15,118,110,0.08)]">
-                        <div
-                          className="h-3 rounded-full bg-[var(--color-accent)]"
-                          style={{
-                            width: getComparisonBarWidth(
-                              data.freeMoney.totalIncome,
-                              monthlyFlowMax,
-                            ),
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex items-center justify-between gap-3 text-sm">
-                        <span className="text-[var(--color-muted)]">Saídas</span>
-                        <span className="font-semibold text-[var(--color-foreground)]">
-                          {formatCurrency(data.freeMoney.totalExpense)}
-                        </span>
-                      </div>
-                      <div className="mt-2 h-3 rounded-full bg-[color:rgba(217,119,6,0.12)]">
-                        <div
-                          className="h-3 rounded-full bg-[var(--color-warm)]"
-                          style={{
-                            width: getComparisonBarWidth(
-                              data.freeMoney.totalExpense,
-                              monthlyFlowMax,
-                            ),
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </article>
-
-                <article className="rounded-[24px] border border-[var(--color-line)] bg-white p-5">
-                  <div className="text-sm font-semibold text-[var(--color-foreground)]">
-                    Planejado x gasto
-                  </div>
-                  <div className="mt-4 space-y-4">
-                    <div>
-                      <div className="flex items-center justify-between gap-3 text-sm">
-                        <span className="text-[var(--color-muted)]">Planejado</span>
-                        <span className="font-semibold text-[var(--color-foreground)]">
-                          {formatCurrency(data.budget.totalPlanned)}
-                        </span>
-                      </div>
-                      <div className="mt-2 h-3 rounded-full bg-[color:rgba(15,118,110,0.08)]">
-                        <div
-                          className="h-3 rounded-full bg-[var(--color-accent)]"
-                          style={{
-                            width: getComparisonBarWidth(
-                              data.budget.totalPlanned,
-                              budgetFlowMax,
-                            ),
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex items-center justify-between gap-3 text-sm">
-                        <span className="text-[var(--color-muted)]">Gasto</span>
-                        <span className="font-semibold text-[var(--color-foreground)]">
-                          {formatCurrency(data.budget.totalSpent)}
-                        </span>
-                      </div>
-                      <div className="mt-2 h-3 rounded-full bg-[color:rgba(217,119,6,0.12)]">
-                        <div
-                          className="h-3 rounded-full bg-[var(--color-warm)]"
-                          style={{
-                            width: getComparisonBarWidth(
-                              data.budget.totalSpent,
-                              budgetFlowMax,
-                            ),
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </article>
-
-                <article className="rounded-[24px] border border-[var(--color-line)] bg-white p-5">
-                  <div className="text-sm font-semibold text-[var(--color-foreground)]">
-                    Próximas contas
-                  </div>
-                  <div className="mt-1 text-xs leading-5 text-[var(--color-muted)]">
-                    Até 5 vencimentos pendentes
-                  </div>
-
-                  <div className="mt-4 space-y-3">
-                    {data.billsSummary.upcoming.length === 0 ? (
-                      <div className="rounded-[20px] border border-dashed border-[var(--color-line)] px-4 py-5 text-sm text-[var(--color-muted)]">
-                        Nenhuma conta pendente para este mês. Se quiser demonstrar
-                        vencimentos e alertas, crie uma nova conta a pagar em{" "}
-                        <Link className="font-semibold text-[var(--color-accent)]" href="/bills">
-                          Contas a pagar
-                        </Link>
-                        .
-                      </div>
-                    ) : (
-                      data.billsSummary.upcoming.map((bill) => (
-                        <div
-                          className="flex flex-col gap-3 rounded-[20px] border border-[var(--color-line)] bg-[var(--color-panel)] px-4 py-4 md:flex-row md:items-center md:justify-between"
-                          key={bill.id}
-                        >
-                          <div>
-                            <div className="text-sm font-semibold text-[var(--color-foreground)]">
-                              {bill.description}
-                            </div>
-                            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-muted)]">
-                              <span>Vence em {formatDate(bill.dueOn)}</span>
-                              {getPredictableBillLabel(bill) ? (
-                                <span className="rounded-full border border-[var(--color-line)] bg-white px-2 py-1 font-semibold text-[var(--color-foreground)]">
-                                  {getPredictableBillLabel(bill)}
-                                </span>
-                              ) : null}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className="rounded-full border border-[color:rgba(217,119,6,0.14)] bg-[color:rgba(217,119,6,0.12)] px-3 py-1 text-xs font-semibold text-[var(--color-warm)]">
-                              Pendente
-                            </span>
-                            <div className="text-sm font-semibold text-[var(--color-foreground)]">
-                              {formatCurrency(bill.amount)}
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </article>
-              </div>
-            </article>
               </section>
 
               {data.summary.byCategory.length > 0 ? (
