@@ -862,7 +862,7 @@ describe("DashboardPage", () => {
     expect(screen.getByLabelText(/descrição \(se quiser\)/i)).toBeInTheDocument();
   });
 
-  it("Dashboard_WithMonthHealth_ShowsSummaryCauseAndAction", async () => {
+  it("Dashboard_WithMonthHealth_RemovesSummarySectionButKeepsDashboardFlow", async () => {
     mockedUseProtectedSession.mockReturnValue({
       session,
       isLoading: false,
@@ -903,20 +903,18 @@ describe("DashboardPage", () => {
 
     render(<DashboardPage />);
 
+    expect(await screen.findByText("Resumo financeiro")).toBeInTheDocument();
+    expect(screen.queryByText("Seu mes pede alguns ajustes agora.")).not.toBeInTheDocument();
     expect(
-      await screen.findByText("Seu mes pede alguns ajustes agora."),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(
+      screen.queryByText(
         "As contas pendentes ja consomem a maior parte da sua folga.",
       ),
-    ).toBeInTheDocument();
+    ).not.toBeInTheDocument();
     expect(
-      screen.getByText(
+      screen.queryByText(
         "Organize a ordem de pagamento e preserve caixa para o essencial.",
       ),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Resumo financeiro")).toBeInTheDocument();
+    ).not.toBeInTheDocument();
     expect(screen.getByText("Entradas x saídas")).toBeInTheDocument();
     expect(screen.getByText("Planejado x gasto")).toBeInTheDocument();
     expect(screen.queryByText("Alertas do mês")).not.toBeInTheDocument();
@@ -966,18 +964,17 @@ describe("DashboardPage", () => {
     const heroGrid = await screen.findByTestId("dashboard-hero-grid");
     const monthDetailsContent = screen.getByTestId("dashboard-month-details-content");
     const billsCompactBlock = screen.getByTestId("dashboard-bills-compact-block");
-    const monthHealthGrid = await screen.findByTestId("dashboard-month-health-grid");
 
-    expect(heroGrid.className).toContain("gap-6");
+    expect(heroGrid.className).toContain("gap-5");
     expect(monthDetailsContent.className).toContain("xl:grid-cols-2");
     expect(billsCompactBlock.className).toContain("rounded-[24px]");
-    expect(monthHealthGrid.className).toContain("gap-6");
     expect(heroGrid.className).toContain(
       "xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]",
     );
-    expect(monthHealthGrid.className).toContain(
-      "xl:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)]",
-    );
+    expect(screen.getByText("Resumo do mês")).toBeInTheDocument();
+    expect(screen.queryByText("Bloco secundário")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("dashboard-month-health-grid")).not.toBeInTheDocument();
+    expect(screen.queryByText("Visão do mês")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "O que você fez hoje com seu dinheiro?" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Detalhes do mês" })).toBeInTheDocument();
   });
@@ -1121,7 +1118,7 @@ describe("DashboardPage", () => {
     expect(screen.getByText("Parcela 3/12")).toBeInTheDocument();
   });
 
-  it("Dashboard_WithRecommendedActions_ShowsPrioritizedLinks", async () => {
+  it("Dashboard_WithRecommendedActions_DoesNotRenderRemovedMonthSummaryActions", async () => {
     mockedUseProtectedSession.mockReturnValue({
       session,
       isLoading: false,
@@ -1184,33 +1181,16 @@ describe("DashboardPage", () => {
 
     render(<DashboardPage />);
 
-    expect(await screen.findByText("Prioridades do momento")).toBeInTheDocument();
+    await screen.findByText("Resumo financeiro");
 
-    const actionLinks = screen.getAllByRole("link").filter((link) =>
-      /^\d+\./i.test(link.textContent ?? ""),
-    );
-
-    expect(actionLinks).toHaveLength(3);
-    expect(screen.getByRole("link", { name: /1\. ver contas vencidas/i })).toHaveAttribute(
-      "href",
-      "/bills?status=overdue",
-    );
-    expect(screen.getByRole("link", { name: /2\. revisar gastos do mes/i })).toHaveAttribute(
-      "href",
-      "/transactions",
-    );
-    expect(screen.getByRole("link", { name: /3\. ajustar orcamento/i })).toHaveAttribute(
-      "href",
-      "/budget",
-    );
-    expect(screen.queryByRole("link", { name: /continuar acompanhando/i })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Ver analise do mes" })).toHaveAttribute(
-      "href",
-      "/analysis?month=2026-04",
-    );
+    expect(screen.queryByText("Prioridades do momento")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /1\. ver contas vencidas/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /2\. revisar gastos do mes/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /3\. ajustar orcamento/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Ver analise do mes" })).not.toBeInTheDocument();
   });
 
-  it("Dashboard_WithMonthHealth_ShowsActiveInsights", async () => {
+  it("Dashboard_WithMonthHealth_DoesNotRenderRemovedInsightsSection", async () => {
     mockedUseProtectedSession.mockReturnValue({
       session,
       isLoading: false,
@@ -1269,14 +1249,11 @@ describe("DashboardPage", () => {
 
     render(<DashboardPage />);
 
-    expect(
-      (await screen.findAllByText("Voce esta no vermelho neste mes.")).length,
-    ).toBeGreaterThanOrEqual(2);
-    expect(
-      screen.getByText("Seu orcamento do mes ja saiu do plano."),
-    ).toBeInTheDocument();
-    expect(screen.getByText("#90")).toBeInTheDocument();
-    expect(screen.getByText("#70")).toBeInTheDocument();
+    await screen.findByText("Resumo financeiro");
+
+    expect(screen.queryByText("Seu orcamento do mes ja saiu do plano.")).not.toBeInTheDocument();
+    expect(screen.queryByText("#90")).not.toBeInTheDocument();
+    expect(screen.queryByText("#70")).not.toBeInTheDocument();
   });
 
   it("Dashboard_UserWithCompletedOnboarding_RemovesOldGuidanceBlocks", async () => {
