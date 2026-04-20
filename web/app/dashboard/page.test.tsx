@@ -966,10 +966,10 @@ describe("DashboardPage", () => {
     const billsCompactBlock = screen.getByTestId("dashboard-bills-compact-block");
 
     expect(heroGrid.className).toContain("gap-5");
-    expect(monthDetailsContent.className).toContain("xl:grid-cols-2");
+    expect(monthDetailsContent.className).not.toContain("xl:grid-cols-2");
     expect(billsCompactBlock.className).toContain("rounded-[24px]");
     expect(heroGrid.className).toContain(
-      "xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]",
+      "xl:grid-cols-[minmax(0,1.72fr)_minmax(360px,1.08fr)]",
     );
     expect(screen.getByText("Resumo do mês")).toBeInTheDocument();
     expect(screen.queryByText("Bloco secundário")).not.toBeInTheDocument();
