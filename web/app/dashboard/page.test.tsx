@@ -963,17 +963,23 @@ describe("DashboardPage", () => {
 
     render(<DashboardPage />);
 
+    const heroGrid = await screen.findByTestId("dashboard-hero-grid");
+    const monthDetailsContent = screen.getByTestId("dashboard-month-details-content");
+    const billsCompactBlock = screen.getByTestId("dashboard-bills-compact-block");
     const monthHealthGrid = await screen.findByTestId("dashboard-month-health-grid");
-    const summaryGrid = screen.getByTestId("dashboard-summary-grid");
 
+    expect(heroGrid.className).toContain("gap-6");
+    expect(monthDetailsContent.className).toContain("xl:grid-cols-2");
+    expect(billsCompactBlock.className).toContain("rounded-[24px]");
     expect(monthHealthGrid.className).toContain("gap-6");
-    expect(summaryGrid.className).toContain("gap-6");
+    expect(heroGrid.className).toContain(
+      "xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]",
+    );
     expect(monthHealthGrid.className).toContain(
       "xl:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)]",
     );
-    expect(summaryGrid.className).toContain(
-      "xl:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)]",
-    );
+    expect(screen.getByRole("heading", { name: "O que você fez hoje com seu dinheiro?" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Detalhes do mês" })).toBeInTheDocument();
   });
 
   it("Dashboard_FreeMoneyComposition_ShowsPlannedAndUnpaidReservesBelowDinheiroLivre", async () => {
