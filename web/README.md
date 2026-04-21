@@ -1,63 +1,76 @@
 # Farol Web
 
-Front-end MVP do Farol para a Sprint 6.
+Frontend standalone do Farol, pronto para rodar como repositorio independente.
 
-Stack:
+## Stack
 
-- Next.js
+- Next.js 15
+- React 19
 - TypeScript
-- Tailwind CSS
+- Tailwind CSS 4
+- Vitest + Testing Library
 
 ## Requisitos
 
 - Node.js 22+
-- backend do Farol rodando localmente
+- npm 10+
+- uma API Farol acessivel por HTTP
 
 ## Configuracao
 
-Crie um arquivo `.env.local` com:
+Crie um arquivo `.env.local` a partir de [`.env.local.example`](./.env.local.example):
 
 ```env
 NEXT_PUBLIC_API_BASE_URL=http://localhost:5258
 ```
 
-Existe um exemplo em [`.env.local.example`](./.env.local.example).
+`NEXT_PUBLIC_API_BASE_URL` deve apontar para a API HTTP do Farol. O frontend nao depende do codigo do backend nem do servico Python para compilar ou iniciar, mas depende de uma API acessivel para executar os fluxos da aplicacao.
 
 ## Rodando localmente
 
-1. Suba o backend do Farol na raiz do repositorio:
-
-```powershell
-docker compose up -d
-$env:DOTNET_CLI_HOME='c:\Users\masuc\Desktop\PensarNoNome\.dotnet'
-$env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE='1'
-dotnet build Farol.sln --no-restore -c Release -m:1 -v minimal
-dotnet run --project src/Farol.Api/Farol.Api.csproj -c Release --no-build
-```
-
-2. Em outro terminal, dentro de `web`:
-
 ```powershell
 npm install
+Copy-Item .env.local.example .env.local
 npm run dev
 ```
 
-3. Abra:
+Abra:
 
 - `http://localhost:3000`
 
-## Comandos uteis
+## Scripts
 
 ```powershell
 npm run dev
-npm run lint
 npm run build
+npm run start
+npm run test
+npm run test:watch
 ```
 
-## Fluxos cobertos no MVP
+## Contrato esperado da API
 
-- login com `POST /api/auth/login`
-- dashboard com resumo mensal, orcamento e dinheiro livre
-- listagem e criacao de transacoes
-- visualizacao e substituicao do orcamento mensal
-- importacao CSV de transacoes
+Este frontend consome uma API externa via `fetch` usando `NEXT_PUBLIC_API_BASE_URL` como base. Os principais grupos de endpoints esperados sao:
+
+- `POST /api/auth/login`
+- `POST /api/auth/register`
+- `GET/POST/PUT /api/accounts`
+- `GET/POST/PUT/DELETE /api/transactions`
+- `GET /api/transactions/history`
+- `GET /api/categories`
+- `GET /api/dashboard/monthly-summary`
+- `GET /api/dashboard/bills-summary`
+- `GET/POST /api/budgets/monthly`
+- `GET/POST /api/budgets/template`
+- `POST /api/budgets/template/apply`
+- `POST /api/imports/transactions/csv`
+- `GET/POST/PUT/DELETE/PATCH /api/bills`
+- `GET /api/insights/free-money`
+- `GET /api/insights/alerts`
+- `GET /api/insights/month-health`
+
+## Observacoes
+
+- A autenticacao do frontend usa `localStorage` como decisao temporaria de MVP.
+- Nao existe modo de mocks em runtime para navegacao manual; os mocks atuais existem apenas nos testes.
+- Se a API estiver no ar, `npm install` + `npm run dev` sao suficientes para subir o frontend de forma independente.

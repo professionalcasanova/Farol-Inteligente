@@ -1,7 +1,8 @@
 {
-  "name": "web",
+  "name": "farol-web",
   "version": "0.1.0",
   "private": true,
+  "description": "Standalone frontend for the Farol personal finance assistant.",
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
