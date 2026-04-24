@@ -1,0 +1,63 @@
+name: Frontend CI
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - master
+    paths:
+      - "web/**"
+      - ".github/workflows/frontend-ci.yml"
+  push:
+    branches:
+      - dev
+      - master
+    paths:
+      - "web/**"
+      - ".github/workflows/frontend-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    name: frontend-build-and-test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    env:
+      CI: true
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:5258
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Detect frontend scripts
+        id: scripts
+        run: |
+          node -e "const fs=require('fs'); const scripts=require('./package.json').scripts ?? {}; const outputs=[['has_lint', Boolean(scripts.lint)], ['has_test', Boolean(scripts.test)], ['has_build', Boolean(scripts.build)]].map(([key, value]) => `${key}=${value}`).join('\n'); fs.appendFileSync(process.env.GITHUB_OUTPUT, `${outputs}\n`);"
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Run frontend lint
+        if: steps.scripts.outputs.has_lint == 'true'
+        run: npm run lint
+
+      - name: Run frontend tests
+        if: steps.scripts.outputs.has_test == 'true'
+        run: npm run test
+
+      - name: Build frontend
+        if: steps.scripts.outputs.has_build == 'true'
+        run: npm run build
