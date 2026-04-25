@@ -1,6 +1,6 @@
 # Farol Intelligence Service
 
-Serviço Python da V1 de inteligência financeira do Farol.
+Serviço Python de inteligência financeira determinística do Farol.
 
 ## O que faz
 
@@ -19,8 +19,14 @@ services/farol_intelligence/
     models.py
   tests/
     test_analysis.py
+    test_main.py
   pyproject.toml
+  README.md
 ```
+
+## Requisitos
+
+- Python 3.11+
 
 ## Rodando localmente
 
@@ -29,16 +35,23 @@ No diretório `services/farol_intelligence`:
 ```powershell
 python -m venv .venv
 .venv\Scripts\Activate.ps1
-pip install -e .
-uvicorn app.main:app --reload
+python -m pip install -e .
+python -m uvicorn app.main:app --reload --port 8000
 ```
 
-O endpoint principal ficará em:
+Endpoints úteis:
 
+- `GET http://127.0.0.1:8000/health`
 - `POST http://127.0.0.1:8000/analyze/v1`
 
 ## Rodando testes
 
 ```powershell
-python -m unittest discover tests -v
+python -m unittest discover tests
 ```
+
+## Limites deste serviço
+
+- este diretório não contém frontend
+- este diretório não substitui a API .NET
+- a integração oficial acontece por HTTP, consumida pelo backend do Farol

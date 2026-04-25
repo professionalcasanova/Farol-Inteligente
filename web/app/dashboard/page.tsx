@@ -74,7 +74,7 @@ const alertSeverityStyles = {
 const dashboardStandardGridClass =
   "grid items-start gap-6 xl:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)]";
 const dashboardHeroGridClass =
-  "grid items-start gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]";
+  "grid items-start gap-5 xl:grid-cols-[minmax(0,1.72fr)_minmax(360px,1.08fr)]";
 const dashboardSectionStackClass = "space-y-6";
 
 export default function DashboardPage() {
@@ -574,7 +574,7 @@ export default function DashboardPage() {
                 </div>
             ) : (
               <div
-                className="mt-5 grid items-start gap-5 xl:grid-cols-[minmax(0,1.28fr)_minmax(320px,0.92fr)]"
+                className="mt-5"
                 data-testid="quick-entry-layout"
               >
                 {activeAccounts.length === 0 ? (
@@ -771,7 +771,7 @@ export default function DashboardPage() {
                 Detalhes do mês
               </h2>
 
-              <div className="mt-3 grid gap-3 xl:grid-cols-2" data-testid="dashboard-month-details-content">
+              <div className="mt-3 grid gap-3" data-testid="dashboard-month-details-content">
                 <article className="rounded-[20px] border border-[var(--color-line)] bg-white px-4 py-3">
                   <div className="text-sm font-semibold text-[var(--color-foreground)]">
                     Entradas x saídas
@@ -866,7 +866,7 @@ export default function DashboardPage() {
                   </div>
                 </article>
 
-                <article className="rounded-[20px] border border-[var(--color-line)] bg-white px-4 py-3 xl:col-span-2">
+                <article className="rounded-[20px] border border-[var(--color-line)] bg-white px-4 py-3">
                   <div className="flex items-baseline justify-between gap-3">
                     <div className="text-sm font-semibold text-[var(--color-foreground)]">
                       Próximas contas

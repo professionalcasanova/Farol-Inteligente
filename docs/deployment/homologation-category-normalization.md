@@ -17,7 +17,7 @@ Important:
 
 Script:
 
-- [scripts/sql/normalize-system-categories.sql](/Users/masuc/Desktop/PensarNoNome/scripts/sql/normalize-system-categories.sql)
+- `scripts/sql/normalize-system-categories.sql`
 
 ## 1. Backup
 
@@ -69,13 +69,16 @@ FROM categories
 WHERE is_system = TRUE
   AND name IN (
     'Alimentacao',
+    'Alimentação',
     'AlimentaÃ§Ã£o',
-    'AlimentaÃƒÂ§ÃƒÂ£o',
     'Contas e servicos',
+    'Contas e serviços',
     'Contas e serviÃ§os',
     'Beneficios',
+    'Benefícios',
     'BenefÃ­cios',
     'Transferencia recebida',
+    'Transferência recebida',
     'TransferÃªncia recebida'
   )
 ORDER BY type, name;
