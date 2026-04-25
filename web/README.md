@@ -1,63 +1,121 @@
 # Farol Web
 
-Front-end MVP do Farol para a Sprint 6.
+Frontend do Farol em Next.js 15 com App Router.
 
-Stack:
+Este workspace e independente no sentido de instalacao e execucao, mas depende da API do Farol para os fluxos reais de autenticacao e dados.
 
-- Next.js
-- TypeScript
-- Tailwind CSS
+## O que existe em `web/`
+
+- aplicacao Next.js
+- telas do MVP
+- integracao HTTP com a API do backend
+- testes de interface com Vitest
 
 ## Requisitos
 
 - Node.js 22+
-- backend do Farol rodando localmente
+- npm
+- API do Farol acessivel pela URL configurada em `NEXT_PUBLIC_API_BASE_URL`
 
-## Configuracao
+## Variaveis de ambiente
 
-Crie um arquivo `.env.local` com:
+### Desenvolvimento local
+
+Crie `web/.env.local`:
 
 ```env
 NEXT_PUBLIC_API_BASE_URL=http://localhost:5258
 ```
 
-Existe um exemplo em [`.env.local.example`](./.env.local.example).
+Exemplo disponivel em [`./.env.local.example`](./.env.local.example).
 
-## Rodando localmente
+### Deploy
 
-1. Suba o backend do Farol na raiz do repositorio:
+Exemplo para ambiente publicado:
 
-```powershell
-docker compose up -d
-$env:DOTNET_CLI_HOME='c:\Users\masuc\Desktop\PensarNoNome\.dotnet'
-$env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE='1'
-dotnet build Farol.sln --no-restore -c Release -m:1 -v minimal
-dotnet run --project src/Farol.Api/Farol.Api.csproj -c Release --no-build
+```env
+NEXT_PUBLIC_API_BASE_URL=https://replace-with-farol-api.onrender.com
 ```
 
-2. Em outro terminal, dentro de `web`:
+Exemplo disponivel em [`./.env.production.example`](./.env.production.example).
+
+## Como rodar o frontend standalone
+
+O frontend pode ser iniciado sem iniciar o backend no mesmo terminal, mas a navegacao com dados reais depende da API configurada.
+
+No diretorio `web/`:
 
 ```powershell
 npm install
 npm run dev
 ```
 
-3. Abra:
+Aplicacao:
 
 - `http://localhost:3000`
 
-## Comandos uteis
+## Integracao com a API
+
+O frontend usa `NEXT_PUBLIC_API_BASE_URL` como base para chamadas HTTP.
+
+Comportamento atual:
+
+- remove barra final automaticamente
+- usa `http://localhost:5258` como fallback local se a variavel nao estiver definida
+- consome endpoints HTTP do backend, nao o servico Python diretamente
+
+Arquivo de referencia:
+
+- [`lib/api.ts`](./lib/api.ts)
+
+## Fluxo recomendado para desenvolvimento local
+
+1. Na raiz do repositorio, suba o banco:
+
+```powershell
+docker compose up -d
+```
+
+2. Na raiz do repositorio, rode a API .NET:
+
+```powershell
+$env:DOTNET_CLI_HOME='c:\Users\masuc\Desktop\PensarNoNome\.dotnet'
+$env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE='1'
+dotnet restore Farol.sln
+dotnet build Farol.sln --no-restore -c Release -m:1 -v minimal
+dotnet run --project src/Farol.Api/Farol.Api.csproj -c Release --no-build
+```
+
+3. Em outro terminal, dentro de `web/`, rode o frontend:
+
+```powershell
+npm install
+npm run dev
+```
+
+Opcional:
+
+4. Para fluxos de saude financeira, rode tambem o servico Python em `http://127.0.0.1:8000`.
+
+## Scripts disponiveis
 
 ```powershell
 npm run dev
 npm run lint
+npm run test
 npm run build
+npm run start
 ```
 
-## Fluxos cobertos no MVP
+## Limites deste workspace
 
-- login com `POST /api/auth/login`
-- dashboard com resumo mensal, orcamento e dinheiro livre
-- listagem e criacao de transacoes
-- visualizacao e substituicao do orcamento mensal
-- importacao CSV de transacoes
+- este diretorio nao contem regras de negocio do backend
+- este diretorio nao substitui o servico Python
+- alteracoes em `web/` nao devem mexer em `src/` ou `services/` sem necessidade explicita de contrato
+
+## Pontos de atencao
+
+- a autenticacao usa `localStorage` como decisao temporaria de MVP
+- nao existe refresh token neste estagio
+- o backend local aceita hoje `http://localhost:3000` e `http://localhost:3001` no CORS
+- se a API nao estiver acessivel, o frontend sobe, mas chamadas de dados falham

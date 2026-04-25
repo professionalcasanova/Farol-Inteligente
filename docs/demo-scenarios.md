@@ -2,8 +2,8 @@
 
 Usuários locais de desenvolvimento:
 
-- Senha de todos: `123456`
-- Conta padrão de todos: `Conta principal`
+- senha de todos: `123456`
+- conta padrão de todos: `Conta principal`
 
 ## Matriz
 
@@ -33,4 +33,5 @@ Usuários locais de desenvolvimento:
 
 ## Observação
 
-Esses usuários são apenas para ambiente local de desenvolvimento. Não devem ser ativados em produção.
+Esses usuários são apenas para ambiente local de desenvolvimento.
+Não devem ser ativados em produção.

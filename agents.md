@@ -1,199 +1,284 @@
 # AGENTS.md
 
-## Product context
-This repository contains an AI-powered personal finance assistant for Brazilian users.
-The product helps users organize expenses, track bills, avoid late payments, and receive financial guidance.
+Este arquivo e a fonte de verdade para agentes que atuam no repositorio Farol.
 
-## Engineering principles
-- Prefer simple and modular architecture
-- Keep backend domain logic isolated
-- Avoid premature optimization
-- Write readable code with explicit naming
-- Add tests for business rules
-- Document assumptions briefly in markdown when needed
+O objetivo e reduzir mudancas fora de escopo, manter a separacao entre stacks e preservar previsibilidade nas entregas.
 
-## Product priorities
-- Fast MVP delivery
-- Clear demo value
-- Real user pain first
-- Brazilian financial context
-- Privacy and consent by default
+## Contexto do produto
 
-## Current MVP scope
-- Manual/CSV input of transactions
-- Expense categorization
-- Monthly summary
-- Bill due-date tracking
-- Alerts
-- Natural language finance assistant
+Farol e um assistente financeiro pessoal para usuarios brasileiros.
 
-## Out of scope for now
-- Real bank integrations
-- Automatic payments
-- Debt negotiation with third parties
-- Credit scoring
-- Complex investment features
+Escopo atual do MVP:
 
-## Response style
-When proposing changes:
-1. Explain the plan
-2. List touched files
-3. Implement incrementally
-4. Include validation steps
-5. Highlight tradeoffs
+- autenticacao
+- contas financeiras
+- categorias e transacoes
+- resumo mensal
+- orcamento
+- importacao CSV
+- contas a pagar
+- alertas e saude financeira
+- frontend web em Next.js
+- servico Python de inteligencia financeira
 
-## Testing principles
-- Every relevant feature must include automated tests
-- Prefer unit tests first, then integration tests when the flow becomes stable
-- Keep tests simple, readable, and fast
-- Avoid unnecessary test infrastructure in early stages
-- A feature is not considered complete unless build and tests pass
+Fora de escopo por enquanto:
 
-## Testing workflow policy
+- integracoes bancarias reais
+- automacao de pagamentos
+- negociacao com terceiros
+- credit scoring
+- investimentos complexos
 
-We do not require rigid TDD for every task.
+## Mapa de responsabilidade por stack
 
-Current rule:
+### Frontend agent
 
-- Keep the current pragmatic workflow when it is the fastest safe path
-- Every meaningful product change must leave the codebase with better test coverage than before
-- Bugs found by testers or users should gain a regression test in the same delivery cycle whenever technically feasible
-- New business rules should preferably be covered close to the rule itself, usually with unit or API tests
-- UI, responsive, and integration work must still receive automated coverage for the main path, even when strict red-green-refactor is not practical
-- When a change is high-risk, user-facing, or affects money flows, increase test depth before considering it done
+Escopo:
 
-Quality bar:
+- pasta `web/`
+- documentacao diretamente ligada ao frontend
+- contratos consumidos no frontend apenas quando o endpoint ja existe
 
-1. If a rule is clear and easily isolatable, writing the failing test first is preferred
-2. If the work is exploratory or heavily UI-driven, implementation may come first, but tests must be added in the same cycle before completion
-3. If a production or beta issue is fixed without automated coverage, that is an exception and should be treated as technical debt to close immediately after
-4. Before merging `dev` into `master`, prioritize regression coverage for the paths touched by the tested wave
+Nao pode:
 
-## Definition of done
-For each completed step:
-1. Build passes
-2. Automated tests pass
-3. Manual validation steps are documented when needed
-4. Key tradeoffs are documented briefly
+- alterar `src/`
+- alterar `tests/` do backend
+- alterar `services/farol_intelligence/`
+- alterar infraestrutura do backend sem pedido explicito
 
-## Version control rules
+Responsabilidade principal:
 
-The agent must use git commits to keep track of changes.
+- experiencia do usuario
+- integracao com API ja existente
+- estados de tela
+- validacao visual e de navegacao
+- documentacao de uso do frontend
 
-Rules:
+### Backend agent
 
-- Every meaningful step must be committed
-- Commit messages must follow conventional commits
-- Never commit broken builds
-- Tests must pass before committing
-- Every pull request must include closing keywords for its issues in the body, for example `Closes #123`
-- When a pull request covers more than one issue, include one closing line per issue
+Escopo:
 
-Before committing:
-1. Run build
-2. Run tests
-3. Confirm success
-4. Then commit
+- `src/`
+- `tests/Farol.Tests/`
+- configuracoes e scripts diretamente ligados ao backend .NET
 
-## Branch strategy and deploy safety
+Nao pode:
 
-This repository uses the following branch model:
+- alterar `web/`
+- alterar `services/farol_intelligence/` sem mudanca formal de contrato
+- mexer em deploy de frontend
 
-- `master`: published/stable branch
-- `dev`: local integration branch for combined validation before publish
-- `codex/issue-*`: issue branches created from `dev`
+Responsabilidade principal:
 
-Rules:
+- dominio
+- API HTTP
+- persistencia
+- autenticacao
+- testes de regra de negocio e API
 
-- New issue work must branch from `dev`, not from `master`
-- Completed issue branches must be merged into `dev` first for local end-to-end testing
-- `master` must only receive changes that already passed local validation in `dev`
-- The repository must not rely on branch-specific hacks for environment behavior
-- Local development must keep pointing to local services by default
-- Published environments must use platform environment variables and deployment settings, not ad-hoc code changes in `dev`
-- Merging `dev` into `master` must not carry "dev-only" runtime targets, localhost overrides, or temporary local deployment values
-- If a deploy setting differs between local and published environments, it must be controlled by environment-specific configuration, never by changing business logic or hardcoding published URLs into `dev`
-- Do not introduce or recreate a `main` branch in this repository unless explicitly requested
-- Data corrections for homologation or published environments must use an explicit migration script or runbook, not an ad-hoc manual edit during deploy
-- Before any homologation or published data correction, take a database backup or snapshot first
+### Python agent
 
-Operational expectations:
+Escopo:
 
-1. Create or update the issue branch from `dev`
-2. Implement the change
-3. Run build and tests
-4. Commit to the issue branch
-5. Merge the issue branch into `dev`
-6. User validates locally from `dev`
-7. Only after approval, merge `dev` into `master`
+- `services/farol_intelligence/`
+- documentacao diretamente ligada ao servico Python
 
-## Architecture Overview
+Nao pode:
 
-This is a multi-stack personal finance assistant with the following components:
+- alterar `web/`
+- alterar `src/`
+- alterar testes do backend
 
-- **Backend**: .NET 10 modular monolith with sealed domain classes. No Repository pattern, no Application layer, no CQRS (MVP constraint). Domain entities use private constructors with validation. Layers: Domain (aggregates), Infrastructure (Persistence + Auth), API (Controllers direct to DbContext).
+Responsabilidade principal:
 
-- **Frontend**: Next.js 15 with App Router, feature-driven routing. Client-side auth with localStorage (temporary for MVP).
+- analise financeira deterministica
+- contrato do servico Python
+- testes do servico
 
-- **Intelligence Service**: Python FastAPI service with single endpoint for deterministic financial insights.
+### DevOps agent
 
-- **Database**: PostgreSQL 16.8 via Docker Compose.
+Escopo:
 
-Bounded contexts: Users, Bills, Categories, Budgets, Ledger (Accounts & Transactions).
+- `.github/workflows/`
+- `docker-compose.yml`
+- `render.yaml`
+- scripts e documentacao operacional
+- `.gitignore`
 
-## Build and Test Commands
+Nao pode:
 
-**Backend (.NET)**:
-- Restore: `dotnet restore Farol.sln`
-- Build: `dotnet build Farol.sln --no-restore -c Release -m:1 -v minimal`
-- Migrate DB: `dotnet-ef database update --project src/Farol.Infrastructure/Farol.Infrastructure.csproj --startup-project src/Farol.Api --context FarolDbContext --no-build`
-- Tests: `dotnet test tests/Farol.Tests/Farol.Tests.csproj --no-build -c Release -m:1 -v minimal`
-- Run: `dotnet run --project src/Farol.Api/Farol.Api.csproj -c Release --no-build`
+- alterar regra de negocio
+- implementar feature de produto
+- misturar responsabilidades entre frontend, backend e Python
 
-**Frontend (Next.js)**:
-- Install: `cd web && npm install`
-- Dev: `npm run dev` (port 3000)
-- Tests: `npm run test` (Vitest)
+Responsabilidade principal:
 
-**Python Service**:
-- Install: `cd services/farol_intelligence && pip install -e .`
-- Run: `uvicorn app.main:app --reload` (port 8000)
+- CI
+- infraestrutura local
+- deploy
+- padronizacao operacional
+- higiene do repositorio
 
-**Infrastructure**:
-- DB: `docker-compose up -d`
+## Regra central de separacao
 
-## Key Conventions
+- frontend nao mexe em backend por conveniencia
+- backend nao mexe em frontend por conveniencia
+- servico Python nao mexe nas outras stacks
+- DevOps nao altera comportamento funcional da aplicacao
 
-- **Domain Immutability**: Private constructors with validation methods (e.g., [User.cs](src/Farol.Domain/Users/User.cs)).
-- **Build Flags**: Use `-m:1 -v minimal` for reproducible builds.
-- **Test Time**: Fixed to 2026-03-10 12:00 UTC in [FarolApiFactory.cs](tests/Farol.Tests/Api/FarolApiFactory.cs).
-- **Error Responses**: Always `{ "message": "..." }` format.
-- **Sealed Classes**: Domain entities, Controllers, Services to prevent accidental inheritance.
-- **Database**: InMemory for tests, PostgreSQL for dev/prod.
-- **Frontend Auth**: Temporary localStorage (no refresh tokens).
+Se uma tarefa exigir mudanca em mais de uma stack, o agente deve:
 
-## Common Pitfalls
+1. explicitar a dependencia entre as stacks
+2. limitar a mudanca ao menor contrato possivel
+3. evitar refatoracao ampla
+4. separar o que e mudanca funcional do que e ajuste de infraestrutura/documentacao
 
-- **Environment Setup**: Set `$env:DOTNET_CLI_HOME='c:\Users\masuc\Desktop\PensarNoNome\.dotnet'` and `$env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE='1'` before first build.
-- **Auth Persistence**: localStorage auth not persistent on page reload (MVP design).
-- **CORS**: Hardcoded to localhost:3000/3001 only.
-- **Email Uniqueness**: Case-insensitive, normalized in User constructor.
-- **Migrations**: Not auto-applied; run `dotnet-ef database update` manually.
-- **TypeScript**: Strict mode enabled; implicit `any` fails build.
-- **Python Integration**: Called from Insights endpoints; no visible retry logic.
+## Regras obrigatorias de execucao
 
-## Key Files and Patterns
+Todo agente deve:
 
-- [User.cs](src/Farol.Domain/Users/User.cs): Sealed aggregate with validation.
-- [UserConfiguration.cs](src/Farol.Infrastructure/Persistence/Configurations/UserConfiguration.cs): EF Fluent API template.
-- [AccountsController.cs](src/Farol.Api/Modules/Accounts/AccountsController.cs): Secured HTTP handler pattern.
-- [AuthenticatedUser.cs](src/Farol.Api/Common/AuthenticatedUser.cs): JWT claim extraction utility.
-- [FarolApiFactory.cs](tests/Farol.Tests/Api/FarolApiFactory.cs): Integration test fixture.
-- [api.ts](web/lib/api.ts): Frontend API contract.
-- [analysis.py](services/farol_intelligence/app/analysis.py): Insight rule engine.
+1. analisar antes de alterar
+2. entender o escopo real da tarefa
+3. fazer mudancas minimas e locais
+4. evitar refatoracoes globais sem pedido explicito
+5. preservar convencoes existentes da stack tocada
+6. validar o impacto antes de concluir
 
-## Documentation Links
+Se houver duvida sobre remover, renomear ou mover algo:
 
-- [README.md](README.md): Setup and endpoint summaries.
-- [docs/demo-scenarios.md](docs/demo-scenarios.md): Seed users for testing.
-- [docs/sprints/](docs/sprints/): Sprint notes with architecture decisions (sprint-1.md to sprint-10.md).
+- nao remover
+- nao renomear
+- nao mover
+- registrar o ponto como observacao
+
+## Politica de alteracao por escopo
+
+### Mudancas permitidas
+
+- ajustes locais no escopo da stack
+- atualizacao de documentacao correspondente
+- testes da propria stack
+- configuracao estritamente ligada ao escopo tocado
+
+### Mudancas que exigem justificativa explicita
+
+- alterar contrato entre frontend e backend
+- alterar contrato entre backend e servico Python
+- mexer em arquivos compartilhados
+- mudar fluxo de CI
+- mudar configuracao de deploy
+
+### Mudancas proibidas sem pedido explicito
+
+- refatoracao transversal do repositorio
+- mover diretorios
+- renomear modulos
+- reestruturar arquitetura
+- alterar regra de negocio fora da stack da tarefa
+
+## Arquivos compartilhados que exigem cuidado extra
+
+Os arquivos abaixo afetam mais de uma stack e devem ser tratados como compartilhados:
+
+- `README.md`
+- `agents.md`
+- `.github/workflows/**`
+- `docker-compose.yml`
+- `render.yaml`
+- `.gitignore`
+- `Farol.sln`
+- documentacao em `docs/`
+
+Ao tocar nesses arquivos, o agente deve deixar claro:
+
+- qual stack foi impactada
+- por que o arquivo compartilhado precisou ser alterado
+- qual parte foi mantida sem mudanca
+
+## Fluxo de trabalho esperado
+
+1. Ler a documentacao relevante e a estrutura do projeto
+2. Localizar os arquivos realmente ligados a tarefa
+3. Confirmar o limite de atuacao da stack
+4. Implementar apenas o necessario
+5. Validar com os comandos apropriados
+6. Resumir arquivos alterados, correcoes e riscos
+
+## Build e testes por stack
+
+### Frontend
+
+No diretorio `web/`:
+
+```powershell
+npm install
+npm run lint
+npm run test
+npm run build
+```
+
+### Backend
+
+Na raiz do repositorio:
+
+```powershell
+$env:DOTNET_CLI_HOME='c:\Users\masuc\Desktop\PensarNoNome\.dotnet'
+$env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE='1'
+dotnet restore Farol.sln
+dotnet build Farol.sln --no-restore -c Release -m:1 -v minimal
+dotnet test tests/Farol.Tests/Farol.Tests.csproj --no-build -c Release -m:1 -v minimal
+```
+
+### Python
+
+No diretorio `services/farol_intelligence/`:
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install -e .
+python -m unittest discover tests
+```
+
+## Padrao de resposta do agente
+
+Ao propor ou concluir uma mudanca, o agente deve informar:
+
+1. plano curto
+2. arquivos alterados
+3. validacao executada
+4. tradeoffs ou pontos de atencao
+
+## Branches e integracao
+
+Modelo atual:
+
+- `master`: estado estavel/publicado
+- `dev`: integracao local antes de promover
+- `codex/issue-*` ou branch de trabalho derivada de `dev`
+
+Regras:
+
+- novas mudancas devem partir de `dev`
+- evitar trabalho direto em `master`
+- nao fazer merge cego entre `dev` e `master`
+- validar localmente antes de promover
+
+## Principios de engenharia
+
+- preferir arquitetura simples e modular
+- manter logica de dominio isolada no backend
+- evitar otimização prematura
+- usar nomes explicitos e codigo legivel
+- adicionar testes quando houver mudanca funcional
+- documentar assumptions de forma curta quando necessario
+
+## Definicao de pronto
+
+Uma entrega so esta pronta quando:
+
+1. o escopo esta respeitado
+2. a documentacao relevante foi atualizada
+3. build e testes adequados ao escopo foram considerados
+4. nao houve alteracao desnecessaria fora da stack
+5. riscos residuais foram citados no resumo
