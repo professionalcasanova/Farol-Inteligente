@@ -1,82 +1,164 @@
 # Farol
 
-Farol e um assistente financeiro pessoal para o mercado brasileiro, construido com foco em simplicidade, clareza e evolucao incremental do backend.
+Farol e um assistente financeiro pessoal para usuarios brasileiros.
+
+O repositorio esta organizado como um monorepo com quatro partes bem separadas:
+
+- `web/`: frontend em Next.js/React para a experiencia do usuario
+- `src/`: backend .NET com API HTTP e regras de dominio
+- `services/farol_intelligence/`: servico Python para analise financeira deterministica
+- `docker-compose.yml`: infraestrutura local do PostgreSQL para desenvolvimento
+
+Este README descreve o estado atual do projeto e como trabalhar em cada parte sem misturar responsabilidades.
 
 ## Estado atual
 
-Sprint 1 a Sprint 10 concluidas, com MVP fechado para demonstracao local:
+O projeto cobre hoje o MVP local de demonstracao com:
 
-- estrutura base da solution em .NET
-- dominio inicial
-- persistencia com EF Core e PostgreSQL
-- migrations aplicadas para a persistencia atual
-- seed de categorias de sistema
-- autenticacao minima com JWT
-- endpoints de contas financeiras
-- endpoints de categorias e transacoes
-- endpoint de resumo mensal
-- endpoints de orcamento mensal por categoria
-- endpoint de importacao CSV de transacoes com categorizacao simples por regras
-- endpoint de insight de dinheiro livre
-- endpoint de alertas financeiros
-- modulo minimo de bills/vencimentos no backend e no front MVP
-- endpoint de resumo de bills no dashboard
-- front-end MVP em `web/` com Next.js, TypeScript e Tailwind CSS
-- login web com persistencia temporaria de `accessToken` em `localStorage` para demo local
-- dashboard web com resumo mensal, bills, orcamento, dinheiro livre, alertas e onboarding
-- alertas web acionaveis com redirecionamento para a proxima acao
-- telas web de transacoes, orcamento, importacao CSV e bills consumindo a API existente
-- fluxo de onboarding simples para primeiro valor do usuario
-- polimento de microcopy, CTAs e estados vazios para demonstracao
-- testes unitarios e testes de API para autenticacao, contas, categorias, transacoes, resumo mensal, orcamento, importacao CSV, insights e bills
+- autenticacao basica
+- contas financeiras
+- categorias e transacoes
+- resumo mensal
+- orcamento mensal e template base
+- importacao CSV
+- contas a pagar
+- alertas e leitura de saude financeira do mes
+- frontend web consumindo a API
+- servico Python responsavel pela analise deterministica
 
-O MVP esta fechado para demonstracao local.
-
-## Deploy beta fechado
-
-Para publicar o Farol para testers com o menor atrito operacional hoje:
-
-- `web` no Vercel
-- `api`, `farol-intelligence` e PostgreSQL no Render
-
-Tutorial passo a passo:
-
-- [docs/deployment/vercel-render-beta.md](docs/deployment/vercel-render-beta.md)
-
-## Stack atual
-
-- .NET 10
-- ASP.NET Core Web API
-- Next.js
-- TypeScript
-- Tailwind CSS
-- EF Core
-- PostgreSQL
-- xUnit
-- Docker Compose
-
-## Estrutura
+## Estrutura do repositorio
 
 ```txt
 Farol.sln
+.github/
+docs/
+scripts/
+services/
+  farol_intelligence/
 src/
   Farol.Api/
   Farol.Domain/
   Farol.Infrastructure/
-web/
 tests/
   Farol.Tests/
-docs/
-  product-decisions/
-  sprints/
+web/
+docker-compose.yml
+render.yaml
 ```
 
-## Decisoes de produto recentes
+## Separacao entre frontend, backend e servicos
 
-- [Modelagem de meio de pagamento ou origem sem poluir categorias](docs/product-decisions/issue-37-payment-trail-modeling.md)
-- [Primeira fase do assistente financeiro em linguagem natural](docs/product-decisions/issue-38-natural-language-assistant-phase-1.md)
+- O frontend em `web/` pode ser executado isoladamente como workspace proprio.
+- O backend em `src/` e os testes em `tests/` formam a aplicacao .NET.
+- O servico Python em `services/farol_intelligence/` e independente do frontend e exposto por HTTP.
+- O banco local e provisionado via `docker compose`.
 
-## Rodando localmente
+Importante:
+
+- frontend nao deve conter regra de dominio do backend
+- backend nao deve incorporar detalhes de UI do frontend
+- servico Python nao deve assumir responsabilidade de API web ou tela
+- integracao entre stacks deve acontecer por contrato HTTP e configuracao
+
+## Requisitos locais
+
+### Backend e banco
+
+- .NET 10 SDK
+- Docker Desktop ou compatível com `docker compose`
+- PostgreSQL local via Compose
+
+### Frontend
+
+- Node.js 22+
+- npm
+
+### Servico Python
+
+- Python 3.11+
+
+## Variaveis de ambiente principais
+
+### Frontend
+
+Arquivo local: `web/.env.local`
+
+```env
+NEXT_PUBLIC_API_BASE_URL=http://localhost:5258
+```
+
+Arquivos de exemplo:
+
+- [`web/.env.local.example`](web/.env.local.example)
+- [`web/.env.production.example`](web/.env.production.example)
+
+### Backend
+
+Nao existe um `.env` obrigatorio para o fluxo local padrao. A configuracao base fica em:
+
+- [`src/Farol.Api/appsettings.json`](src/Farol.Api/appsettings.json)
+- [`src/Farol.Api/appsettings.Development.json`](src/Farol.Api/appsettings.Development.json)
+
+Pontos principais:
+
+- `ConnectionStrings:DefaultConnection`
+- `Jwt:*`
+- `Cors:AllowedOrigins`
+- `FinancialIntelligence:*`
+- `Database:MigrateOnStartup`
+
+Valores locais atuais:
+
+- API HTTP local: `http://localhost:5258`
+- PostgreSQL local: `localhost:5432`
+- servico Python local: `http://127.0.0.1:8000`
+
+### Servico Python
+
+Hoje o servico usa apenas configuracao empacotada no projeto para o fluxo local basico.
+Nao ha variavel de ambiente obrigatoria documentada para subir o servico localmente.
+
+## Como rodar o frontend isoladamente
+
+O frontend pode ser iniciado sozinho, mas as telas reais dependem da API configurada em `NEXT_PUBLIC_API_BASE_URL`.
+
+1. Configure o arquivo `web/.env.local`
+
+```env
+NEXT_PUBLIC_API_BASE_URL=http://localhost:5258
+```
+
+2. Instale dependencias
+
+```powershell
+Set-Location web
+npm install
+```
+
+3. Rode o frontend
+
+```powershell
+npm run dev
+```
+
+Aplicacao web:
+
+- `http://localhost:3000`
+
+Comandos uteis do frontend:
+
+```powershell
+npm run dev
+npm run lint
+npm run test
+npm run build
+```
+
+Observacao:
+
+- o frontend sobe sozinho, mas login, dashboard e fluxos de dados dependem da API estar disponivel
+
+## Como rodar backend e infraestrutura
 
 ### 1. Subir o banco
 
@@ -84,7 +166,14 @@ docs/
 docker compose up -d
 ```
 
-### 2. Restaurar e compilar
+Banco local atual:
+
+- database: `farol_dev`
+- user: `postgres`
+- password: `postgres`
+- porta: `5432`
+
+### 2. Restaurar e compilar a solution
 
 ```powershell
 $env:DOTNET_CLI_HOME='c:\Users\masuc\Desktop\PensarNoNome\.dotnet'
@@ -93,304 +182,100 @@ dotnet restore Farol.sln
 dotnet build Farol.sln --no-restore -c Release -m:1 -v minimal
 ```
 
-### 3. Aplicar migrations
+### 3. Aplicar migrations manualmente, se necessario
+
+Em desenvolvimento, `appsettings.Development.json` esta com `Database:MigrateOnStartup=true`, mas o comando abaixo continua sendo o caminho explicito e seguro quando for necessario controlar a atualizacao:
 
 ```powershell
 & "$env:USERPROFILE\.dotnet\tools\dotnet-ef.exe" database update `
   --project src/Farol.Infrastructure/Farol.Infrastructure.csproj `
-  --startup-project src/Farol.Api/Farol.Api.csproj `
+  --startup-project src/Farol.Api `
   --context FarolDbContext `
   --no-build
 ```
 
-### 4. Subir a API
+### 4. Rodar a API
 
 ```powershell
 dotnet run --project src/Farol.Api/Farol.Api.csproj -c Release --no-build
 ```
 
-Swagger:
+Endpoints uteis:
 
-- `http://localhost:5258/swagger`
+- Swagger: `http://localhost:5258/swagger`
+- Health: `http://localhost:5258/health`
 
-Health:
-
-- `http://localhost:5258/health`
-
-### 5. Rodar testes
+### 5. Rodar testes do backend
 
 ```powershell
 dotnet test tests/Farol.Tests/Farol.Tests.csproj --no-build -c Release -m:1 -v minimal
 ```
 
-### 6. Rodar o front-end MVP
+## Como rodar o servico Python
 
-Crie `web/.env.local` com:
-
-```env
-NEXT_PUBLIC_API_BASE_URL=http://localhost:5258
-```
-
-Depois, em outro terminal:
+No diretorio `services/farol_intelligence`:
 
 ```powershell
-Set-Location web
-npm install
-npm run dev
-```
-
-Aplicacao web:
-
-- `http://localhost:3000`
-
-### 7. Rodar o servico de inteligencia
-
-```powershell
-Set-Location services/farol_intelligence
+python -m venv .venv
+.venv\Scripts\Activate.ps1
 python -m pip install -e .
 python -m uvicorn app.main:app --reload --port 8000
 ```
 
-Health:
+Endpoints uteis:
 
-- `http://127.0.0.1:8000/health`
+- Health: `http://127.0.0.1:8000/health`
+- Analise: `POST http://127.0.0.1:8000/analyze/v1`
 
-Observacao:
+Para rodar testes:
 
-- o `localStorage` e usado apenas como decisao temporaria de MVP para demo local
-- nao existe refresh token nesta etapa
+```powershell
+python -m unittest discover tests
+```
 
-## Autenticacao atual
+## Fluxo basico de desenvolvimento
 
-Endpoints disponiveis:
+### Quando a tarefa for de frontend
 
-- `POST /api/auth/register`
-- `POST /api/auth/login`
+1. Trabalhe em `web/`
+2. Aponte `NEXT_PUBLIC_API_BASE_URL` para a API correta
+3. Rode `npm run lint`, `npm run test` e `npm run build`
+4. Nao altere backend ou servico Python sem necessidade explicita
 
-Resposta atual:
+### Quando a tarefa for de backend
 
-- `accessToken`
-- `userId`
-- `name`
-- `email`
+1. Trabalhe em `src/` e `tests/`
+2. Suba o banco local
+3. Rode restore, build e testes .NET
+4. Nao altere `web/` nem o servico Python sem contrato explicito
 
-## Contas financeiras
+### Quando a tarefa for do servico Python
 
-Endpoints disponiveis:
+1. Trabalhe em `services/farol_intelligence/`
+2. Valide o contrato HTTP consumido pelo backend
+3. Rode os testes Python existentes
+4. Nao altere frontend ou backend sem motivo de integracao formal
 
-- `POST /api/accounts`
-- `GET /api/accounts`
-- `PUT /api/accounts/{id}`
+## Fluxo recomendado para rodar tudo localmente
 
-Regras atuais:
+1. `docker compose up -d`
+2. Subir a API .NET em `http://localhost:5258`
+3. Subir o servico Python em `http://127.0.0.1:8000`
+4. Subir o frontend em `http://localhost:3000`
 
-- endpoints protegidos com JWT
-- cada conta pertence a um unico usuario
-- a listagem retorna apenas contas do usuario autenticado
-- atualizacao respeita ownership por `userId`
-- validacoes do dominio continuam centralizadas em `FinancialAccount`
+## Documentacao adicional
 
-## Categorias e transacoes
+- [`agents.md`](agents.md): governanca e escopo dos agentes
+- [`web/README.md`](web/README.md): documentacao do frontend
+- [`services/farol_intelligence/README.md`](services/farol_intelligence/README.md): documentacao do servico Python
+- [`docs/demo-scenarios.md`](docs/demo-scenarios.md): usuarios de demonstracao local
+- [`docs/deployment/vercel-render-beta.md`](docs/deployment/vercel-render-beta.md): deploy beta
+- [`docs/product-decisions/issue-37-payment-trail-modeling.md`](docs/product-decisions/issue-37-payment-trail-modeling.md)
+- [`docs/product-decisions/issue-38-natural-language-assistant-phase-1.md`](docs/product-decisions/issue-38-natural-language-assistant-phase-1.md)
 
-Endpoints disponiveis:
+## Observacoes importantes
 
-- `GET /api/categories`
-- `GET /api/transactions`
-- `POST /api/transactions`
-- `PUT /api/transactions/{id}`
-
-Regras atuais:
-
-- categorias listam categorias de sistema e categorias do usuario autenticado
-- transacoes respeitam ownership por `userId`
-- transacoes exigem conta financeira do usuario autenticado
-- categoria, quando informada, deve ser visivel ao usuario e compativel com o tipo da transacao
-
-## Resumo mensal
-
-Endpoint disponivel:
-
-- `GET /api/dashboard/monthly-summary`
-
-Parametros:
-
-- `month`
-- `year`
-
-Retorno atual:
-
-- `totalIncome`
-- `totalExpense`
-- `balance`
-- `byCategory`
-
-## Bills no dashboard
-
-Endpoint disponivel:
-
-- `GET /api/dashboard/bills-summary?month={m}&year={y}`
-
-Retorno atual:
-
-- `totalPending`
-- `totalOverdue`
-- `totalPaid`
-- `countPending`
-- `countOverdue`
-- `countPaid`
-- `upcoming`
-
-## Orcamento mensal
-
-Endpoints disponiveis:
-
-- `POST /api/budgets/monthly`
-- `GET /api/budgets/monthly?month={m}&year={y}`
-
-Retorno atual:
-
-- `totalPlanned`
-- `totalSpent`
-- `totalRemaining`
-- `categories`
-
-## Importacao CSV
-
-Endpoint disponivel:
-
-- `POST /api/imports/transactions/csv`
-
-Fluxo atual:
-
-- endpoint protegido com JWT
-- aceita arquivo CSV simples com colunas `occurredOn,description,amount,type,categoryName`
-- importa transacoes para uma conta financeira do usuario autenticado
-- usa `categoryName` quando valido
-- tenta categorizacao simples por regras quando `categoryName` vier vazio
-- linhas invalidas sao ignoradas com erro registrado no resumo
-
-## Bills
-
-Endpoints disponiveis:
-
-- `POST /api/bills`
-- `GET /api/bills`
-- `PATCH /api/bills/{id}/pay`
-- `PATCH /api/bills/{id}/unpay`
-
-Fluxo atual:
-
-- bills pertencem ao usuario autenticado
-- criacao com descricao, valor e vencimento
-- listagem com filtros simples por `month`, `year` e `status`
-- marcacao e desmarcacao de pagamento
-- pagina web `/bills` para demonstracao do fluxo
-
-## Insights
-
-Endpoints disponiveis:
-
-- `GET /api/insights/free-money?month={m}&year={y}`
-- `GET /api/insights/alerts?month={m}&year={y}`
-
-Retorno atual de `free-money`:
-
-- `totalIncome`
-- `totalExpense`
-- `balance`
-- `totalPlannedBudget`
-- `totalBudgetSpent`
-- `totalBudgetRemaining`
-- `freeToSpend`
-
-Retorno atual de `alerts`:
-
-- `alerts`
-- `type`
-- `severity`
-- `message`
-- `amount`
-- `actionUrl`
-
-## Analise critica de saude financeira
-
-Endpoint disponivel:
-
-- `GET /api/insights/month-health?month={m}&year={y}`
-
-Contrarato e decisoes de criticidade:
-
-- Motor determinístico em Python (`services/farol_intelligence/app/analysis.py`)
-- Status: `healthy`, `attention`, `critical`
-- Critical é acionado quando:
-  - `maxOverdueDays >= 7` (dias em atraso >= 7)
-  - OU `free_to_spend < 0` E `variable_expense_ratio > 0.8` (saldo negativo + despesas variáveis > 80% da renda)
-- Retorno incluindo:
-  - `status`: saúde do mês
-  - `score`: 0-100, penalidades acumuladas
-  - `message`: resumo principal (fonte de verdade para exibição no dashboard)
-  - `reasons`: array de razões explícitas (ex: "Conta de energia vencida há 8 dias")
-  - `actions`: array de ações recomendadas (ex: "Priorize o pagamento das contas fixas vencidas")
-  - `priority`: nível de urgência (ex: 110 para crítico)
-  - `summary`: causa e ação adicionais
-  - `insights`: detalhes completos por tipo de pressão
-  - `recommendedActions`: navegação web para próximo passo do usuário
-
-Dashboard:
-
-- Bloco crítico proeminente exibe quando `status === "critical"`
-- Título: "Risco financeiro crítico"
-- Mostra mensagem + até 2 razões + até 2 ações
-- CTA padrão: "Ver contas a pagar"
-- Fallback: se `reasons/actions` ausentes, usa `cause`/`action` de insights
-- Comportamento não-crítico preservado
-
-Testes:
-
-- Cenários críticos cobertos (overdue, negative+variável)
-- Fallback validado
-- Backend mapeia resposta sem duplicar lógica
-- Frontend renderiza sem reimplementar regras
-
-## Banco local
-
-`docker-compose.yml` sobe um PostgreSQL local com:
-
-- database: `farol_dev`
-- user: `postgres`
-- password: `postgres`
-- porta: `5432`
-
-## Documentacao
-
-Fechamento detalhado da Sprint 1:
-
-- [docs/sprints/sprint-1.md](docs/sprints/sprint-1.md)
-
-Fechamento detalhado da Sprint 2:
-
-- [docs/sprints/sprint-2.md](docs/sprints/sprint-2.md)
-
-Fechamento detalhado da Sprint 3:
-
-- [docs/sprints/sprint-3.md](docs/sprints/sprint-3.md)
-
-Fechamento detalhado da Sprint 4:
-
-- [docs/sprints/sprint-4.md](docs/sprints/sprint-4.md)
-
-Fechamento detalhado da Sprint 5:
-
-- [docs/sprints/sprint-5.md](docs/sprints/sprint-5.md)
-
-Fechamento detalhado da Sprint 6:
-
-- [docs/sprints/sprint-6.md](docs/sprints/sprint-6.md)
-
-Fechamento detalhado da Sprint 7:
-
-- [docs/sprints/sprint-7.md](docs/sprints/sprint-7.md)
-
-Fechamento detalhado da Sprint 10:
-
-- [docs/sprints/sprint-10.md](docs/sprints/sprint-10.md)
+- o frontend usa `localStorage` apenas como decisao temporaria de MVP
+- nao existe refresh token neste estagio
+- o backend local aceita `http://localhost:3000` e `http://localhost:3001` no CORS atual
+- o servico Python e consumido pelo backend, nao diretamente pelo navegador
