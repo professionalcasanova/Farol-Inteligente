@@ -374,7 +374,7 @@ public sealed class FinancialAlertsInsightsEndpointsTests : IClassFixture<FarolA
         {
             Name = "Usuario Teste",
             Email = email,
-            Password = "123456"
+            Password = "Password123"
         });
 
         response.EnsureSuccessStatusCode();

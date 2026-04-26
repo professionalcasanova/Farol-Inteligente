@@ -36,9 +36,9 @@ public sealed class FakeFinancialIntelligenceClient : IFinancialIntelligenceClie
             Score = 100,
             Summary = new FinancialAnalysisSummaryResponse
             {
-                Message = "Seu mês está sob controle até aqui.",
-                Cause = "Você não tem sinais fortes de pressão financeira imediata neste período.",
-                Action = "Continue registrando o mês para manter essa clareza."
+                Message = "Seu mÃªs estÃ¡ sob controle atÃ© aqui.",
+                Cause = "VocÃª nÃ£o tem sinais fortes de pressÃ£o financeira imediata neste perÃ­odo.",
+                Action = "Continue registrando o mÃªs para manter essa clareza."
             },
             Insights = [],
             RecommendedActions = []

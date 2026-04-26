@@ -63,14 +63,14 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
                 ContractVersion = "v1",
                 Status = "critical",
                 Score = 32,
-                Message = "Crítico: saldo negativo e dívidas atrasadas.",
-                Reasons = new[] { "Conta de energia vencida há 10 dias", "Saldo do mês está em -R$ 1.200,00" },
-                Actions = new[] { "Priorize o pagamento das contas fixas vencidas", "Suspenda despesas não essenciais até estabilizar o saldo" },
+                Message = "CrÃ­tico: saldo negativo e dÃ­vidas atrasadas.",
+                Reasons = new[] { "Conta de energia vencida hÃ¡ 10 dias", "Saldo do mÃªs estÃ¡ em -R$ 1.200,00" },
+                Actions = new[] { "Priorize o pagamento das contas fixas vencidas", "Suspenda despesas nÃ£o essenciais atÃ© estabilizar o saldo" },
                 Priority = 110,
                 Summary = new FinancialAnalysisSummaryResponse
                 {
-                    Message = "Há contas vencidas no seu mês.",
-                    Cause = "Você tem contas que já passaram do vencimento e isso aumenta a pressão financeira agora.",
+                    Message = "HÃ¡ contas vencidas no seu mÃªs.",
+                    Cause = "VocÃª tem contas que jÃ¡ passaram do vencimento e isso aumenta a pressÃ£o financeira agora.",
                     Action = "Priorize quitar ou renegociar as contas vencidas hoje."
                 },
                 Insights = new List<FinancialAnalysisInsightResponse>
@@ -80,8 +80,8 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
                         Type = "overdue_bills",
                         Severity = "high",
                         Priority = 100,
-                        Message = "Há contas vencidas no seu mês.",
-                        Cause = "Você tem contas que já passaram do vencimento e isso aumenta a pressão financeira agora.",
+                        Message = "HÃ¡ contas vencidas no seu mÃªs.",
+                        Cause = "VocÃª tem contas que jÃ¡ passaram do vencimento e isso aumenta a pressÃ£o financeira agora.",
                         Action = "Priorize quitar ou renegociar as contas vencidas hoje."
                     }
                 },
@@ -104,13 +104,13 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
         Assert.NotNull(response);
         Assert.Equal("critical", response.Status);
         Assert.Equal(32, response.Score);
-        Assert.Equal("Crítico: saldo negativo e dívidas atrasadas.", response.Message);
+        Assert.Equal("CrÃ­tico: saldo negativo e dÃ­vidas atrasadas.", response.Message);
         Assert.Equal(2, response.Reasons.Count);
         Assert.Contains(response.Reasons, reason => reason.Contains("Conta de energia vencida", StringComparison.Ordinal));
         Assert.Equal(2, response.Actions.Count);
         Assert.Contains(response.Actions, action => action.Contains("Priorize o pagamento das contas fixas vencidas", StringComparison.Ordinal));
         Assert.Equal(110, response.Priority);
-        Assert.Equal("Há contas vencidas no seu mês.", response.Summary.Message);
+        Assert.Equal("HÃ¡ contas vencidas no seu mÃªs.", response.Summary.Message);
         Assert.Equal("overdue_bills", Assert.Single(response.Insights).Type);
         Assert.Equal("review_overdue_bills", Assert.Single(response.RecommendedActions).Id);
     }
@@ -130,14 +130,14 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
                 Status = "critical",
                 Score = 18,
                 Message = "Criticidade de fluxo de caixa detectada.",
-                Reasons = new[] { "Saldo do mês está em -R$ 1.200,00", "Despesas variáveis > 80%" },
-                Actions = new[] { "Suspenda despesas não essenciais até estabilizar o saldo" },
+                Reasons = new[] { "Saldo do mÃªs estÃ¡ em -R$ 1.200,00", "Despesas variÃ¡veis > 80%" },
+                Actions = new[] { "Suspenda despesas nÃ£o essenciais atÃ© estabilizar o saldo" },
                 Priority = 105,
                 Summary = new FinancialAnalysisSummaryResponse
                 {
-                    Message = "Você está no vermelho e tem pressão de gastos variáveis.",
+                    Message = "VocÃª estÃ¡ no vermelho e tem pressÃ£o de gastos variÃ¡veis.",
                     Cause = "Gastos elevados versus renda e cashflow negativo.",
-                    Action = "Ajuste imediatamente o orçamento." 
+                    Action = "Ajuste imediatamente o orÃ§amento." 
                 },
                 Insights = new List<FinancialAnalysisInsightResponse>
                 {
@@ -146,9 +146,9 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
                         Type = "negative_balance_high_variable_expense",
                         Severity = "high",
                         Priority = 105,
-                        Message = "Saldo negativo e mais de 80% das despesas são variáveis.",
-                        Cause = "Saldo do mês está em -R$ 1.200,00 e despesas variáveis são muito altas.",
-                        Action = "Suspender despesas não essenciais e renegociar contrato."
+                        Message = "Saldo negativo e mais de 80% das despesas sÃ£o variÃ¡veis.",
+                        Cause = "Saldo do mÃªs estÃ¡ em -R$ 1.200,00 e despesas variÃ¡veis sÃ£o muito altas.",
+                        Action = "Suspender despesas nÃ£o essenciais e renegociar contrato."
                     }
                 },
                 RecommendedActions = new List<FinancialAnalysisRecommendedActionResponse>
@@ -156,7 +156,7 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
                     new FinancialAnalysisRecommendedActionResponse
                     {
                         Id = "suspend_non_essential",
-                        Label = "Suspender não essenciais",
+                        Label = "Suspender nÃ£o essenciais",
                         Target = "/transactions"
                     }
                 }
@@ -171,8 +171,8 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
         Assert.Equal("critical", response.Status);
         Assert.Equal(18, response.Score);
         Assert.Equal("Criticidade de fluxo de caixa detectada.", response.Message);
-        Assert.Contains("Saldo do mês está em -R$ 1.200,00", response.Reasons);
-        Assert.Contains("Suspenda despesas não essenciais até estabilizar o saldo", response.Actions);
+        Assert.Contains("Saldo do mÃªs estÃ¡ em -R$ 1.200,00", response.Reasons);
+        Assert.Contains("Suspenda despesas nÃ£o essenciais atÃ© estabilizar o saldo", response.Actions);
         Assert.Equal(105, response.Priority);
         Assert.Equal("negative_balance_high_variable_expense", Assert.Single(response.Insights).Type);
         Assert.Equal("suspend_non_essential", Assert.Single(response.RecommendedActions).Id);
@@ -317,7 +317,7 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
         var today = _factory.Today;
         var seed = await SeedAccountAndCategoriesAsync(
             "maria@email.com",
-            ("Salário", CategoryType.Income),
+            ("SalÃ¡rio", CategoryType.Income),
             ("Transporte", CategoryType.Expense),
             ("Lazer", CategoryType.Expense));
 
@@ -331,7 +331,7 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
             "maria@email.com",
             seed.AccountId,
             [
-                (today, "Salário", 16000m, TransactionType.Income, seed.CategoryIds["Salário"]),
+                (today, "SalÃ¡rio", 16000m, TransactionType.Income, seed.CategoryIds["SalÃ¡rio"]),
                 (today, "Lazer", 15000m, TransactionType.Expense, seed.CategoryIds["Lazer"])
             ]);
 
@@ -357,7 +357,7 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
         var today = _factory.Today;
         var seed = await SeedAccountAndCategoriesAsync(
             "maria@email.com",
-            ("Salário", CategoryType.Income),
+            ("SalÃ¡rio", CategoryType.Income),
             ("Delivery", CategoryType.Expense),
             ("Mercado", CategoryType.Expense));
 
@@ -365,8 +365,8 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
             "maria@email.com",
             seed.AccountId,
             [
-                (today, "Salário", 5000m, TransactionType.Income, seed.CategoryIds["Salário"]),
-                (today, "Almoço", 100m, TransactionType.Expense, seed.CategoryIds["Delivery"]),
+                (today, "SalÃ¡rio", 5000m, TransactionType.Income, seed.CategoryIds["SalÃ¡rio"]),
+                (today, "AlmoÃ§o", 100m, TransactionType.Expense, seed.CategoryIds["Delivery"]),
                 (today, "Jantar", 80m, TransactionType.Expense, seed.CategoryIds["Delivery"]),
                 (today, "Compras", 250m, TransactionType.Expense, seed.CategoryIds["Mercado"])
             ]);
@@ -384,7 +384,7 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
             item.Type == "expense" &&
             item.Amount == 180m);
         Assert.Contains(request.Categories, item =>
-            item.Name == "Salário" &&
+            item.Name == "SalÃ¡rio" &&
             item.Type == "income" &&
             item.Amount == 5000m);
     }
@@ -430,7 +430,7 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<ErrorResponse>();
         Assert.NotNull(payload);
-        Assert.Equal("A inteligência financeira está indisponível no momento.", payload.Message);
+        Assert.Equal("A inteligÃªncia financeira estÃ¡ indisponÃ­vel no momento.", payload.Message);
     }
 
     [Fact]
@@ -449,9 +449,9 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
                 Score = 100,
                 Summary = new FinancialAnalysisSummaryResponse
                 {
-                    Message = "Seu mÃªs estÃ¡ sob controle atÃ© aqui.",
-                    Cause = "VocÃª nÃ£o tem sinais fortes de pressÃ£o financeira imediata neste perÃ­odo.",
-                    Action = "Continue registrando o mÃªs para manter essa clareza."
+                    Message = "Seu mÃƒÂªs estÃƒÂ¡ sob controle atÃƒÂ© aqui.",
+                    Cause = "VocÃƒÂª nÃƒÂ£o tem sinais fortes de pressÃƒÂ£o financeira imediata neste perÃƒÂ­odo.",
+                    Action = "Continue registrando o mÃƒÂªs para manter essa clareza."
                 },
                 Insights = [],
                 RecommendedActions = []
@@ -465,9 +465,9 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
         Assert.NotNull(response);
         Assert.Equal("healthy", response.Status);
         Assert.Equal(100, response.Score);
-        Assert.Equal("Seu mÃªs estÃ¡ sob controle atÃ© aqui.", response.Message);
-        Assert.Equal(["VocÃª nÃ£o tem sinais fortes de pressÃ£o financeira imediata neste perÃ­odo."], response.Reasons);
-        Assert.Equal(["Continue registrando o mÃªs para manter essa clareza."], response.Actions);
+        Assert.Equal("Seu mÃƒÂªs estÃƒÂ¡ sob controle atÃƒÂ© aqui.", response.Message);
+        Assert.Equal(["VocÃƒÂª nÃƒÂ£o tem sinais fortes de pressÃƒÂ£o financeira imediata neste perÃƒÂ­odo."], response.Reasons);
+        Assert.Equal(["Continue registrando o mÃƒÂªs para manter essa clareza."], response.Actions);
         Assert.Equal(10, response.Priority);
         Assert.Empty(response.Insights);
         Assert.Empty(response.RecommendedActions);
@@ -600,7 +600,7 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
         {
             Name = "Usuario Teste",
             Email = email,
-            Password = "123456"
+            Password = "Password123"
         });
 
         response.EnsureSuccessStatusCode();

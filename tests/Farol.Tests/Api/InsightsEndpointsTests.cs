@@ -115,7 +115,7 @@ public sealed class InsightsEndpointsTests : IClassFixture<FarolApiFactory>
         {
             Name = "Usuario Teste",
             Email = email,
-            Password = "123456"
+            Password = "Password123"
         });
 
         response.EnsureSuccessStatusCode();

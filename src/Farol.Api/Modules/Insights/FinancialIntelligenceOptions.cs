@@ -10,6 +10,10 @@ public sealed class FinancialIntelligenceOptions
 
     public int TimeoutSeconds { get; init; } = 3;
 
+    public string InternalApiKeyEnvironmentVariable { get; init; } = "FAROL_INTERNAL_API_KEY";
+
+    public string InternalApiKeyHeaderName { get; init; } = "X-Farol-Internal-Key";
+
     public string ContractVersion { get; init; } = "v1";
 
     public string Currency { get; init; } = "BRL";

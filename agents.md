@@ -151,6 +151,44 @@ Se houver duvida sobre remover, renomear ou mover algo:
 - nao mover
 - registrar o ponto como observacao
 
+## Test-Driven Development (TDD)
+
+TDD e obrigatorio para todo trabalho no backend.
+
+### Regra principal
+
+- todo novo codigo deve ser precedido por teste
+- nenhuma feature deve ser implementada sem teste cobrindo o comportamento esperado
+
+### Ciclo obrigatorio
+
+- Red: criar primeiro o teste que falha
+- Green: implementar o minimo necessario para fazer o teste passar
+- Refactor: melhorar o codigo sem quebrar os testes existentes
+
+### Regras praticas
+
+- testes devem validar comportamento observado, nao implementacao interna
+- evitar mocks desnecessarios
+- priorizar testes simples, diretos e com leitura rapida
+- cada endpoint novo deve ter ao menos 1 teste de sucesso e 1 teste de falha
+- testes devem cobrir regras de negocio criticas antes de refatoracoes
+- nomes de testes devem seguir o formato `Metodo_Condicao_ResultadoEsperado`
+
+### Proibicoes
+
+- nao escrever codigo de producao sem teste correspondente
+- nao ignorar testes quebrando
+- nao comentar testes para "passar build"
+
+### Criterio de aceite
+
+Uma task backend so e considerada concluida se:
+
+- testes foram criados ou ajustados antes da consolidacao final do codigo
+- testes estao passando no escopo da mudanca
+- codigo foi revisado com base nos cenarios cobertos pelos testes
+
 ## Politica de alteracao por escopo
 
 ### Mudancas permitidas
@@ -228,6 +266,20 @@ dotnet restore Farol.sln
 dotnet build Farol.sln --no-restore -c Release -m:1 -v minimal
 dotnet test tests/Farol.Tests/Farol.Tests.csproj --no-build -c Release -m:1 -v minimal
 ```
+
+Organizacao atual dos testes backend:
+
+- `tests/Farol.Tests/Domain/`: unit tests de entidades e invariantes
+- `tests/Farol.Tests/Auth/`: unit tests de servicos de autenticacao
+- `tests/Farol.Tests/Seeding/`: testes focados em seed e dados base
+- `tests/Farol.Tests/Api/`: integration tests de endpoints HTTP
+- `tests/Farol.Tests/Smoke/`: validacoes de infraestrutura e migracoes
+
+Regra de classificacao:
+
+- testes sem host HTTP devem permanecer em `Domain/`, `Auth/` ou pasta especializada equivalente
+- testes que sobem `FarolApiFactory` devem permanecer em `Api/`
+- smoke tests devem ficar isolados de testes funcionais
 
 ### Python
 

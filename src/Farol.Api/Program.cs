@@ -1,4 +1,5 @@
 using System.Text;
+using System.Threading.RateLimiting;
 using Farol.Api.Common;
 using Farol.Api.Modules.Bills;
 using Farol.Api.Modules.Imports;
@@ -10,11 +11,16 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
 
 builder.Services
     .AddControllers()
@@ -23,6 +29,35 @@ builder.Services
         options.InvalidModelStateResponseFactory = ApiValidationErrorFactory.Create;
     });
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddRateLimiter(options =>
+{
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        context.HttpContext.Response.ContentType = "application/json";
+        await context.HttpContext.Response.WriteAsJsonAsync(
+            new ErrorResponse("Muitas tentativas. Tente novamente em alguns instantes."),
+            cancellationToken);
+    };
+
+    options.AddPolicy("auth-login", httpContext =>
+    {
+        var forwardedFor = httpContext.Request.Headers["X-Forwarded-For"].ToString();
+        var partitionKey = string.IsNullOrWhiteSpace(forwardedFor)
+            ? httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown"
+            : forwardedFor.Split(',')[0].Trim();
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey,
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            });
+    });
+});
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options =>
 {
@@ -66,6 +101,19 @@ var signingKey = jwtSection["SigningKey"]
     ?? throw new InvalidOperationException("Jwt:SigningKey configuration is required.");
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection configuration is required.");
+var financialIntelligenceOptions = builder.Configuration
+    .GetSection(FinancialIntelligenceOptions.SectionName)
+    .Get<FinancialIntelligenceOptions>()
+    ?? new FinancialIntelligenceOptions();
+var internalApiKey = builder.Configuration[financialIntelligenceOptions.InternalApiKeyEnvironmentVariable];
+
+if (!builder.Environment.IsDevelopment() &&
+    !builder.Environment.IsEnvironment("Testing") &&
+    string.IsNullOrWhiteSpace(internalApiKey))
+{
+    throw new InvalidOperationException(
+        $"{financialIntelligenceOptions.InternalApiKeyEnvironmentVariable} configuration is required.");
+}
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -106,6 +154,8 @@ builder.Services.AddDbContext<FarolDbContext>(options =>
     options.UseNpgsql(connectionString));
 builder.Services.AddScoped<PasswordService>();
 builder.Services.AddScoped<JwtTokenService>();
+builder.Services.AddScoped<PasswordResetService>();
+builder.Services.AddScoped<RefreshTokenService>();
 builder.Services.AddScoped<BillSeriesExpansionService>();
 builder.Services.AddScoped<BillPaymentService>();
 builder.Services.AddScoped<BillSeriesUpdateService>();
@@ -169,6 +219,7 @@ app.MapGet("/health", () => Results.Ok(new
 }));
 
 app.UseCors("FarolWeb");
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

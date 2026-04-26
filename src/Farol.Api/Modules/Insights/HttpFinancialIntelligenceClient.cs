@@ -1,22 +1,35 @@
 using System.Net.Http.Json;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 
 namespace Farol.Api.Modules.Insights;
 
 public sealed class HttpFinancialIntelligenceClient(
     HttpClient httpClient,
-    IOptions<FinancialIntelligenceOptions> options) : IFinancialIntelligenceClient
+    IOptions<FinancialIntelligenceOptions> options,
+    IConfiguration configuration) : IFinancialIntelligenceClient
 {
     public async Task<FinancialAnalysisResponse> AnalyzeAsync(
         FinancialAnalysisRequest request,
         CancellationToken cancellationToken)
     {
+        var internalApiKey = configuration[options.Value.InternalApiKeyEnvironmentVariable];
+
+        if (string.IsNullOrWhiteSpace(internalApiKey))
+        {
+            throw new InvalidOperationException(
+                $"{options.Value.InternalApiKeyEnvironmentVariable} configuration is required.");
+        }
+
         try
         {
-            using var response = await httpClient.PostAsJsonAsync(
-                options.Value.AnalyzePath,
-                request,
-                cancellationToken);
+            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, options.Value.AnalyzePath)
+            {
+                Content = JsonContent.Create(request)
+            };
+            httpRequest.Headers.Add(options.Value.InternalApiKeyHeaderName, internalApiKey);
+
+            using var response = await httpClient.SendAsync(httpRequest, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
             {

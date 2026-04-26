@@ -296,7 +296,7 @@ public sealed class TransactionCsvImportsEndpointsTests : IClassFixture<FarolApi
             Conta 12345-6
             Periodo 01/03/2026 a 31/03/2026
 
-            Data Lançamento,Data Contábil,Título,Descrição,Entrada(R$),Saída(R$),Saldo do Dia(R$)
+            Data LanÃ§amento,Data ContÃ¡bil,TÃ­tulo,DescriÃ§Ã£o,Entrada(R$),SaÃ­da(R$),Saldo do Dia(R$)
             01/03/2026,01/03/2026,Salario Empresa,Credito mensal,"3000,00",,"3000,00"
             02/03/2026,02/03/2026,Uber*Viagem,Uber viagem,,"42,00","2958,00"
             """);
@@ -580,7 +580,7 @@ public sealed class TransactionCsvImportsEndpointsTests : IClassFixture<FarolApi
         {
             Name = "Usuario Teste",
             Email = email,
-            Password = "123456"
+            Password = "Password123"
         });
 
         response.EnsureSuccessStatusCode();
