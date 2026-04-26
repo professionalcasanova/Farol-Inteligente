@@ -83,8 +83,8 @@ public sealed class CategoriesEndpointsTests : IClassFixture<FarolApiFactory>
 
         Assert.NotNull(categories);
         Assert.Contains(categories, category => category.Name == "Mercado" && category.IsSystem);
-        Assert.Contains(categories, category => category.Name == "Contas e serviÃ§os" && category.IsSystem);
-        Assert.Contains(categories, category => category.Name == "BenefÃ­cios" && category.IsSystem);
+        Assert.Contains(categories, category => category.Name == "Contas e servi\u00e7os" && category.IsSystem);
+        Assert.Contains(categories, category => category.Name == "Benef\u00edcios" && category.IsSystem);
         Assert.Contains(categories, category => category.Name == "Rendimento" && category.IsSystem);
         Assert.DoesNotContain(categories, category => string.Equals(category.Name, "PIX", StringComparison.OrdinalIgnoreCase));
     }
@@ -100,7 +100,7 @@ public sealed class CategoriesEndpointsTests : IClassFixture<FarolApiFactory>
 
         response.EnsureSuccessStatusCode();
 
-        var authResponse = await response.Content.ReadFromJsonAsync<AuthResponse>();
+        var authResponse = await ApiTestResponseReader.ReadDataAsync<AuthResponse>(response);
 
         Assert.NotNull(authResponse);
 

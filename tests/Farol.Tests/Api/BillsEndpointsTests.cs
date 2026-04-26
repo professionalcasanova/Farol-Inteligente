@@ -1154,7 +1154,7 @@ public sealed class BillsEndpointsTests : IClassFixture<FarolApiFactory>
 
         response.EnsureSuccessStatusCode();
 
-        var authResponse = await response.Content.ReadFromJsonAsync<AuthResponse>();
+        var authResponse = await ApiTestResponseReader.ReadDataAsync<AuthResponse>(response);
 
         Assert.NotNull(authResponse);
 
@@ -1162,6 +1162,12 @@ public sealed class BillsEndpointsTests : IClassFixture<FarolApiFactory>
     }
 
     private sealed class ErrorResponse
+    {
+        public ApiError? Error { get; init; }
+        public string? Message => Error?.Message;
+    }
+
+    private sealed class ApiError
     {
         public string? Message { get; init; }
     }

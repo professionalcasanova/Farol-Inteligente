@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Farol.Api.Modules.Auth;
 using Farol.Domain.Users;
 using Farol.Infrastructure.Persistence;
@@ -39,7 +40,7 @@ public sealed class AuthEndpointsTests : IClassFixture<FarolApiFactory>
 
         response.EnsureSuccessStatusCode();
 
-        var payload = await response.Content.ReadFromJsonAsync<AuthResponse>();
+        var payload = await ReadDataAsync<AuthResponse>(response);
 
         Assert.NotNull(payload);
         Assert.False(string.IsNullOrWhiteSpace(payload.AccessToken));
@@ -129,7 +130,7 @@ public sealed class AuthEndpointsTests : IClassFixture<FarolApiFactory>
 
         response.EnsureSuccessStatusCode();
 
-        var payload = await response.Content.ReadFromJsonAsync<AuthResponse>();
+        var payload = await ReadDataAsync<AuthResponse>(response);
 
         Assert.NotNull(payload);
         Assert.False(string.IsNullOrWhiteSpace(payload.AccessToken));
@@ -196,7 +197,7 @@ public sealed class AuthEndpointsTests : IClassFixture<FarolApiFactory>
 
         response.EnsureSuccessStatusCode();
 
-        var payload = await response.Content.ReadFromJsonAsync<AuthResponse>();
+        var payload = await ReadDataAsync<AuthResponse>(response);
 
         Assert.NotNull(payload);
         Assert.False(string.IsNullOrWhiteSpace(payload.AccessToken));
@@ -288,7 +289,7 @@ public sealed class AuthEndpointsTests : IClassFixture<FarolApiFactory>
 
         loginResponse.EnsureSuccessStatusCode();
 
-        var loginPayload = await loginResponse.Content.ReadFromJsonAsync<AuthResponse>();
+        var loginPayload = await ReadDataAsync<AuthResponse>(loginResponse);
 
         Assert.NotNull(loginPayload);
 
@@ -299,7 +300,7 @@ public sealed class AuthEndpointsTests : IClassFixture<FarolApiFactory>
 
         refreshResponse.EnsureSuccessStatusCode();
 
-        var refreshPayload = await refreshResponse.Content.ReadFromJsonAsync<AuthResponse>();
+        var refreshPayload = await ReadDataAsync<AuthResponse>(refreshResponse);
 
         Assert.NotNull(refreshPayload);
         Assert.False(string.IsNullOrWhiteSpace(refreshPayload.AccessToken));
@@ -416,7 +417,7 @@ public sealed class AuthEndpointsTests : IClassFixture<FarolApiFactory>
 
         loginResponse.EnsureSuccessStatusCode();
 
-        var loginPayload = await loginResponse.Content.ReadFromJsonAsync<AuthResponse>();
+        var loginPayload = await ReadDataAsync<AuthResponse>(loginResponse);
 
         Assert.NotNull(loginPayload);
 
@@ -432,6 +433,145 @@ public sealed class AuthEndpointsTests : IClassFixture<FarolApiFactory>
         var refreshToken = dbContext.RefreshTokens.Single(token => token.Token == loginPayload.RefreshToken);
 
         Assert.True(refreshToken.Revoked);
+    }
+
+    [Fact]
+    public async Task Sessions_AuthenticatedUser_ShouldListOnlyOwnActiveSessions()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = CreateIsolatedClient();
+
+        var mariaAuth = await RegisterAsync(client, "Maria Silva", "maria@email.com", StrongPassword);
+        await RegisterAsync(client, "Joao Souza", "joao@email.com", AnotherStrongPassword);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", mariaAuth.AccessToken);
+
+        var response = await client.GetAsync("/api/auth/sessions");
+
+        response.EnsureSuccessStatusCode();
+
+        var sessions = await ReadDataAsync<List<SessionResponse>>(response);
+
+        Assert.NotNull(sessions);
+        Assert.Single(sessions);
+        Assert.False(sessions[0].Revoked);
+    }
+
+    [Fact]
+    public async Task Sessions_ExpiredOrRevokedSessions_ShouldNotReturnAsActive()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = CreateIsolatedClient();
+
+        var auth = await RegisterAsync(client, "Maria Silva", "maria@email.com", StrongPassword);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<FarolDbContext>();
+            var expiredToken = new RefreshToken(
+                auth.UserId,
+                "expired-session-token",
+                new DateTimeOffset(2026, 3, 10, 10, 0, 0, TimeSpan.Zero),
+                new DateTimeOffset(2026, 3, 10, 11, 0, 0, TimeSpan.Zero));
+            var revokedToken = new RefreshToken(
+                auth.UserId,
+                "revoked-session-token",
+                new DateTimeOffset(2026, 3, 10, 12, 0, 0, TimeSpan.Zero),
+                new DateTimeOffset(2026, 3, 17, 12, 0, 0, TimeSpan.Zero));
+            revokedToken.Revoke();
+
+            dbContext.RefreshTokens.Add(expiredToken);
+            dbContext.RefreshTokens.Add(revokedToken);
+            await dbContext.SaveChangesAsync();
+        }
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.AccessToken);
+
+        var response = await client.GetAsync("/api/auth/sessions");
+
+        response.EnsureSuccessStatusCode();
+
+        var sessions = await ReadDataAsync<List<SessionResponse>>(response);
+
+        Assert.NotNull(sessions);
+        Assert.Single(sessions);
+    }
+
+    [Fact]
+    public async Task Sessions_OwnSession_ShouldRevokeSession()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = CreateIsolatedClient();
+
+        var auth = await RegisterAsync(client, "Maria Silva", "maria@email.com", StrongPassword);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.AccessToken);
+
+        var sessionsResponse = await client.GetAsync("/api/auth/sessions");
+        sessionsResponse.EnsureSuccessStatusCode();
+        var sessions = await ReadDataAsync<List<SessionResponse>>(sessionsResponse);
+
+        Assert.NotNull(sessions);
+
+        var deleteResponse = await client.DeleteAsync($"/api/auth/sessions/{sessions[0].Id}");
+
+        deleteResponse.EnsureSuccessStatusCode();
+
+        using var scope = _factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<FarolDbContext>();
+        var refreshToken = dbContext.RefreshTokens.Single(token => token.Id == sessions[0].Id);
+
+        Assert.True(refreshToken.Revoked);
+    }
+
+    [Fact]
+    public async Task Sessions_OtherUserSession_ShouldNotRevokeSession()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = CreateIsolatedClient();
+
+        var mariaAuth = await RegisterAsync(client, "Maria Silva", "maria@email.com", StrongPassword);
+        var joaoAuth = await RegisterAsync(client, "Joao Souza", "joao@email.com", AnotherStrongPassword);
+
+        Guid joaoSessionId;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<FarolDbContext>();
+            joaoSessionId = dbContext.RefreshTokens.Single(token => token.Token == joaoAuth.RefreshToken).Id;
+        }
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", mariaAuth.AccessToken);
+
+        var deleteResponse = await client.DeleteAsync($"/api/auth/sessions/{joaoSessionId}");
+
+        Assert.Equal(HttpStatusCode.NotFound, deleteResponse.StatusCode);
+
+        using var verificationScope = _factory.Services.CreateScope();
+        var verificationDbContext = verificationScope.ServiceProvider.GetRequiredService<FarolDbContext>();
+        var joaoToken = verificationDbContext.RefreshTokens.Single(token => token.Id == joaoSessionId);
+
+        Assert.False(joaoToken.Revoked);
+    }
+
+    [Fact]
+    public async Task Sessions_Response_ShouldNotExposeRefreshTokenValue()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = CreateIsolatedClient();
+
+        var auth = await RegisterAsync(client, "Maria Silva", "maria@email.com", StrongPassword);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.AccessToken);
+
+        var response = await client.GetAsync("/api/auth/sessions");
+
+        response.EnsureSuccessStatusCode();
+
+        var json = await response.Content.ReadAsStringAsync();
+        using var document = JsonDocument.Parse(json);
+        var session = document.RootElement.GetProperty("data").EnumerateArray().Single();
+
+        Assert.False(session.TryGetProperty("token", out _));
+        Assert.False(session.TryGetProperty("refreshToken", out _));
+        Assert.DoesNotContain(auth.RefreshToken, json, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -728,16 +868,46 @@ public sealed class AuthEndpointsTests : IClassFixture<FarolApiFactory>
 
         response.EnsureSuccessStatusCode();
 
-        var payload = await response.Content.ReadFromJsonAsync<AuthResponse>();
+        var payload = await ReadDataAsync<AuthResponse>(response);
 
         Assert.NotNull(payload);
 
         return payload;
     }
 
+    private static async Task<T> ReadDataAsync<T>(HttpResponseMessage response)
+    {
+        var payload = await response.Content.ReadFromJsonAsync<SuccessResponse<T>>();
+
+        Assert.NotNull(payload);
+        Assert.NotNull(payload.Data);
+
+        return payload.Data;
+    }
+
+    private sealed class SuccessResponse<T>
+    {
+        public T? Data { get; init; }
+    }
+
     private sealed class ErrorResponse
     {
+        public ApiError? Error { get; init; }
+        public string? Message => Error?.Message;
+    }
+
+    private sealed class ApiError
+    {
+        public string? Code { get; init; }
         public string? Message { get; init; }
+    }
+
+    private sealed class SessionResponse
+    {
+        public Guid Id { get; init; }
+        public DateTimeOffset CreatedAt { get; init; }
+        public DateTimeOffset ExpiresAt { get; init; }
+        public bool Revoked { get; init; }
     }
 
     private HttpClient CreateClientWithIp(string ipAddress)

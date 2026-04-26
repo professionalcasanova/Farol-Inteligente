@@ -111,6 +111,17 @@ class InternalAuthenticationTests(unittest.TestCase):
         self.assertEqual(200, response.status_code)
         self.assertEqual("healthy", response.json()["status"])
 
+    def test_analyze_with_invalid_payload_should_return_validation_error(self) -> None:
+        client = TestClient(load_app())
+
+        response = client.post(
+            "/analyze/v1",
+            json={"contractVersion": "v1"},
+            headers={"X-Farol-Internal-Key": "test-internal-key"},
+        )
+
+        self.assertEqual(422, response.status_code)
+
     def test_create_app_without_key_in_production_should_fail(self) -> None:
         with self.assertRaises(RuntimeError):
             load_app(environment="production", internal_api_key=None)

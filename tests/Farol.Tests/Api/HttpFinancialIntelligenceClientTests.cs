@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Farol.Api.Modules.Insights;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
@@ -16,25 +17,85 @@ public sealed class HttpFinancialIntelligenceClientTests
         {
             capturedRequest = request;
 
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(CreateHealthyResponse())
+            });
+        });
+
+        var client = CreateClient(handler);
+
+        await client.AnalyzeAsync(CreateRequest(), CancellationToken.None);
+
+        Assert.NotNull(capturedRequest);
+        Assert.True(capturedRequest.Headers.TryGetValues("X-Farol-Internal-Key", out var values));
+        Assert.Equal("test-internal-key", Assert.Single(values));
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_Request_ShouldUsePythonContractFieldNames()
+    {
+        string? capturedJson = null;
+        var handler = new StubHttpMessageHandler(async request =>
+        {
+            capturedJson = await request.Content!.ReadAsStringAsync();
+
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = JsonContent.Create(new FinancialAnalysisResponse
-                {
-                    ContractVersion = "v1",
-                    Status = "healthy",
-                    Score = 100,
-                    Summary = new FinancialAnalysisSummaryResponse
-                    {
-                        Message = "ok",
-                        Cause = "ok",
-                        Action = "ok"
-                    },
-                    Insights = [],
-                    RecommendedActions = []
-                })
+                Content = JsonContent.Create(CreateHealthyResponse())
             };
         });
 
+        var client = CreateClient(handler);
+
+        await client.AnalyzeAsync(CreateRequest(), CancellationToken.None);
+
+        Assert.NotNull(capturedJson);
+        using var document = JsonDocument.Parse(capturedJson);
+        var root = document.RootElement;
+
+        Assert.True(root.TryGetProperty("contractVersion", out _));
+        Assert.True(root.TryGetProperty("reference", out var reference));
+        Assert.True(reference.TryGetProperty("userId", out _));
+        Assert.True(root.TryGetProperty("plannedBudget", out _) is false);
+        Assert.True(root.GetProperty("totals").TryGetProperty("plannedBudget", out _));
+        Assert.True(root.GetProperty("bills").TryGetProperty("upcoming7DaysAmount", out _));
+        Assert.True(root.GetProperty("categories")[0].TryGetProperty("categoryId", out _));
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_InvalidPayload_ShouldThrowUnavailableException()
+    {
+        var handler = new StubHttpMessageHandler(_ =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new
+                {
+                    contractVersion = "v1",
+                    status = "healthy"
+                })
+            }));
+
+        var client = CreateClient(handler);
+
+        await Assert.ThrowsAsync<FinancialIntelligenceUnavailableException>(() =>
+            client.AnalyzeAsync(CreateRequest(), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_UnsuccessfulStatusCode_ShouldThrowUnavailableException()
+    {
+        var handler = new StubHttpMessageHandler(_ =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.Unauthorized)));
+
+        var client = CreateClient(handler);
+
+        await Assert.ThrowsAsync<FinancialIntelligenceUnavailableException>(() =>
+            client.AnalyzeAsync(CreateRequest(), CancellationToken.None));
+    }
+
+    private static HttpFinancialIntelligenceClient CreateClient(HttpMessageHandler handler)
+    {
         var httpClient = new HttpClient(handler)
         {
             BaseAddress = new Uri("http://127.0.0.1:8000")
@@ -47,12 +108,15 @@ public sealed class HttpFinancialIntelligenceClientTests
             })
             .Build();
 
-        var client = new HttpFinancialIntelligenceClient(
+        return new HttpFinancialIntelligenceClient(
             httpClient,
             Options.Create(new FinancialIntelligenceOptions()),
             configuration);
+    }
 
-        await client.AnalyzeAsync(new FinancialAnalysisRequest
+    private static FinancialAnalysisRequest CreateRequest()
+    {
+        return new FinancialAnalysisRequest
         {
             ContractVersion = "v1",
             Reference = new FinancialAnalysisReferenceRequest
@@ -88,19 +152,43 @@ public sealed class HttpFinancialIntelligenceClientTests
                 InstallmentAmount = 0,
                 InstallmentCount = 0
             },
-            Categories = []
-        }, CancellationToken.None);
-
-        Assert.NotNull(capturedRequest);
-        Assert.True(capturedRequest.Headers.TryGetValues("X-Farol-Internal-Key", out var values));
-        Assert.Equal("test-internal-key", Assert.Single(values));
+            Categories =
+            [
+                new FinancialAnalysisCategoryRequest
+                {
+                    CategoryId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                    Name = "Mercado",
+                    Type = "expense",
+                    Amount = 250
+                }
+            ]
+        };
     }
 
-    private sealed class StubHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> responder) : HttpMessageHandler
+    private static FinancialAnalysisResponse CreateHealthyResponse()
+    {
+        return new FinancialAnalysisResponse
+        {
+            ContractVersion = "v1",
+            Status = "healthy",
+            Score = 100,
+            Summary = new FinancialAnalysisSummaryResponse
+            {
+                Message = "ok",
+                Cause = "ok",
+                Action = "ok"
+            },
+            Insights = [],
+            RecommendedActions = []
+        };
+    }
+
+    private sealed class StubHttpMessageHandler(Func<HttpRequestMessage, Task<HttpResponseMessage>> responder)
+        : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            return Task.FromResult(responder(request));
+            return responder(request);
         }
     }
 }

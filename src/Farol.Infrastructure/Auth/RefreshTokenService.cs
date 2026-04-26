@@ -106,6 +106,55 @@ public sealed class RefreshTokenService(
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<RefreshToken>> ListActiveSessionsAsync(
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        if (userId == Guid.Empty)
+        {
+            return [];
+        }
+
+        var now = timeProvider.GetUtcNow();
+
+        return await dbContext.RefreshTokens
+            .Where(token =>
+                token.UserId == userId &&
+                !token.Revoked &&
+                token.ExpiresAtUtc > now)
+            .OrderByDescending(token => token.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<bool> RevokeSessionAsync(
+        Guid userId,
+        Guid sessionId,
+        CancellationToken cancellationToken)
+    {
+        if (userId == Guid.Empty || sessionId == Guid.Empty)
+        {
+            return false;
+        }
+
+        var refreshToken = await dbContext.RefreshTokens
+            .SingleOrDefaultAsync(
+                token => token.Id == sessionId && token.UserId == userId,
+                cancellationToken);
+
+        if (refreshToken is null)
+        {
+            return false;
+        }
+
+        if (!refreshToken.Revoked)
+        {
+            refreshToken.Revoke();
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        return true;
+    }
+
     private async Task RevokeActiveTokensAsync(Guid userId, CancellationToken cancellationToken)
     {
         var activeTokens = await dbContext.RefreshTokens

@@ -129,7 +129,7 @@ public sealed class MonthlySummaryEndpointsTests : IClassFixture<FarolApiFactory
 
         response.EnsureSuccessStatusCode();
 
-        var authResponse = await response.Content.ReadFromJsonAsync<AuthResponse>();
+        var authResponse = await ApiTestResponseReader.ReadDataAsync<AuthResponse>(response);
 
         Assert.NotNull(authResponse);
 

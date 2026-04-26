@@ -18,6 +18,10 @@
       "value": ""
     },
     {
+      "key": "sessionId",
+      "value": ""
+    },
+    {
       "key": "resetToken",
       "value": ""
     }
@@ -100,6 +104,53 @@
             "api",
             "auth",
             "logout"
+          ]
+        }
+      }
+    },
+    {
+      "name": "List Sessions",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/sessions",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "auth",
+            "sessions"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Revoke Session",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/sessions/{{sessionId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "auth",
+            "sessions",
+            "{{sessionId}}"
           ]
         }
       }

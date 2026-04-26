@@ -36,7 +36,7 @@ builder.Services.AddRateLimiter(options =>
         context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
         context.HttpContext.Response.ContentType = "application/json";
         await context.HttpContext.Response.WriteAsJsonAsync(
-            new ErrorResponse("Muitas tentativas. Tente novamente em alguns instantes."),
+            new ErrorResponse("Muitas tentativas. Tente novamente em alguns instantes.", "rate_limited"),
             cancellationToken);
     };
 
@@ -137,13 +137,13 @@ builder.Services
                 context.HandleResponse();
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                 context.Response.ContentType = "application/json";
-                await context.Response.WriteAsJsonAsync(new ErrorResponse("Invalid access token."));
+                await context.Response.WriteAsJsonAsync(new ErrorResponse("Invalid access token.", "unauthorized"));
             },
             OnForbidden = async context =>
             {
                 context.Response.StatusCode = StatusCodes.Status403Forbidden;
                 context.Response.ContentType = "application/json";
-                await context.Response.WriteAsJsonAsync(new ErrorResponse("Access is forbidden."));
+                await context.Response.WriteAsJsonAsync(new ErrorResponse("Access is forbidden.", "forbidden"));
             }
         };
     });
@@ -202,6 +202,18 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.UseExceptionHandler(errorApp =>
+{
+    errorApp.Run(async context =>
+    {
+        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        context.Response.ContentType = "application/json";
+
+        await context.Response.WriteAsJsonAsync(
+            new ErrorResponse("An unexpected error occurred.", "internal_error"));
+    });
+});
 
 if (!app.Environment.IsEnvironment("Testing"))
 {

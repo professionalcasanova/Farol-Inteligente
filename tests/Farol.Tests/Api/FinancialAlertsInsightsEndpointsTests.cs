@@ -379,7 +379,7 @@ public sealed class FinancialAlertsInsightsEndpointsTests : IClassFixture<FarolA
 
         response.EnsureSuccessStatusCode();
 
-        var authResponse = await response.Content.ReadFromJsonAsync<AuthResponse>();
+        var authResponse = await ApiTestResponseReader.ReadDataAsync<AuthResponse>(response);
 
         Assert.NotNull(authResponse);
 

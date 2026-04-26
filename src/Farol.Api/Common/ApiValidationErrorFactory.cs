@@ -14,6 +14,6 @@ public static class ApiValidationErrorFactory
             .FirstOrDefault(errorMessage => !string.IsNullOrWhiteSpace(errorMessage))
             ?? "Request payload is invalid.";
 
-        return new BadRequestObjectResult(new ErrorResponse(message));
+        return new BadRequestObjectResult(new ErrorResponse(message, "validation_error"));
     }
 }

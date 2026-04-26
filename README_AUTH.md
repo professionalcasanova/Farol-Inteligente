@@ -5,6 +5,27 @@
 - API: `http://localhost:5258`
 - Prefixo auth: `http://localhost:5258/api/auth`
 
+## Formato de resposta
+
+Sucesso:
+
+```json
+{
+  "data": {}
+}
+```
+
+Erro:
+
+```json
+{
+  "error": {
+    "code": "string_curto",
+    "message": "mensagem clara"
+  }
+}
+```
+
 ## Como autenticar
 
 ### Login
@@ -24,11 +45,13 @@ Sucesso:
 
 ```json
 {
-  "accessToken": "jwt",
-  "refreshToken": "refresh-token",
-  "userId": "00000000-0000-0000-0000-000000000000",
-  "name": "Maria Silva",
-  "email": "maria@email.com"
+  "data": {
+    "accessToken": "jwt",
+    "refreshToken": "refresh-token",
+    "userId": "00000000-0000-0000-0000-000000000000",
+    "name": "Maria Silva",
+    "email": "maria@email.com"
+  }
 }
 ```
 
@@ -56,24 +79,80 @@ Sucesso:
 
 ```json
 {
-  "accessToken": "novo-jwt",
-  "refreshToken": "novo-refresh-token",
-  "userId": "00000000-0000-0000-0000-000000000000",
-  "name": "Maria Silva",
-  "email": "maria@email.com"
+  "data": {
+    "accessToken": "novo-jwt",
+    "refreshToken": "novo-refresh-token",
+    "userId": "00000000-0000-0000-0000-000000000000",
+    "name": "Maria Silva",
+    "email": "maria@email.com"
+  }
 }
 ```
 
 Regras:
 
-- o refresh token antigo é revogado
-- o refresh token novo passa a ser o único válido da sessão
-- se o token estiver inválido, expirado ou revogado, o endpoint retorna `400`
+- o refresh token antigo e revogado
+- o refresh token novo passa a ser o unico valido da sessao
+- se o token estiver invalido, expirado ou revogado, o endpoint retorna `400`
 
-## Como lidar com expiração
+## Sessoes do usuario
 
-- o `accessToken` é curto e deve ser renovado com `refresh`
-- ao receber `401` por token expirado/inválido:
+### Listar sessoes
+
+`GET /api/auth/sessions`
+
+Auth:
+
+```http
+Authorization: Bearer {accessToken}
+```
+
+Sucesso:
+
+```json
+{
+  "data": [
+    {
+      "id": "00000000-0000-0000-0000-000000000000",
+      "createdAt": "2026-04-26T10:00:00+00:00",
+      "expiresAt": "2026-05-03T10:00:00+00:00",
+      "revoked": false
+    }
+  ]
+}
+```
+
+Observacao: o refresh token puro nunca e retornado.
+
+### Revogar sessao
+
+`DELETE /api/auth/sessions/{sessionId}`
+
+Auth:
+
+```http
+Authorization: Bearer {accessToken}
+```
+
+Sucesso:
+
+```json
+{
+  "data": {
+    "message": "Session revoked successfully."
+  }
+}
+```
+
+Regras:
+
+- so revoga sessao do usuario autenticado
+- tentativa de revogar sessao de outro usuario retorna `404`
+
+## Como lidar com expiracao
+
+- o `accessToken` e curto e deve ser renovado com `refresh`
+- ao receber `401` por token expirado/invalido:
   1. chamar `POST /api/auth/refresh`
   2. substituir `accessToken` e `refreshToken`
   3. repetir a chamada protegida
@@ -95,7 +174,9 @@ Sucesso:
 
 ```json
 {
-  "message": "Logged out successfully."
+  "data": {
+    "message": "Logged out successfully."
+  }
 }
 ```
 
@@ -117,7 +198,9 @@ Resposta:
 
 ```json
 {
-  "message": "If the email exists, a password reset token has been generated."
+  "data": {
+    "message": "If the email exists, a password reset token has been generated."
+  }
 }
 ```
 
@@ -138,7 +221,9 @@ Sucesso:
 
 ```json
 {
-  "message": "Password has been reset successfully."
+  "data": {
+    "message": "Password has been reset successfully."
+  }
 }
 ```
 
@@ -166,18 +251,20 @@ Sucesso:
 
 ```json
 {
-  "message": "Password changed successfully."
+  "data": {
+    "message": "Password changed successfully."
+  }
 }
 ```
 
-## Política de senha
+## Politica de senha
 
-- mínimo 8 caracteres
+- minimo 8 caracteres
 - pelo menos 1 letra
-- pelo menos 1 número
-- não aceita somente espaços
+- pelo menos 1 numero
+- nao aceita somente espacos
 
-Mensagem padrão:
+Mensagem padrao:
 
 ```text
 Password must be at least 8 characters long, contain at least 1 letter and 1 number, and cannot be only spaces.
@@ -185,23 +272,29 @@ Password must be at least 8 characters long, contain at least 1 letter and 1 num
 
 ## Respostas comuns
 
-### Credenciais inválidas
+### Credenciais invalidas
 
 `401`
 
 ```json
 {
-  "message": "Invalid email or password."
+  "error": {
+    "code": "invalid_credentials",
+    "message": "Invalid email or password."
+  }
 }
 ```
 
-### Refresh inválido
+### Refresh invalido
 
 `400`
 
 ```json
 {
-  "message": "Refresh token is invalid or expired."
+  "error": {
+    "code": "invalid_refresh_token",
+    "message": "Refresh token is invalid or expired."
+  }
 }
 ```
 
@@ -211,26 +304,29 @@ Password must be at least 8 characters long, contain at least 1 letter and 1 num
 
 ```json
 {
-  "message": "Muitas tentativas. Tente novamente em alguns instantes."
+  "error": {
+    "code": "rate_limited",
+    "message": "Muitas tentativas. Tente novamente em alguns instantes."
+  }
 }
 ```
 
-## Instruções rápidas DEV
+## Instrucoes rapidas DEV
 
-Variáveis/configuração:
+Variaveis/configuracao:
 
 - `src/Farol.Api/appsettings.Development.json`
   - `ConnectionStrings:DefaultConnection`
   - `Jwt:*`
   - `FinancialIntelligence:*`
-- variável de ambiente:
+- variavel de ambiente:
   - `FAROL_INTERNAL_API_KEY`
 
 Subida local:
 
 1. garantir PostgreSQL em `localhost:5432`
 2. exportar `FAROL_INTERNAL_API_KEY`
-3. subir o serviço Python em `127.0.0.1:8000`
+3. subir o servico Python em `127.0.0.1:8000`
 4. rodar:
 
 ```powershell

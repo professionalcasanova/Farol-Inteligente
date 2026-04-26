@@ -27,9 +27,18 @@ public sealed class FinancialIntelligenceService(
             return BuildProjectedMonthHealthResponse(snapshot);
         }
 
-        var response = await financialIntelligenceClient.AnalyzeAsync(
-            BuildRequest(userId, periodStart, snapshot, options.Value),
-            cancellationToken);
+        FinancialAnalysisResponse response;
+
+        try
+        {
+            response = await financialIntelligenceClient.AnalyzeAsync(
+                BuildRequest(userId, periodStart, snapshot, options.Value),
+                cancellationToken);
+        }
+        catch (FinancialIntelligenceUnavailableException)
+        {
+            return BuildLocalFallbackMonthHealthResponse(snapshot);
+        }
 
         var mappedInsightList = response.Insights
             .Select(item => new MonthHealthInsightResponse
@@ -113,6 +122,80 @@ public sealed class FinancialIntelligenceService(
             Insights = [],
             RecommendedActions = BuildProjectedRecommendedActions(needsIncomeConfirmation, snapshot)
         };
+    }
+
+    private static MonthHealthResponse BuildLocalFallbackMonthHealthResponse(MonthlyInsightSnapshot snapshot)
+    {
+        var isCritical = snapshot.TotalOverdueBills > 0 || snapshot.Balance < 0 || snapshot.FreeToSpend < 0;
+        var status = isCritical ? "critical" : "attention";
+        var score = isCritical ? 45 : 72;
+        var priority = isCritical ? CriticalPriority : AttentionPriority;
+        var message = isCritical
+            ? "A inteligencia financeira esta indisponivel; exibindo uma leitura local com sinais de atencao alta."
+            : "A inteligencia financeira esta indisponivel; exibindo uma leitura local temporaria.";
+        var cause = isCritical
+            ? "A leitura local encontrou saldo, dinheiro livre ou contas vencidas em zona de risco."
+            : "A leitura local usa apenas saldos, orcamento e contas ja registrados, sem analise avancada.";
+        var action = isCritical
+            ? "Revise contas vencidas, saldo disponivel e gastos do mes antes de assumir novos compromissos."
+            : "Use esta leitura local como referencia temporaria e confira novamente em alguns instantes.";
+
+        return new MonthHealthResponse
+        {
+            Status = status,
+            Score = score,
+            Message = message,
+            Reasons = [cause],
+            Actions = [action],
+            Priority = priority,
+            Summary = new MonthHealthSummaryResponse
+            {
+                Message = message,
+                Cause = cause,
+                Action = action
+            },
+            Insights = [],
+            RecommendedActions = BuildLocalFallbackRecommendedActions(snapshot, isCritical)
+        };
+    }
+
+    private static IReadOnlyList<RecommendedActionResponse> BuildLocalFallbackRecommendedActions(
+        MonthlyInsightSnapshot snapshot,
+        bool isCritical)
+    {
+        var actions = new List<RecommendedActionResponse>();
+
+        if (snapshot.TotalOverdueBills > 0)
+        {
+            actions.Add(new RecommendedActionResponse
+            {
+                Id = "review_overdue_bills",
+                Label = "Resolver contas vencidas",
+                Target = "/bills?status=overdue"
+            });
+        }
+
+        if (isCritical && snapshot.Balance < 0)
+        {
+            actions.Add(new RecommendedActionResponse
+            {
+                Id = "review_month_transactions",
+                Label = "Revisar saidas do mes",
+                Target = "/transactions"
+            });
+        }
+
+        if (actions.Count == 0)
+        {
+            actions.Add(new RecommendedActionResponse
+            {
+                Id = "retry_month_health",
+                Label = "Atualizar saude do mes",
+                Target = "/dashboard"
+            });
+        }
+
+        return actions;
     }
 
     private static IReadOnlyList<RecommendedActionResponse> BuildProjectedRecommendedActions(

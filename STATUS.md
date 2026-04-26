@@ -1,49 +1,65 @@
 # Backend Status
 
-## Implementado hoje
+## Implementado
 
 - Password Reset
   - `POST /api/auth/forgot-password`
   - `POST /api/auth/reset-password`
-  - token persistido, expiração, uso único
+  - token persistido, expiracao e uso unico
 - Change Password
   - `POST /api/auth/change-password`
   - exige JWT
-  - valida senha atual, confirmação e política mínima
+  - valida senha atual, confirmacao e politica minima
 - Refresh Token + Logout
   - `POST /api/auth/refresh`
   - `POST /api/auth/logout`
-  - rotação de refresh token
+  - rotacao de refresh token
+- Sessoes do usuario
+  - `GET /api/auth/sessions`
+  - `DELETE /api/auth/sessions/{sessionId}`
+  - lista apenas sessoes ativas do usuario autenticado
+  - nao expoe refresh token puro
 - Rate Limiting no login
   - `POST /api/auth/login`
   - 5 tentativas por minuto por IP
   - retorna `429` ao exceder
-- Autenticação backend -> Python
+- Autenticacao backend -> Python
   - backend envia `X-Farol-Internal-Key`
-  - serviço Python valida `FAROL_INTERNAL_API_KEY`
-- Introdução de TDD
+  - servico Python valida `FAROL_INTERNAL_API_KEY`
+- Fallback C# para inteligencia financeira
+  - `GET /api/insights/month-health` usa fallback local seguro se o Python falhar, expirar, retornar status nao-2xx ou payload invalido
+- Padronizacao de respostas da API
+  - sucesso: `{ "data": ... }`
+  - erro: `{ "error": { "code", "message", "details?" } }`
+- Correcoes de encoding
+  - categorias usam nomes canonicos com acentuacao correta
+  - importacao CSV tolera cabecalhos com UTF-8 legado repetido em extratos bancarios
+- TDD
   - `AGENTS.md` atualizado
-  - testes de auth e integração interna adicionados/ajustados
+  - testes de auth, sessoes, integracao interna e contrato API/Python adicionados ou ajustados
 
 ## Endpoints atuais
 
-| Método | Rota | Auth |
+| Metodo | Rota | Auth |
 |---|---|---|
-| `POST` | `/api/auth/register` | pública |
-| `POST` | `/api/auth/login` | pública + rate limit |
-| `POST` | `/api/auth/forgot-password` | pública |
-| `POST` | `/api/auth/reset-password` | pública |
-| `POST` | `/api/auth/refresh` | pública |
-| `POST` | `/api/auth/logout` | pública |
+| `POST` | `/api/auth/register` | publica |
+| `POST` | `/api/auth/login` | publica + rate limit |
+| `POST` | `/api/auth/forgot-password` | publica |
+| `POST` | `/api/auth/reset-password` | publica |
+| `POST` | `/api/auth/refresh` | publica |
+| `POST` | `/api/auth/logout` | publica |
 | `POST` | `/api/auth/change-password` | `Bearer JWT` |
-| `GET` | `/health` | pública |
+| `GET` | `/api/auth/sessions` | `Bearer JWT` |
+| `DELETE` | `/api/auth/sessions/{sessionId}` | `Bearer JWT` |
+| `GET` | `/api/insights/month-health` | `Bearer JWT` |
+| `GET` | `/health` | publica |
 
 ## Fluxos principais
 
 ### Login
 
 1. `POST /api/auth/login`
-2. retorna `accessToken` + `refreshToken`
+2. retorna `data.accessToken` + `data.refreshToken`
 3. `accessToken` deve ser usado no header `Authorization: Bearer {token}`
 
 ### Refresh
@@ -60,6 +76,13 @@
 2. envia `refreshToken`
 3. backend revoga o refresh token informado
 
+### Sessions
+
+1. `GET /api/auth/sessions`
+2. exige JWT
+3. retorna sessoes ativas do usuario autenticado com `id`, `createdAt`, `expiresAt`, `revoked`
+4. `DELETE /api/auth/sessions/{sessionId}` revoga apenas sessao do proprio usuario
+
 ### Forgot Password
 
 1. `POST /api/auth/forgot-password`
@@ -70,80 +93,87 @@
 
 1. `POST /api/auth/reset-password`
 2. envia `token` + `password`
-3. backend valida existência, expiração, uso e política mínima
+3. backend valida existencia, expiracao, uso e politica minima
 
 ### Change Password
 
 1. `POST /api/auth/change-password`
 2. exige JWT
 3. envia `currentPassword`, `newPassword`, `confirmNewPassword`
-4. backend valida senha atual e política mínima
+4. backend valida senha atual e politica minima
 
-## Política atual de senha
+### Month Health com Python
 
-- mínimo 8 caracteres
+1. `GET /api/insights/month-health`
+2. backend monta snapshot financeiro local
+3. backend chama `POST /analyze/v1` no servico Python
+4. header obrigatorio: `X-Farol-Internal-Key`
+5. se o Python falhar, expirar, rejeitar ou retornar payload invalido, a API responde com fallback local seguro
+
+## Integracao API C# -> Python
+
+- chamada atual: `GET /api/insights/month-health` no backend usa `POST /analyze/v1` no servico Python
+- endpoint Python de saude: `GET /health`, publico
+- endpoint Python interno: `POST /analyze/v1`, exige `X-Farol-Internal-Key`
+- chave compartilhada: `FAROL_INTERNAL_API_KEY`
+- request enviado: `contractVersion`, `reference`, `totals`, `bills`, `categories`
+- response esperado: `contractVersion`, `status`, `score`, `summary`, `insights`, `recommendedActions`
+- status codes Python esperados: `200` sucesso, `401` chave ausente/invalida, `422` payload invalido
+- timeout do backend: `FinancialIntelligence:TimeoutSeconds`
+- comportamento resiliente: falha, timeout, status nao-2xx ou payload invalido do Python geram fallback local seguro no backend
+- a chave interna nao deve ser logada nem versionada
+
+## Politica atual de senha
+
+- minimo 8 caracteres
 - pelo menos 1 letra
-- pelo menos 1 número
-- não aceita somente espaços
+- pelo menos 1 numero
+- nao aceita somente espacos
 
-## Pendências curtas
+## Pendencias curtas
 
 - envio real de e-mail para reset
-- listagem e revogação de sessões por usuário
-- verificação de e-mail
-- lockout por conta além do rate limit por IP
+- verificacao de e-mail
+- lockout por conta alem do rate limit por IP
 - MFA
 
-## Observações de segurança
+## Observacoes de seguranca
 
-- erro de login continua genérico
-- forgot password não revela se o e-mail existe
-- reset token expira e é de uso único
-- refresh token é rotacionado e revogado após uso
-- reuse de refresh token revoga tokens ativos do usuário
+- erro de login continua generico
+- forgot password nao revela se o e-mail existe
+- reset token expira e e de uso unico
+- refresh token e rotacionado e revogado apos uso
+- reuse de refresh token revoga tokens ativos do usuario
+- sessoes de usuario nao expoem refresh token puro
 - login tem limite de 5 tentativas por minuto por IP
-- integração backend -> Python depende de `FAROL_INTERNAL_API_KEY`
-- a chave interna não deve ser logada nem versionada
+- integracao backend -> Python depende de `FAROL_INTERNAL_API_KEY`
+- a chave interna nao deve ser logada nem versionada
+- falha ou payload invalido do Python nao derruba `month-health`; a API usa fallback local
 
 ## DEV
 
 - URL base local da API: `http://localhost:5258`
-- serviço Python local esperado: `http://127.0.0.1:8000`
-- variável obrigatória para integração interna:
+- servico Python local esperado: `http://127.0.0.1:8000`
+- variavel obrigatoria para integracao interna:
   - `FAROL_INTERNAL_API_KEY`
 
-## Validação DEV feita hoje
+## Validacao final
 
-- build backend: ok
-- testes de auth/backend: ok
-- testes do serviço Python: ok
-- PostgreSQL local em Docker: ok
-- migrations aplicadas no banco local: ok
-- serviço Python local: ok
-- API ASP.NET Core em `Development`: ok
-- smoke test real validado:
-  - `GET /health`
-  - `POST /api/auth/register`
-  - `POST /api/auth/refresh`
-  - `POST /api/auth/change-password`
-  - `POST /api/auth/login`
-  - `POST /api/auth/forgot-password`
-  - `POST /api/auth/logout`
-  - `GET /api/insights/month-health`
-  - `POST /analyze/v1` no Python:
-    - sem header -> `401`
-    - com `X-Farol-Internal-Key` válido -> `200`
+- C# tests: `209/209`
+- Python tests: `23/23`
+- build backend: OK
+- testes de auth/backend: OK
+- testes de integracao API C# -> Python: OK
+- testes do servico Python: OK
+- PostgreSQL local em Docker: OK
+- migrations aplicadas no banco local: OK
+- API ASP.NET Core em `Development`: OK
 
-## Ajustes operacionais feitos para DEV
-
-- logging da API passou a usar `Console` e `Debug`, removendo o provider padrão de `EventLog` que estava quebrando requisições locais neste ambiente Windows
-- migrations `AddPasswordResetTokens` e `AddRefreshTokens` receberam metadata do EF para serem reconhecidas e aplicadas no banco local
-
-## Retomada rápida
+## Retomada rapida
 
 1. subir PostgreSQL local ou Docker Desktop
-2. configurar `FAROL_INTERNAL_API_KEY` no backend e no serviço Python
-3. subir o serviço Python em `127.0.0.1:8000`
+2. configurar `FAROL_INTERNAL_API_KEY` no backend e no servico Python
+3. subir o servico Python em `127.0.0.1:8000`
 4. subir a API ASP.NET Core em `http://localhost:5258`
 5. validar `GET /health`
-6. usar a coleção Postman de auth para validar login, refresh e fluxos de senha
+6. usar a colecao Postman de auth para validar login, refresh, sessoes e fluxos de senha

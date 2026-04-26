@@ -413,7 +413,7 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
     }
 
     [Fact]
-    public async Task GetMonthHealth_WhenFinancialIntelligenceIsUnavailable_ShouldReturnServiceUnavailable()
+    public async Task GetMonthHealth_WhenFinancialIntelligenceIsUnavailable_ShouldReturnSafeFallback()
     {
         await _factory.ResetDatabaseAsync();
         using var client = _factory.CreateClient();
@@ -427,10 +427,40 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
 
         var response = await client.GetAsync($"/api/insights/month-health?month={today.Month}&year={today.Year}");
 
-        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
-        var payload = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<MonthHealthResponse>();
+
         Assert.NotNull(payload);
-        Assert.Equal("A inteligÃªncia financeira estÃ¡ indisponÃ­vel no momento.", payload.Message);
+        Assert.Equal("attention", payload.Status);
+        Assert.Contains("leitura local", payload.Message ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.NotEmpty(payload.Reasons);
+        Assert.NotEmpty(payload.Actions);
+    }
+
+    [Fact]
+    public async Task GetMonthHealth_WhenFinancialIntelligencePayloadIsInvalid_ShouldReturnSafeFallback()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var today = _factory.Today;
+
+        _factory.FinancialIntelligenceClient.Handler = (_, _) =>
+            throw new FinancialIntelligenceUnavailableException("Invalid payload.");
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await client.GetAsync($"/api/insights/month-health?month={today.Month}&year={today.Year}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<MonthHealthResponse>();
+
+        Assert.NotNull(payload);
+        Assert.Equal("attention", payload.Status);
+        Assert.Contains("leitura local", payload.Message ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(payload.Insights);
     }
 
     [Fact]
@@ -605,7 +635,7 @@ public sealed class MonthHealthInsightsEndpointsTests : IClassFixture<FarolApiFa
 
         response.EnsureSuccessStatusCode();
 
-        var authResponse = await response.Content.ReadFromJsonAsync<AuthResponse>();
+        var authResponse = await ApiTestResponseReader.ReadDataAsync<AuthResponse>(response);
 
         Assert.NotNull(authResponse);
 

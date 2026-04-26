@@ -107,7 +107,7 @@ internal sealed class TransactionImportCategoryResolver
             return string.Empty;
         }
 
-        var normalized = value.Trim().ToLowerInvariant();
+        var normalized = RepairLegacyUtf8IfNeeded(value.Trim()).ToLowerInvariant();
 
         normalized = normalized
             .Replace("\u00c3\u00a1", "a", StringComparison.Ordinal)
@@ -139,6 +139,100 @@ internal sealed class TransactionImportCategoryResolver
         }
 
         return builder.ToString();
+    }
+
+    private static string RepairLegacyUtf8IfNeeded(string value)
+    {
+        if (!MayContainLegacyUtf8(value))
+        {
+            return value;
+        }
+
+        var repaired = value;
+
+        for (var attempt = 0; attempt < 4; attempt += 1)
+        {
+            var next = TryRepairLegacyUtf8(repaired);
+
+            if (string.Equals(next, repaired, StringComparison.Ordinal))
+            {
+                break;
+            }
+
+            repaired = next;
+
+            if (!MayContainLegacyUtf8(repaired))
+            {
+                break;
+            }
+        }
+
+        return repaired;
+    }
+
+    private static bool MayContainLegacyUtf8(string value)
+    {
+        return value.Contains('Ã', StringComparison.Ordinal) ||
+               value.Contains('Â', StringComparison.Ordinal) ||
+               value.Contains('�', StringComparison.Ordinal);
+    }
+
+    private static string TryRepairLegacyUtf8(string value)
+    {
+        var bytes = new byte[value.Length];
+
+        for (var index = 0; index < value.Length; index += 1)
+        {
+            if (!TryGetWindows1252Byte(value[index], out bytes[index]))
+            {
+                return value;
+            }
+        }
+
+        return Encoding.UTF8.GetString(bytes);
+    }
+
+    private static bool TryGetWindows1252Byte(char value, out byte result)
+    {
+        if (value <= byte.MaxValue)
+        {
+            result = (byte)value;
+            return true;
+        }
+
+        result = value switch
+        {
+            '\u20AC' => 0x80,
+            '\u201A' => 0x82,
+            '\u0192' => 0x83,
+            '\u201E' => 0x84,
+            '\u2026' => 0x85,
+            '\u2020' => 0x86,
+            '\u2021' => 0x87,
+            '\u02C6' => 0x88,
+            '\u2030' => 0x89,
+            '\u0160' => 0x8A,
+            '\u2039' => 0x8B,
+            '\u0152' => 0x8C,
+            '\u017D' => 0x8E,
+            '\u2018' => 0x91,
+            '\u2019' => 0x92,
+            '\u201C' => 0x93,
+            '\u201D' => 0x94,
+            '\u2022' => 0x95,
+            '\u2013' => 0x96,
+            '\u2014' => 0x97,
+            '\u02DC' => 0x98,
+            '\u2122' => 0x99,
+            '\u0161' => 0x9A,
+            '\u203A' => 0x9B,
+            '\u0153' => 0x9C,
+            '\u017E' => 0x9E,
+            '\u0178' => 0x9F,
+            _ => 0
+        };
+
+        return result != 0;
     }
 }
 

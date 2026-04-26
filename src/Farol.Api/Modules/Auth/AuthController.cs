@@ -27,14 +27,14 @@ public sealed class AuthController(
             string.IsNullOrWhiteSpace(request.Email) ||
             string.IsNullOrWhiteSpace(request.Password))
         {
-            return BadRequest(new ErrorResponse("Name, email and password are required."));
+            return BadRequest(new ErrorResponse("Name, email and password are required.", "validation_error"));
         }
 
         var passwordValidation = passwordService.ValidatePassword(request.Password);
 
         if (!passwordValidation.IsValid)
         {
-            return BadRequest(new ErrorResponse(passwordValidation.ErrorMessage!));
+            return BadRequest(new ErrorResponse(passwordValidation.ErrorMessage!, "validation_error"));
         }
 
         var normalizedEmail = NormalizeEmail(request.Email);
@@ -43,7 +43,7 @@ public sealed class AuthController(
 
         if (emailAlreadyInUse)
         {
-            return Conflict(new ErrorResponse("Email is already in use."));
+            return Conflict(new ErrorResponse("Email is already in use.", "duplicate_email"));
         }
 
         User user;
@@ -54,7 +54,7 @@ public sealed class AuthController(
         }
         catch (ArgumentException exception)
         {
-            return BadRequest(new ErrorResponse(exception.Message));
+            return BadRequest(new ErrorResponse(exception.Message, "validation_error"));
         }
 
         var passwordHash = passwordService.HashPassword(user, request.Password);
@@ -63,7 +63,7 @@ public sealed class AuthController(
         dbContext.Users.Add(user);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return Ok(await CreateAuthResponseAsync(user, cancellationToken));
+        return Ok(new SuccessResponse<AuthResponse>(await CreateAuthResponseAsync(user, cancellationToken)));
     }
 
     [AllowAnonymous]
@@ -75,7 +75,7 @@ public sealed class AuthController(
     {
         if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
         {
-            return BadRequest(new ErrorResponse("Email and password are required."));
+            return BadRequest(new ErrorResponse("Email and password are required.", "validation_error"));
         }
 
         var normalizedEmail = NormalizeEmail(request.Email);
@@ -84,10 +84,10 @@ public sealed class AuthController(
 
         if (user is null || !passwordService.VerifyPassword(user, request.Password))
         {
-            return Unauthorized(new ErrorResponse("Invalid email or password."));
+            return Unauthorized(new ErrorResponse("Invalid email or password.", "invalid_credentials"));
         }
 
-        return Ok(await CreateAuthResponseAsync(user, cancellationToken));
+        return Ok(new SuccessResponse<AuthResponse>(await CreateAuthResponseAsync(user, cancellationToken)));
     }
 
     [AllowAnonymous]
@@ -98,15 +98,15 @@ public sealed class AuthController(
     {
         if (string.IsNullOrWhiteSpace(request.Email))
         {
-            return BadRequest(new ErrorResponse("Email is required."));
+            return BadRequest(new ErrorResponse("Email is required.", "validation_error"));
         }
 
         await passwordResetService.RequestPasswordResetAsync(request.Email, cancellationToken);
 
-        return Ok(new
+        return Ok(new SuccessResponse<object>(new
         {
             message = "If the email exists, a password reset token has been generated."
-        });
+        }));
     }
 
     [AllowAnonymous]
@@ -117,7 +117,7 @@ public sealed class AuthController(
     {
         if (string.IsNullOrWhiteSpace(request.Token) || string.IsNullOrWhiteSpace(request.Password))
         {
-            return BadRequest(new ErrorResponse("Token and password are required."));
+            return BadRequest(new ErrorResponse("Token and password are required.", "validation_error"));
         }
 
         var result = await passwordResetService.ResetPasswordAsync(
@@ -129,16 +129,16 @@ public sealed class AuthController(
         {
             if (result == PasswordResetResult.WeakPassword)
             {
-                return BadRequest(new ErrorResponse(PasswordService.PasswordPolicyErrorMessage));
+                return BadRequest(new ErrorResponse(PasswordService.PasswordPolicyErrorMessage, "validation_error"));
             }
 
-            return BadRequest(new ErrorResponse("Password reset token is invalid or expired."));
+            return BadRequest(new ErrorResponse("Password reset token is invalid or expired.", "invalid_reset_token"));
         }
 
-        return Ok(new
+        return Ok(new SuccessResponse<object>(new
         {
             message = "Password has been reset successfully."
-        });
+        }));
     }
 
     [AllowAnonymous]
@@ -149,24 +149,24 @@ public sealed class AuthController(
     {
         if (string.IsNullOrWhiteSpace(request.RefreshToken))
         {
-            return BadRequest(new ErrorResponse("Refresh token is required."));
+            return BadRequest(new ErrorResponse("Refresh token is required.", "validation_error"));
         }
 
         var result = await refreshTokenService.RefreshAsync(request.RefreshToken, cancellationToken);
 
         if (!result.IsSuccess || result.User is null || result.AccessToken is null || result.RefreshToken is null)
         {
-            return BadRequest(new ErrorResponse("Refresh token is invalid or expired."));
+            return BadRequest(new ErrorResponse("Refresh token is invalid or expired.", "invalid_refresh_token"));
         }
 
-        return Ok(new AuthResponse
+        return Ok(new SuccessResponse<AuthResponse>(new AuthResponse
         {
             AccessToken = result.AccessToken,
             RefreshToken = result.RefreshToken,
             UserId = result.User.Id,
             Name = result.User.Name,
             Email = result.User.Email
-        });
+        }));
     }
 
     [AllowAnonymous]
@@ -177,15 +177,55 @@ public sealed class AuthController(
     {
         if (string.IsNullOrWhiteSpace(request.RefreshToken))
         {
-            return BadRequest(new ErrorResponse("Refresh token is required."));
+            return BadRequest(new ErrorResponse("Refresh token is required.", "validation_error"));
         }
 
         await refreshTokenService.RevokeAsync(request.RefreshToken, cancellationToken);
 
-        return Ok(new
+        return Ok(new SuccessResponse<object>(new
         {
             message = "Logged out successfully."
-        });
+        }));
+    }
+
+    [Authorize]
+    [HttpGet("sessions")]
+    public async Task<ActionResult<IReadOnlyList<SessionResponse>>> GetSessions(CancellationToken cancellationToken)
+    {
+        if (!AuthenticatedUser.TryGetUserId(User, out var userId))
+        {
+            return Unauthorized(new ErrorResponse("Invalid access token.", "unauthorized"));
+        }
+
+        var sessions = await refreshTokenService.ListActiveSessionsAsync(userId, cancellationToken);
+
+        return Ok(new SuccessResponse<IReadOnlyList<SessionResponse>>(sessions
+            .Select(SessionResponse.FromRefreshToken)
+            .ToList()));
+    }
+
+    [Authorize]
+    [HttpDelete("sessions/{sessionId:guid}")]
+    public async Task<ActionResult> RevokeSession(
+        Guid sessionId,
+        CancellationToken cancellationToken)
+    {
+        if (!AuthenticatedUser.TryGetUserId(User, out var userId))
+        {
+            return Unauthorized(new ErrorResponse("Invalid access token.", "unauthorized"));
+        }
+
+        var revoked = await refreshTokenService.RevokeSessionAsync(userId, sessionId, cancellationToken);
+
+        if (!revoked)
+        {
+            return NotFound(new ErrorResponse("Session not found.", "session_not_found"));
+        }
+
+        return Ok(new SuccessResponse<object>(new
+        {
+            message = "Session revoked successfully."
+        }));
     }
 
     [Authorize]
@@ -198,24 +238,26 @@ public sealed class AuthController(
             string.IsNullOrWhiteSpace(request.NewPassword) ||
             string.IsNullOrWhiteSpace(request.ConfirmNewPassword))
         {
-            return BadRequest(new ErrorResponse("Current password, new password and confirmation are required."));
+            return BadRequest(new ErrorResponse(
+                "Current password, new password and confirmation are required.",
+                "validation_error"));
         }
 
         if (!string.Equals(request.NewPassword, request.ConfirmNewPassword, StringComparison.Ordinal))
         {
-            return BadRequest(new ErrorResponse("New password and confirmation must match."));
+            return BadRequest(new ErrorResponse("New password and confirmation must match.", "validation_error"));
         }
 
         var passwordValidation = passwordService.ValidatePassword(request.NewPassword);
 
         if (!passwordValidation.IsValid)
         {
-            return BadRequest(new ErrorResponse(passwordValidation.ErrorMessage!));
+            return BadRequest(new ErrorResponse(passwordValidation.ErrorMessage!, "validation_error"));
         }
 
         if (!AuthenticatedUser.TryGetUserId(User, out var userId))
         {
-            return Unauthorized(new ErrorResponse("Invalid access token."));
+            return Unauthorized(new ErrorResponse("Invalid access token.", "unauthorized"));
         }
 
         var user = await dbContext.Users
@@ -223,26 +265,28 @@ public sealed class AuthController(
 
         if (user is null)
         {
-            return Unauthorized(new ErrorResponse("Invalid access token."));
+            return Unauthorized(new ErrorResponse("Invalid access token.", "unauthorized"));
         }
 
         if (!passwordService.VerifyPassword(user, request.CurrentPassword))
         {
-            return BadRequest(new ErrorResponse("Current password is invalid."));
+            return BadRequest(new ErrorResponse("Current password is invalid.", "invalid_current_password"));
         }
 
         if (passwordService.VerifyPassword(user, request.NewPassword))
         {
-            return BadRequest(new ErrorResponse("New password must be different from the current password."));
+            return BadRequest(new ErrorResponse(
+                "New password must be different from the current password.",
+                "validation_error"));
         }
 
         user.ChangePasswordHash(passwordService.HashPassword(user, request.NewPassword));
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return Ok(new
+        return Ok(new SuccessResponse<object>(new
         {
             message = "Password changed successfully."
-        });
+        }));
     }
 
     private async Task<AuthResponse> CreateAuthResponseAsync(User user, CancellationToken cancellationToken)

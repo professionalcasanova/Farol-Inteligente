@@ -66,21 +66,12 @@ public sealed class InsightsController(
             return validationResult;
         }
 
-        try
-        {
-            var response = await financialIntelligenceService.GetMonthHealthAsync(
-                userId,
-                periodStart,
-                cancellationToken);
+        var response = await financialIntelligenceService.GetMonthHealthAsync(
+            userId,
+            periodStart,
+            cancellationToken);
 
-            return Ok(response);
-        }
-        catch (FinancialIntelligenceUnavailableException)
-        {
-            return StatusCode(
-                StatusCodes.Status503ServiceUnavailable,
-                new ErrorResponse("A inteligência financeira está indisponível no momento."));
-        }
+        return Ok(response);
     }
 
     private ActionResult? TryGetUserIdAndPeriodStart(

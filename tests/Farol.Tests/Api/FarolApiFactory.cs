@@ -25,6 +25,10 @@ public sealed class FarolApiFactory : WebApplicationFactory<Program>
 
         builder.ConfigureServices(services =>
         {
+            services
+                .AddControllers()
+                .AddApplicationPart(typeof(FarolApiFactory).Assembly);
+
             services.RemoveAll<DbContextOptions<FarolDbContext>>();
             services.RemoveAll<DbContextOptions>();
             services.RemoveAll<FarolDbContext>();
