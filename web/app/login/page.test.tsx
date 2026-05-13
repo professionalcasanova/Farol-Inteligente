@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import LoginPage from "@/app/login/page";
 import {
   readStoredSession,
+  clearStoredSession,
   writeAuthNotice,
   writeStoredSession,
   type StoredSession,
@@ -40,6 +41,7 @@ describe("LoginPage", () => {
   beforeEach(() => {
     replace.mockReset();
     mockedLogin.mockReset();
+    clearStoredSession();
     window.localStorage.clear();
     window.sessionStorage.clear();
   });

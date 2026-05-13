@@ -1,5 +1,7 @@
 ﻿import type { StoredSession } from "@/lib/auth";
 
+import { clearStoredSession, writeStoredSession } from "@/lib/auth";
+
 export type TransactionType = 1 | 2;
 export type CategoryType = 1 | 2;
 export type FinancialAccountType = 1 | 2 | 3 | 4;
@@ -318,6 +320,7 @@ type RequestOptions = {
   method?: string;
   token?: string;
   body?: BodyInit | object;
+  skipRefresh?: boolean;
 };
 
 async function apiRequest<T>(path: string, options: RequestOptions = {}) {
@@ -343,9 +346,24 @@ async function apiRequest<T>(path: string, options: RequestOptions = {}) {
       headers,
       body,
       cache: "no-store",
+      credentials: "include",
     });
   } catch {
     throw new ApiError("Nao foi possivel conectar com a API do Farol.", 0);
+  }
+
+  if (response.status === 401 && options.token && !options.skipRefresh) {
+    try {
+      const refreshedSession = await refreshSession();
+      writeStoredSession(refreshedSession);
+      return apiRequest<T>(path, {
+        ...options,
+        token: refreshedSession.accessToken,
+        skipRefresh: true,
+      });
+    } catch {
+      clearStoredSession();
+    }
   }
 
   if (!response.ok) {
@@ -354,10 +372,12 @@ async function apiRequest<T>(path: string, options: RequestOptions = {}) {
 
     if (contentType.includes("application/json")) {
       const payload = (await response.json().catch(() => null)) as
-        | { message?: string }
+        | { message?: string; error?: { message?: string } }
         | null;
 
-      if (payload?.message) {
+      if (payload?.error?.message) {
+        message = payload.error.message;
+      } else if (payload?.message) {
         message = payload.message;
       }
     } else {
@@ -375,7 +395,18 @@ async function apiRequest<T>(path: string, options: RequestOptions = {}) {
     return undefined as T;
   }
 
-  return (await response.json()) as T;
+  const payload = (await response.json()) as T | { data?: T };
+
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "data" in payload &&
+    Object.keys(payload).length === 1
+  ) {
+    return (payload as { data: T }).data;
+  }
+
+  return payload as T;
 }
 
 export async function login(email: string, password: string) {
@@ -396,6 +427,20 @@ export async function register(name: string, email: string, password: string) {
       email,
       password,
     },
+  });
+}
+
+export async function refreshSession() {
+  return apiRequest<AuthResponse>("/api/auth/refresh", {
+    method: "POST",
+    skipRefresh: true,
+  });
+}
+
+export async function logoutSession() {
+  return apiRequest<void>("/api/auth/logout", {
+    method: "POST",
+    skipRefresh: true,
   });
 }
 

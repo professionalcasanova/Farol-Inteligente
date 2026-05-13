@@ -3,11 +3,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  addSessionChangeListener,
   clearStoredSession,
   readStoredSession,
   writeAuthNotice,
+  writeStoredSession,
   type StoredSession,
 } from "@/lib/auth";
+import { logoutSession, refreshSession } from "@/lib/api";
 
 type SessionRouter = {
   replace: (href: string) => void;
@@ -27,10 +30,29 @@ export function resolveProtectedSession(router: SessionRouter) {
   return storedSession;
 }
 
+export async function resolveProtectedSessionAsync(router: SessionRouter) {
+  const storedSession = readStoredSession();
+
+  if (storedSession) {
+    return storedSession;
+  }
+
+  try {
+    const refreshedSession = await refreshSession();
+    writeStoredSession(refreshedSession);
+    return refreshedSession;
+  } catch {
+    clearStoredSession();
+    router.replace("/login");
+    return null;
+  }
+}
+
 export function logoutProtectedSession(
   router: SessionRouter,
   reason: LogoutReason = "manual",
 ) {
+  void logoutSession().catch(() => {});
   clearStoredSession();
 
   if (reason === "session-expired") {
@@ -47,11 +69,15 @@ export function useProtectedSession() {
 
   useEffect(() => {
     function syncSessionFromStorage() {
-      const storedSession = resolveProtectedSession(router);
+      setSession(readStoredSession());
+    }
 
-      if (!storedSession) {
-        setSession(null);
-        setIsLoading(false);
+    let isMounted = true;
+
+    async function resolveSession() {
+      const storedSession = await resolveProtectedSessionAsync(router);
+
+      if (!isMounted) {
         return;
       }
 
@@ -59,11 +85,12 @@ export function useProtectedSession() {
       setIsLoading(false);
     }
 
-    syncSessionFromStorage();
-    window.addEventListener("storage", syncSessionFromStorage);
+    void resolveSession();
+    const removeSessionChangeListener = addSessionChangeListener(syncSessionFromStorage);
 
     return () => {
-      window.removeEventListener("storage", syncSessionFromStorage);
+      isMounted = false;
+      removeSessionChangeListener();
     };
   }, [router]);
 

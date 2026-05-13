@@ -7,8 +7,10 @@ export type StoredSession = {
 
 export type AuthNotice = "session-expired";
 
-const SESSION_STORAGE_KEY = "farol.session";
 const AUTH_NOTICE_STORAGE_KEY = "farol.auth.notice";
+const SESSION_CHANGED_EVENT = "farol.session.changed";
+
+let currentSession: StoredSession | null = null;
 
 function isStoredSession(value: unknown): value is StoredSession {
   if (!value || typeof value !== "object") {
@@ -25,54 +27,49 @@ function isStoredSession(value: unknown): value is StoredSession {
   );
 }
 
-export function readStoredSession(): StoredSession | null {
+function notifySessionChanged() {
   if (typeof window === "undefined") {
-    return null;
+    return;
   }
 
-  const rawValue = window.localStorage.getItem(SESSION_STORAGE_KEY);
+  window.dispatchEvent(new Event(SESSION_CHANGED_EVENT));
+}
 
-  if (!rawValue) {
-    return null;
+export function addSessionChangeListener(listener: () => void) {
+  if (typeof window === "undefined") {
+    return () => {};
   }
 
-  try {
-    const parsedValue = JSON.parse(rawValue) as unknown;
+  window.addEventListener(SESSION_CHANGED_EVENT, listener);
 
-    if (!isStoredSession(parsedValue)) {
-      window.localStorage.removeItem(SESSION_STORAGE_KEY);
-      return null;
-    }
+  return () => {
+    window.removeEventListener(SESSION_CHANGED_EVENT, listener);
+  };
+}
 
-    return parsedValue;
-  } catch {
-    window.localStorage.removeItem(SESSION_STORAGE_KEY);
-    return null;
-  }
+export function readStoredSession(): StoredSession | null {
+  return currentSession;
 }
 
 export function writeStoredSession(session: StoredSession) {
-  if (typeof window === "undefined") {
+  if (!isStoredSession(session)) {
+    currentSession = null;
+    notifySessionChanged();
     return;
   }
 
-  window.localStorage.setItem(
-    SESSION_STORAGE_KEY,
-    JSON.stringify({
-      accessToken: session.accessToken,
-      userId: session.userId,
-      name: session.name,
-      email: session.email,
-    } satisfies StoredSession),
-  );
+  currentSession = {
+    accessToken: session.accessToken,
+    userId: session.userId,
+    name: session.name,
+    email: session.email,
+  };
+  notifySessionChanged();
 }
 
 export function clearStoredSession() {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  window.localStorage.removeItem(SESSION_STORAGE_KEY);
+  currentSession = null;
+  notifySessionChanged();
 }
 
 export function writeAuthNotice(notice: AuthNotice) {

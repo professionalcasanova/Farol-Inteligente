@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import RegisterPage from "@/app/register/page";
-import { readStoredSession, type StoredSession } from "@/lib/auth";
+import { clearStoredSession, readStoredSession, type StoredSession } from "@/lib/auth";
 import { ApiError, register } from "@/lib/api";
 
 const replace = vi.fn();
@@ -35,6 +35,7 @@ describe("RegisterPage", () => {
   beforeEach(() => {
     replace.mockReset();
     mockedRegister.mockReset();
+    clearStoredSession();
     window.localStorage.clear();
     window.sessionStorage.clear();
   });

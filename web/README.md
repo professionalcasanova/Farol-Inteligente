@@ -145,8 +145,8 @@ npm run test:watch
 
 ## Pontos de atencao
 
-- a autenticacao usa `localStorage` como decisao temporaria de MVP
-- nao existe refresh token neste estagio
+- a autenticacao mantem o access token apenas em memoria no frontend
+- o refresh token e enviado pela API em cookie `HttpOnly`, `Secure` e `SameSite=Lax`
 - o backend local aceita hoje `http://localhost:3000` e `http://localhost:3001` no CORS
 - nao existe modo de mocks em runtime para navegacao manual; os mocks atuais existem apenas nos testes
 - se a API nao estiver acessivel, o frontend sobe, mas chamadas de dados falham

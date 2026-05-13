@@ -40,19 +40,21 @@ Voce precisa ter:
 Isso vai preparar:
 
 - `farol-postgres`
-- `farol-intelligence`
+- `farol-intelligence` como servico privado
 - `farol-api`
 
 ### Ajustes manuais no Render apos criar o Blueprint
 
-Abra o servico `farol-intelligence` e copie a URL publica gerada pelo Render.
+Abra o servico privado `farol-intelligence` e copie a URL interna gerada pelo Render.
 
 Depois abra o servico `farol-api` e configure:
 
 - `FinancialIntelligence__BaseUrl`
-  Exemplo: `https://farol-intelligence.onrender.com`
+  Exemplo: URL interna do `farol-intelligence`, sem exposicao publica
 - `Cors__AllowedOrigins__0`
   Exemplo: `https://seu-projeto-web.vercel.app`
+- `FAROL_INTERNAL_API_KEY`
+  Mesmo valor configurado no `farol-intelligence`
 
 Os outros envs principais ja ficam previstos no `render.yaml`:
 
@@ -61,15 +63,19 @@ Os outros envs principais ja ficam previstos no `render.yaml`:
 - `Jwt__Audience`
 - `Jwt__SigningKey`
 - `Database__MigrateOnStartup`
+- `FAROL_ENVIRONMENT=Production` no `farol-intelligence`
+
+`Jwt__SigningKey` deve ser um segredo forte de producao. A API bloqueia startup em
+producao se a chave estiver vazia, curta ou contiver termos como `default`, `local`,
+`development` ou `change-in-production`.
 
 ### Validar o backend
 
 Teste estas URLs no navegador:
 
 - `https://sua-api.onrender.com/health`
-- `https://seu-intelligence.onrender.com/health`
 
-Os dois devem responder JSON com `status = ok`.
+A API deve responder JSON com `status = ok`. O `farol-intelligence` nao deve ter URL publica; o `/health` dele exige `X-Internal-API-Key` e deve ser validado pela rede interna.
 
 ## Passo 2. Subir o frontend no Vercel
 
@@ -122,9 +128,9 @@ Valide em producao:
 ## Observacoes importantes
 
 - este deploy e para beta fechado, nao para producao ampla
-- o login web ainda usa `localStorage`, entao a autenticacao nao e arquitetura final
+- o access token do frontend fica apenas em memoria; o refresh token e enviado por cookie `HttpOnly`
 - o Render free pode hibernar servicos sem trafego
-- se a API estiver no ar e os insights falharem, confira `FinancialIntelligence__BaseUrl`
+- se a API estiver no ar e os insights falharem, confira `FinancialIntelligence__BaseUrl` e `FAROL_INTERNAL_API_KEY`
 
 ## Quando usar Railway em vez de Render
 

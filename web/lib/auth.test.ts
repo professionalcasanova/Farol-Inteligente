@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
   consumeAuthNotice,
   clearStoredSession,
@@ -16,25 +16,22 @@ const session: StoredSession = {
 };
 
 describe("auth storage", () => {
-  it("ReadStoredSession_InvalidShape_ReturnsNull", () => {
-    window.localStorage.setItem(
-      "farol.session",
-      JSON.stringify({
-        accessToken: "token",
-        email: "maria@email.com",
-      }),
-    );
-
-    const storedSession = readStoredSession();
-
-    expect(storedSession).toBeNull();
-    expect(window.localStorage.getItem("farol.session")).toBeNull();
+  beforeEach(() => {
+    clearStoredSession();
+    window.sessionStorage.clear();
   });
 
-  it("WriteStoredSession_ValidSession_PersistsSession", () => {
+  it("ReadStoredSession_WithoutMemorySession_ReturnsNull", () => {
+    clearStoredSession();
+
+    expect(readStoredSession()).toBeNull();
+  });
+
+  it("WriteStoredSession_ValidSession_KeepsSessionInMemoryOnly", () => {
     writeStoredSession(session);
 
     expect(readStoredSession()).toEqual(session);
+    expect(window.localStorage.getItem("farol.session")).toBeNull();
   });
 
   it("ClearStoredSession_WithPersistedSession_RemovesSession", () => {

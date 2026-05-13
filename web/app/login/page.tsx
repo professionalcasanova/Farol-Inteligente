@@ -104,8 +104,8 @@ export default function LoginPage() {
               Acesse seu painel
             </h2>
             <p className="mt-3 text-sm leading-6 text-[var(--color-muted)]">
-              Use o mesmo login do backend do Farol. O token fica salvo
-              localmente apenas para este MVP.
+              Use o mesmo login do backend do Farol. Sua sessao usa cookie
+              seguro para renovacao.
             </p>
           </div>
 

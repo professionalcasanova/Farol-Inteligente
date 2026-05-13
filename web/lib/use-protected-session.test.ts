@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   consumeAuthNotice,
+  clearStoredSession,
   readStoredSession,
   writeStoredSession,
   type StoredSession,
@@ -19,6 +20,7 @@ const session: StoredSession = {
 
 describe("protected session helpers", () => {
   beforeEach(() => {
+    clearStoredSession();
     window.localStorage.clear();
     window.sessionStorage.clear();
   });

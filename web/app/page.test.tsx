@@ -1,7 +1,8 @@
 import { render, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import HomePage from "@/app/page";
-import { writeStoredSession, type StoredSession } from "@/lib/auth";
+import { clearStoredSession, writeStoredSession, type StoredSession } from "@/lib/auth";
+import { refreshSession } from "@/lib/api";
 
 const replace = vi.fn();
 
@@ -10,6 +11,12 @@ vi.mock("next/navigation", () => ({
     replace,
   }),
 }));
+
+vi.mock("@/lib/api", () => ({
+  refreshSession: vi.fn(),
+}));
+
+const mockedRefreshSession = vi.mocked(refreshSession);
 
 const session: StoredSession = {
   accessToken: "token",
@@ -21,6 +28,9 @@ const session: StoredSession = {
 describe("HomePage", () => {
   beforeEach(() => {
     replace.mockReset();
+    mockedRefreshSession.mockReset();
+    mockedRefreshSession.mockRejectedValue(new Error("missing refresh cookie"));
+    clearStoredSession();
     window.localStorage.clear();
   });
 
