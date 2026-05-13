@@ -42,10 +42,10 @@ public sealed class PasswordResetService(
         dbContext.PasswordResetTokens.Add(resetToken);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        logger.LogInformation(
-            "Password reset requested for user {UserId}. Token: {Token}",
+        AuthenticationSecurityLogger.LogPasswordResetRequested(
+            logger,
             user.Id,
-            resetToken.Token);
+            timeProvider.GetUtcNow());
     }
 
     public async Task<PasswordResetResult> ResetPasswordAsync(
@@ -95,6 +95,11 @@ public sealed class PasswordResetService(
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        AuthenticationSecurityLogger.LogPasswordResetCompleted(
+            logger,
+            user.Id,
+            timeProvider.GetUtcNow());
 
         return PasswordResetResult.Success;
     }

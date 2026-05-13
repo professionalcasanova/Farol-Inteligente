@@ -24,7 +24,7 @@
   - 5 tentativas por minuto por IP
   - retorna `429` ao exceder
 - Autenticacao backend -> Python
-  - backend envia `X-Farol-Internal-Key`
+  - backend envia `X-Internal-API-Key`
   - servico Python valida `FAROL_INTERNAL_API_KEY`
 - Fallback C# para inteligencia financeira
   - `GET /api/insights/month-health` usa fallback local seguro se o Python falhar, expirar, retornar status nao-2xx ou payload invalido
@@ -107,14 +107,14 @@
 1. `GET /api/insights/month-health`
 2. backend monta snapshot financeiro local
 3. backend chama `POST /analyze/v1` no servico Python
-4. header obrigatorio: `X-Farol-Internal-Key`
+4. header obrigatorio: `X-Internal-API-Key`
 5. se o Python falhar, expirar, rejeitar ou retornar payload invalido, a API responde com fallback local seguro
 
 ## Integracao API C# -> Python
 
 - chamada atual: `GET /api/insights/month-health` no backend usa `POST /analyze/v1` no servico Python
-- endpoint Python de saude: `GET /health`, publico
-- endpoint Python interno: `POST /analyze/v1`, exige `X-Farol-Internal-Key`
+- endpoint Python de saude: `GET /health`, exige `X-Internal-API-Key`
+- endpoint Python interno: `POST /analyze/v1`, exige `X-Internal-API-Key`
 - chave compartilhada: `FAROL_INTERNAL_API_KEY`
 - request enviado: `contractVersion`, `reference`, `totals`, `bills`, `categories`
 - response esperado: `contractVersion`, `status`, `score`, `summary`, `insights`, `recommendedActions`
@@ -155,6 +155,7 @@
 - URL base local da API: `http://localhost:5258`
 - servico Python local esperado: `http://127.0.0.1:8000`
 - variavel obrigatoria para integracao interna:
+  - `FAROL_ENVIRONMENT`
   - `FAROL_INTERNAL_API_KEY`
 
 ## Validacao final
@@ -172,7 +173,7 @@
 ## Retomada rapida
 
 1. subir PostgreSQL local ou Docker Desktop
-2. configurar `FAROL_INTERNAL_API_KEY` no backend e no servico Python
+2. configurar `FAROL_ENVIRONMENT` e `FAROL_INTERNAL_API_KEY` no servico Python; configurar `FAROL_INTERNAL_API_KEY` tambem no backend
 3. subir o servico Python em `127.0.0.1:8000`
 4. subir a API ASP.NET Core em `http://localhost:5258`
 5. validar `GET /health`

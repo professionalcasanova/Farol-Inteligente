@@ -14,6 +14,9 @@ internal sealed record CsvImportParseResult(
 
 public sealed class CsvImportFileReader
 {
+    private const int MaxCsvLines = 5000;
+    private const int MaxCsvLineCharacters = 10000;
+
     internal async Task<IReadOnlyList<string>> ReadLinesAsync(
         IFormFile file,
         CancellationToken cancellationToken)
@@ -24,9 +27,23 @@ public sealed class CsvImportFileReader
             detectEncodingFromByteOrderMarks: true);
 
         var lines = new List<string>();
+        var lineNumber = 0;
 
         while (await reader.ReadLineAsync(cancellationToken) is { } line)
         {
+            lineNumber++;
+
+            if (lineNumber > MaxCsvLines)
+            {
+                throw new InvalidOperationException("O CSV excede o limite maximo de 5000 linhas.");
+            }
+
+            if (line.Length > MaxCsvLineCharacters)
+            {
+                throw new InvalidOperationException(
+                    $"A linha {lineNumber} do CSV excede o tamanho maximo permitido.");
+            }
+
             lines.Add(line);
         }
 

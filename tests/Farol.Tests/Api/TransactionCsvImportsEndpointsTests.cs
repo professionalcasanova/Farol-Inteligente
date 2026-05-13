@@ -149,6 +149,101 @@ public sealed class TransactionCsvImportsEndpointsTests : IClassFixture<FarolApi
     }
 
     [Fact]
+    public async Task PostCsv_FileTooLarge_ReturnsBadRequest()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var seed = await SeedAccountAndCategoriesAsync("maria@email.com");
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var content = CreateMultipartContent(
+            seed.AccountId,
+            new string('a', (2 * 1024 * 1024) + 1));
+
+        var response = await client.PostAsync("/api/imports/transactions/csv", content);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+
+        Assert.NotNull(error);
+        Assert.Equal("O arquivo CSV excede o tamanho maximo permitido de 2 MB.", error.Message);
+    }
+
+    [Fact]
+    public async Task PostCsv_InvalidFileName_ReturnsBadRequest()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var seed = await SeedAccountAndCategoriesAsync("maria@email.com");
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var content = CreateMultipartContent(
+            seed.AccountId,
+            "occurredOn,description,amount,type",
+            fileName: "transactions.txt");
+
+        var response = await client.PostAsync("/api/imports/transactions/csv", content);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+
+        Assert.NotNull(error);
+        Assert.Equal("Envie um arquivo CSV valido.", error.Message);
+    }
+
+    [Fact]
+    public async Task PostCsv_TooManyLines_ReturnsBadRequest()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var seed = await SeedAccountAndCategoriesAsync("maria@email.com");
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var content = CreateMultipartContent(seed.AccountId, BuildCsvWithRows(5001));
+
+        var response = await client.PostAsync("/api/imports/transactions/csv", content);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+
+        Assert.NotNull(error);
+        Assert.Equal("O CSV excede o limite maximo de 5000 linhas.", error.Message);
+    }
+
+    [Fact]
+    public async Task PostCsv_LineTooLong_ReturnsBadRequest()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+        var accessToken = await RegisterAndGetTokenAsync(client, "maria@email.com");
+        var seed = await SeedAccountAndCategoriesAsync("maria@email.com");
+        var longDescription = new string('a', 10_001);
+        var csv = $"Data,Descricao,Valor,Tipo{Environment.NewLine}2026-03-10,{longDescription},10,expense";
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var content = CreateMultipartContent(seed.AccountId, csv);
+
+        var response = await client.PostAsync("/api/imports/transactions/csv", content);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+
+        Assert.NotNull(error);
+        Assert.Equal("A linha 2 do CSV excede o tamanho maximo permitido.", error.Message);
+    }
+
+    [Fact]
     public async Task PostCsv_HeaderOnly_ReturnsSuccessWithEmptySummary()
     {
         await _factory.ResetDatabaseAsync();
@@ -562,16 +657,33 @@ public sealed class TransactionCsvImportsEndpointsTests : IClassFixture<FarolApi
         return (account.Id, categoryIds);
     }
 
-    private static MultipartFormDataContent CreateMultipartContent(Guid accountId, string csv)
+    private static MultipartFormDataContent CreateMultipartContent(
+        Guid accountId,
+        string csv,
+        string fileName = "transactions.csv",
+        string contentType = "text/csv")
     {
         var content = new MultipartFormDataContent();
         var fileContent = new ByteArrayContent(Encoding.UTF8.GetBytes(csv));
-        fileContent.Headers.ContentType = new MediaTypeHeaderValue("text/csv");
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue(contentType);
 
         content.Add(new StringContent(accountId.ToString()), "FinancialAccountId");
-        content.Add(fileContent, "File", "transactions.csv");
+        content.Add(fileContent, "File", fileName);
 
         return content;
+    }
+
+    private static string BuildCsvWithRows(int rowCount)
+    {
+        var builder = new StringBuilder("Data,Descricao,Valor,Tipo");
+
+        for (var row = 0; row < rowCount; row++)
+        {
+            builder.AppendLine();
+            builder.Append("2026-03-10,Compra teste,10,expense");
+        }
+
+        return builder.ToString();
     }
 
     private static async Task<string> RegisterAndGetTokenAsync(HttpClient client, string email)

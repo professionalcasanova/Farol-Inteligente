@@ -102,9 +102,10 @@ Nao existe um `.env` obrigatorio para o fluxo local padrao. A configuracao base 
 Pontos principais:
 
 - `ConnectionStrings:DefaultConnection`
-- `Jwt:*`
+- `Jwt:*` (`Jwt:SigningKey` nao pode ser vazio, fraco ou conter termos de segredo local/default em producao)
 - `Cors:AllowedOrigins`
 - `FinancialIntelligence:*`
+- `FAROL_INTERNAL_API_KEY`
 - `Database:MigrateOnStartup`
 
 Valores locais atuais:
@@ -115,8 +116,24 @@ Valores locais atuais:
 
 ### Servico Python
 
-Hoje o servico usa apenas configuracao empacotada no projeto para o fluxo local basico.
-Nao ha variavel de ambiente obrigatoria documentada para subir o servico localmente.
+Variaveis obrigatorias:
+
+- `FAROL_ENVIRONMENT`: `Production` em deploy; `Development` apenas localmente.
+- `FAROL_INTERNAL_API_KEY`: chave compartilhada com a API .NET.
+
+Todas as chamadas ao servico Python exigem o header `X-Internal-API-Key`.
+
+### Importacao CSV
+
+Limites de seguranca atuais:
+
+- upload maximo: 2 MB
+- extensao obrigatoria: `.csv`
+- MIME types aceitos: `text/csv`, `application/csv`, `application/vnd.ms-excel`, `application/octet-stream` ou vazio
+- maximo de linhas: 5000
+- maximo por linha: 10000 caracteres
+
+Erros de limite retornam resposta controlada com mensagem amigavel.
 
 ## Como rodar o frontend isoladamente
 
@@ -219,6 +236,8 @@ No diretorio `services/farol_intelligence`:
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 python -m pip install -e .
+$env:FAROL_ENVIRONMENT='Development'
+$env:FAROL_INTERNAL_API_KEY='dev-internal-key'
 python -m uvicorn app.main:app --reload --port 8000
 ```
 
@@ -275,7 +294,7 @@ python -m unittest discover tests
 
 ## Observacoes importantes
 
-- o frontend usa `localStorage` apenas como decisao temporaria de MVP
-- nao existe refresh token neste estagio
+- o frontend mantem access token apenas em memoria
+- o refresh token e enviado por cookie `HttpOnly`
 - o backend local aceita `http://localhost:3000` e `http://localhost:3001` no CORS atual
 - o servico Python e consumido pelo backend, nao diretamente pelo navegador

@@ -13,8 +13,20 @@ public sealed class ImportsController(
     FarolDbContext dbContext,
     TransactionCsvImportProcessor importProcessor) : ControllerBase
 {
+    private const long MaxCsvFileBytes = 2 * 1024 * 1024;
+    private const long MaxCsvRequestBytes = MaxCsvFileBytes + (128 * 1024);
+
+    private static readonly HashSet<string> AllowedCsvContentTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "text/csv",
+        "application/csv",
+        "application/vnd.ms-excel",
+        "application/octet-stream"
+    };
+
     [HttpPost("csv")]
     [Consumes("multipart/form-data")]
+    [RequestSizeLimit(MaxCsvRequestBytes)]
     public async Task<ActionResult<ImportTransactionsCsvResponse>> ImportCsv(
         [FromForm] ImportTransactionsCsvRequest request,
         CancellationToken cancellationToken)
@@ -32,6 +44,16 @@ public sealed class ImportsController(
         if (request.File.Length == 0)
         {
             return BadRequest(new ErrorResponse("O arquivo CSV esta vazio."));
+        }
+
+        if (request.File.Length > MaxCsvFileBytes)
+        {
+            return BadRequest(new ErrorResponse("O arquivo CSV excede o tamanho maximo permitido de 2 MB."));
+        }
+
+        if (!IsCsvFile(request.File))
+        {
+            return BadRequest(new ErrorResponse("Envie um arquivo CSV valido."));
         }
 
         var financialAccount = await dbContext.FinancialAccounts
@@ -56,5 +78,21 @@ public sealed class ImportsController(
         {
             return BadRequest(new ErrorResponse(exception.Message));
         }
+    }
+
+    private static bool IsCsvFile(IFormFile file)
+    {
+        var hasCsvExtension = string.Equals(
+            Path.GetExtension(file.FileName),
+            ".csv",
+            StringComparison.OrdinalIgnoreCase);
+
+        if (!hasCsvExtension)
+        {
+            return false;
+        }
+
+        return string.IsNullOrWhiteSpace(file.ContentType) ||
+               AllowedCsvContentTypes.Contains(file.ContentType);
     }
 }

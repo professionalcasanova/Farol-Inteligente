@@ -4,13 +4,17 @@ databases:
     user: farol
 
 services:
-  - type: web
+  - type: pserv
     name: farol-intelligence
     runtime: docker
     dockerContext: .
     dockerfilePath: ./services/farol_intelligence/Dockerfile
     autoDeploy: true
-    healthCheckPath: /health
+    envVars:
+      - key: FAROL_ENVIRONMENT
+        value: Production
+      - key: FAROL_INTERNAL_API_KEY
+        sync: false
 
   - type: web
     name: farol-api
@@ -35,6 +39,8 @@ services:
           name: farol-postgres
           property: connectionString
       - key: FinancialIntelligence__BaseUrl
+        sync: false
+      - key: FAROL_INTERNAL_API_KEY
         sync: false
       - key: Cors__AllowedOrigins__0
         sync: false

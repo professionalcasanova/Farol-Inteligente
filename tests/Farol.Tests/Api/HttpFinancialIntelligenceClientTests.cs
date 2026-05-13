@@ -28,7 +28,7 @@ public sealed class HttpFinancialIntelligenceClientTests
         await client.AnalyzeAsync(CreateRequest(), CancellationToken.None);
 
         Assert.NotNull(capturedRequest);
-        Assert.True(capturedRequest.Headers.TryGetValues("X-Farol-Internal-Key", out var values));
+        Assert.True(capturedRequest.Headers.TryGetValues("X-Internal-API-Key", out var values));
         Assert.Equal("test-internal-key", Assert.Single(values));
     }
 

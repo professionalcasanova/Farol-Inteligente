@@ -8,6 +8,7 @@ using Farol.Infrastructure.Auth;
 using Farol.Infrastructure.Persistence;
 using Farol.Infrastructure.Seeding;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
@@ -57,6 +58,26 @@ builder.Services.AddRateLimiter(options =>
                 AutoReplenishment = true
             });
     });
+
+    options.AddPolicy("auth-sensitive", httpContext =>
+    {
+        var forwardedFor = httpContext.Request.Headers["X-Forwarded-For"].ToString();
+        var partitionKey = string.IsNullOrWhiteSpace(forwardedFor)
+            ? httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown"
+            : forwardedFor.Split(',')[0].Trim();
+        var environment = httpContext.RequestServices.GetRequiredService<IWebHostEnvironment>();
+        var permitLimit = environment.IsEnvironment("Testing") ? 1000 : 20;
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey,
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = permitLimit,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            });
+    });
 });
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options =>
@@ -71,7 +92,8 @@ builder.Services.AddCors(options =>
         policy
             .WithOrigins(allowedOrigins)
             .AllowAnyHeader()
-            .AllowAnyMethod();
+            .AllowAnyMethod()
+            .AllowCredentials();
     });
 });
 builder.Services.AddSwaggerGen(options =>
@@ -99,6 +121,7 @@ builder.Services.AddSwaggerGen(options =>
 var jwtSection = builder.Configuration.GetSection("Jwt");
 var signingKey = jwtSection["SigningKey"]
     ?? throw new InvalidOperationException("Jwt:SigningKey configuration is required.");
+JwtSigningKeyValidator.EnsureSafeForEnvironment(signingKey, builder.Environment.EnvironmentName);
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection configuration is required.");
 var financialIntelligenceOptions = builder.Configuration

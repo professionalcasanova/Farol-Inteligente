@@ -17,7 +17,10 @@ public sealed class AuthController(
     PasswordResetService passwordResetService,
     RefreshTokenService refreshTokenService) : ControllerBase
 {
+    private const string RefreshTokenCookieName = "__Host-farol_refresh";
+
     [AllowAnonymous]
+    [EnableRateLimiting("auth-sensitive")]
     [HttpPost("register")]
     public async Task<ActionResult<AuthResponse>> Register(
         RegisterRequest request,
@@ -91,6 +94,7 @@ public sealed class AuthController(
     }
 
     [AllowAnonymous]
+    [EnableRateLimiting("auth-sensitive")]
     [HttpPost("forgot-password")]
     public async Task<ActionResult> ForgotPassword(
         ForgotPasswordRequest request,
@@ -110,6 +114,7 @@ public sealed class AuthController(
     }
 
     [AllowAnonymous]
+    [EnableRateLimiting("auth-sensitive")]
     [HttpPost("reset-password")]
     public async Task<ActionResult> ResetPassword(
         ResetPasswordRequest request,
@@ -142,27 +147,32 @@ public sealed class AuthController(
     }
 
     [AllowAnonymous]
+    [EnableRateLimiting("auth-sensitive")]
     [HttpPost("refresh")]
     public async Task<ActionResult<AuthResponse>> Refresh(
-        RefreshTokenRequest request,
+        RefreshTokenRequest? request,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(request.RefreshToken))
+        var refreshToken = ResolveRefreshToken(request?.RefreshToken);
+
+        if (string.IsNullOrWhiteSpace(refreshToken))
         {
             return BadRequest(new ErrorResponse("Refresh token is required.", "validation_error"));
         }
 
-        var result = await refreshTokenService.RefreshAsync(request.RefreshToken, cancellationToken);
+        var result = await refreshTokenService.RefreshAsync(refreshToken, cancellationToken);
 
         if (!result.IsSuccess || result.User is null || result.AccessToken is null || result.RefreshToken is null)
         {
+            ClearRefreshTokenCookie();
             return BadRequest(new ErrorResponse("Refresh token is invalid or expired.", "invalid_refresh_token"));
         }
+
+        SetRefreshTokenCookie(result.RefreshToken);
 
         return Ok(new SuccessResponse<AuthResponse>(new AuthResponse
         {
             AccessToken = result.AccessToken,
-            RefreshToken = result.RefreshToken,
             UserId = result.User.Id,
             Name = result.User.Name,
             Email = result.User.Email
@@ -170,17 +180,21 @@ public sealed class AuthController(
     }
 
     [AllowAnonymous]
+    [EnableRateLimiting("auth-sensitive")]
     [HttpPost("logout")]
     public async Task<ActionResult> Logout(
-        LogoutRequest request,
+        LogoutRequest? request,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(request.RefreshToken))
+        var refreshToken = ResolveRefreshToken(request?.RefreshToken);
+
+        if (string.IsNullOrWhiteSpace(refreshToken))
         {
             return BadRequest(new ErrorResponse("Refresh token is required.", "validation_error"));
         }
 
-        await refreshTokenService.RevokeAsync(request.RefreshToken, cancellationToken);
+        await refreshTokenService.RevokeAsync(refreshToken, cancellationToken);
+        ClearRefreshTokenCookie();
 
         return Ok(new SuccessResponse<object>(new
         {
@@ -292,11 +306,11 @@ public sealed class AuthController(
     private async Task<AuthResponse> CreateAuthResponseAsync(User user, CancellationToken cancellationToken)
     {
         var session = await refreshTokenService.CreateSessionAsync(user, cancellationToken);
+        SetRefreshTokenCookie(session.RefreshToken);
 
         return new AuthResponse
         {
             AccessToken = session.AccessToken,
-            RefreshToken = session.RefreshToken,
             UserId = user.Id,
             Name = user.Name,
             Email = user.Email
@@ -306,5 +320,44 @@ public sealed class AuthController(
     private static string NormalizeEmail(string email)
     {
         return email.Trim().ToLowerInvariant();
+    }
+
+    private string? ResolveRefreshToken(string? requestRefreshToken)
+    {
+        if (!string.IsNullOrWhiteSpace(requestRefreshToken))
+        {
+            return requestRefreshToken;
+        }
+
+        return Request.Cookies.TryGetValue(RefreshTokenCookieName, out var cookieRefreshToken)
+            ? cookieRefreshToken
+            : null;
+    }
+
+    private void SetRefreshTokenCookie(string refreshToken)
+    {
+        Response.Cookies.Append(
+            RefreshTokenCookieName,
+            refreshToken,
+            BuildRefreshCookieOptions(DateTimeOffset.UtcNow.AddDays(7)));
+    }
+
+    private void ClearRefreshTokenCookie()
+    {
+        Response.Cookies.Delete(
+            RefreshTokenCookieName,
+            BuildRefreshCookieOptions(DateTimeOffset.UnixEpoch));
+    }
+
+    private static CookieOptions BuildRefreshCookieOptions(DateTimeOffset expires)
+    {
+        return new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Lax,
+            Path = "/",
+            Expires = expires
+        };
     }
 }

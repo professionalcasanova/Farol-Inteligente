@@ -320,12 +320,13 @@ Variaveis/configuracao:
   - `Jwt:*`
   - `FinancialIntelligence:*`
 - variavel de ambiente:
+  - `FAROL_ENVIRONMENT`
   - `FAROL_INTERNAL_API_KEY`
 
 Subida local:
 
 1. garantir PostgreSQL em `localhost:5432`
-2. exportar `FAROL_INTERNAL_API_KEY`
+2. exportar `FAROL_ENVIRONMENT` e `FAROL_INTERNAL_API_KEY`
 3. subir o servico Python em `127.0.0.1:8000`
 4. rodar:
 
@@ -333,6 +334,7 @@ Subida local:
 $env:DOTNET_CLI_HOME='c:\Users\masuc\Desktop\PensarNoNome\.dotnet'
 $env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE='1'
 $env:ASPNETCORE_ENVIRONMENT='Development'
+$env:FAROL_ENVIRONMENT='Development'
 $env:FAROL_INTERNAL_API_KEY='dev-internal-key'
 dotnet run --project src/Farol.Api --launch-profile http
 ```

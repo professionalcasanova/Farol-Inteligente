@@ -5,6 +5,7 @@ using System.Text.Json;
 using Farol.Api.Modules.Auth;
 using Farol.Domain.Users;
 using Farol.Infrastructure.Persistence;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Farol.Tests.Api;
@@ -17,6 +18,7 @@ public sealed class AuthEndpointsTests : IClassFixture<FarolApiFactory>
     private const string PasswordPolicyMessage =
         "Password must be at least 8 characters long, contain at least 1 letter and 1 number, and cannot be only spaces.";
     private const string LoginRateLimitMessage = "Muitas tentativas. Tente novamente em alguns instantes.";
+    private const string RefreshTokenCookieName = "__Host-farol_refresh";
 
     private readonly FarolApiFactory _factory;
 
@@ -134,9 +136,38 @@ public sealed class AuthEndpointsTests : IClassFixture<FarolApiFactory>
 
         Assert.NotNull(payload);
         Assert.False(string.IsNullOrWhiteSpace(payload.AccessToken));
-        Assert.False(string.IsNullOrWhiteSpace(payload.RefreshToken));
         Assert.Equal("Maria Silva", payload.Name);
         Assert.Equal("maria@email.com", payload.Email);
+        AssertRefreshCookieIsSecure(response);
+    }
+
+    [Fact]
+    public async Task Login_ValidCredentials_ShouldStoreRefreshTokenHashedAtRest()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = CreateClientWithIp("10.0.0.21");
+
+        await RegisterAsync(client, "Maria Silva", "maria@email.com", StrongPassword);
+
+        var response = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        {
+            Email = "maria@email.com",
+            Password = StrongPassword
+        });
+
+        response.EnsureSuccessStatusCode();
+
+        var payload = await ReadDataAsync<AuthResponse>(response);
+
+        Assert.NotNull(payload);
+        var refreshToken = GetRefreshCookieValue(response);
+
+        using var scope = _factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<FarolDbContext>();
+        var storedTokens = dbContext.RefreshTokens.ToList();
+
+        Assert.All(storedTokens, token => Assert.NotEqual(refreshToken, token.Token));
+        Assert.Contains(storedTokens, token => token.Token.Length == 64);
     }
 
     [Fact]
@@ -201,8 +232,8 @@ public sealed class AuthEndpointsTests : IClassFixture<FarolApiFactory>
 
         Assert.NotNull(payload);
         Assert.False(string.IsNullOrWhiteSpace(payload.AccessToken));
-        Assert.False(string.IsNullOrWhiteSpace(payload.RefreshToken));
         Assert.Equal("maria@email.com", payload.Email);
+        AssertRefreshCookieIsSecure(response);
     }
 
     [Fact]
@@ -273,6 +304,27 @@ public sealed class AuthEndpointsTests : IClassFixture<FarolApiFactory>
         registerResponse.EnsureSuccessStatusCode();
     }
 
+    [Theory]
+    [InlineData(nameof(AuthController.Register), "auth-sensitive")]
+    [InlineData(nameof(AuthController.Login), "auth-login")]
+    [InlineData(nameof(AuthController.ForgotPassword), "auth-sensitive")]
+    [InlineData(nameof(AuthController.ResetPassword), "auth-sensitive")]
+    [InlineData(nameof(AuthController.Refresh), "auth-sensitive")]
+    public void AuthSensitiveEndpoints_ShouldRequireRateLimitPolicy(string actionName, string expectedPolicyName)
+    {
+        var method = typeof(AuthController)
+            .GetMethods()
+            .Single(method => method.Name == actionName);
+
+        var attribute = method
+            .GetCustomAttributes(typeof(EnableRateLimitingAttribute), inherit: false)
+            .Cast<EnableRateLimitingAttribute>()
+            .SingleOrDefault();
+
+        Assert.NotNull(attribute);
+        Assert.Equal(expectedPolicyName, attribute.PolicyName);
+    }
+
     [Fact]
     public async Task Refresh_ValidToken_ShouldRotateRefreshTokenAndReturnNewTokens()
     {
@@ -289,31 +341,28 @@ public sealed class AuthEndpointsTests : IClassFixture<FarolApiFactory>
 
         loginResponse.EnsureSuccessStatusCode();
 
-        var loginPayload = await ReadDataAsync<AuthResponse>(loginResponse);
+        var loginRefreshToken = GetRefreshCookieValue(loginResponse);
+        using var refreshRequest = new HttpRequestMessage(HttpMethod.Post, "/api/auth/refresh");
+        refreshRequest.Headers.Add("Cookie", $"{RefreshTokenCookieName}={loginRefreshToken}");
 
-        Assert.NotNull(loginPayload);
-
-        var refreshResponse = await client.PostAsJsonAsync("/api/auth/refresh", new
-        {
-            refreshToken = loginPayload.RefreshToken
-        });
+        var refreshResponse = await client.SendAsync(refreshRequest);
 
         refreshResponse.EnsureSuccessStatusCode();
 
         var refreshPayload = await ReadDataAsync<AuthResponse>(refreshResponse);
+        var rotatedRefreshToken = GetRefreshCookieValue(refreshResponse);
 
         Assert.NotNull(refreshPayload);
         Assert.False(string.IsNullOrWhiteSpace(refreshPayload.AccessToken));
-        Assert.False(string.IsNullOrWhiteSpace(refreshPayload.RefreshToken));
-        Assert.NotEqual(loginPayload.RefreshToken, refreshPayload.RefreshToken);
+        Assert.NotEqual(loginRefreshToken, rotatedRefreshToken);
+        AssertRefreshCookieIsSecure(refreshResponse);
 
         using var scope = _factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<FarolDbContext>();
-        var oldToken = dbContext.RefreshTokens.Single(token => token.Token == loginPayload.RefreshToken);
-        var rotatedToken = dbContext.RefreshTokens.Single(token => token.Token == refreshPayload.RefreshToken);
+        var tokens = dbContext.RefreshTokens.OrderBy(token => token.CreatedAtUtc).ToList();
 
-        Assert.True(oldToken.Revoked);
-        Assert.False(rotatedToken.Revoked);
+        Assert.Contains(tokens, token => token.Revoked);
+        Assert.Contains(tokens, token => !token.Revoked);
     }
 
     [Fact]
@@ -417,22 +466,17 @@ public sealed class AuthEndpointsTests : IClassFixture<FarolApiFactory>
 
         loginResponse.EnsureSuccessStatusCode();
 
-        var loginPayload = await ReadDataAsync<AuthResponse>(loginResponse);
+        var loginRefreshToken = GetRefreshCookieValue(loginResponse);
+        using var logoutRequest = new HttpRequestMessage(HttpMethod.Post, "/api/auth/logout");
+        logoutRequest.Headers.Add("Cookie", $"{RefreshTokenCookieName}={loginRefreshToken}");
 
-        Assert.NotNull(loginPayload);
-
-        var logoutResponse = await client.PostAsJsonAsync("/api/auth/logout", new
-        {
-            refreshToken = loginPayload.RefreshToken
-        });
+        var logoutResponse = await client.SendAsync(logoutRequest);
 
         logoutResponse.EnsureSuccessStatusCode();
 
         using var scope = _factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<FarolDbContext>();
-        var refreshToken = dbContext.RefreshTokens.Single(token => token.Token == loginPayload.RefreshToken);
-
-        Assert.True(refreshToken.Revoked);
+        Assert.Contains(dbContext.RefreshTokens, token => token.Revoked);
     }
 
     [Fact]
@@ -536,7 +580,7 @@ public sealed class AuthEndpointsTests : IClassFixture<FarolApiFactory>
         using (var scope = _factory.Services.CreateScope())
         {
             var dbContext = scope.ServiceProvider.GetRequiredService<FarolDbContext>();
-            joaoSessionId = dbContext.RefreshTokens.Single(token => token.Token == joaoAuth.RefreshToken).Id;
+            joaoSessionId = dbContext.RefreshTokens.Single(token => token.UserId == joaoAuth.UserId).Id;
         }
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", mariaAuth.AccessToken);
@@ -571,7 +615,7 @@ public sealed class AuthEndpointsTests : IClassFixture<FarolApiFactory>
 
         Assert.False(session.TryGetProperty("token", out _));
         Assert.False(session.TryGetProperty("refreshToken", out _));
-        Assert.DoesNotContain(auth.RefreshToken, json, StringComparison.Ordinal);
+        Assert.DoesNotContain(RefreshTokenCookieName, json, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -883,6 +927,43 @@ public sealed class AuthEndpointsTests : IClassFixture<FarolApiFactory>
         Assert.NotNull(payload.Data);
 
         return payload.Data;
+    }
+
+    private static string GetRefreshCookieValue(HttpResponseMessage response)
+    {
+        var setCookie = GetRefreshSetCookieHeader(response);
+        var cookiePrefix = $"{RefreshTokenCookieName}=";
+        var cookieStart = setCookie.IndexOf(cookiePrefix, StringComparison.Ordinal);
+
+        Assert.True(cookieStart >= 0);
+
+        var valueStart = cookieStart + cookiePrefix.Length;
+        var valueEnd = setCookie.IndexOf(';', valueStart);
+
+        return valueEnd < 0
+            ? setCookie[valueStart..]
+            : setCookie[valueStart..valueEnd];
+    }
+
+    private static void AssertRefreshCookieIsSecure(HttpResponseMessage response)
+    {
+        var setCookie = GetRefreshSetCookieHeader(response);
+
+        Assert.Contains("HttpOnly", setCookie, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Secure", setCookie, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("SameSite=Lax", setCookie, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string GetRefreshSetCookieHeader(HttpResponseMessage response)
+    {
+        Assert.True(response.Headers.TryGetValues("Set-Cookie", out var values));
+
+        var setCookie = values.SingleOrDefault(value =>
+            value.StartsWith($"{RefreshTokenCookieName}=", StringComparison.Ordinal));
+
+        Assert.False(string.IsNullOrWhiteSpace(setCookie));
+
+        return setCookie;
     }
 
     private sealed class SuccessResponse<T>

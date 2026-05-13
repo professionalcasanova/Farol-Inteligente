@@ -65,10 +65,20 @@ def make_payload() -> dict:
 
 
 class HealthEndpointTests(unittest.TestCase):
-    def test_health_returns_ok(self) -> None:
+    def test_health_without_header_should_return_unauthorized(self) -> None:
         client = TestClient(load_app())
 
         response = client.get("/health")
+
+        self.assertEqual(401, response.status_code)
+
+    def test_health_with_valid_header_should_return_ok(self) -> None:
+        client = TestClient(load_app())
+
+        response = client.get(
+            "/health",
+            headers={"X-Internal-API-Key": "test-internal-key"},
+        )
 
         self.assertEqual(200, response.status_code)
         self.assertEqual(
@@ -88,13 +98,20 @@ class InternalAuthenticationTests(unittest.TestCase):
 
         self.assertEqual(401, response.status_code)
 
+    def test_analyze_without_header_in_production_should_return_unauthorized(self) -> None:
+        client = TestClient(load_app(environment="production"))
+
+        response = client.post("/analyze/v1", json=make_payload())
+
+        self.assertEqual(401, response.status_code)
+
     def test_analyze_with_invalid_header_should_return_unauthorized(self) -> None:
         client = TestClient(load_app())
 
         response = client.post(
             "/analyze/v1",
             json=make_payload(),
-            headers={"X-Farol-Internal-Key": "wrong-key"},
+            headers={"X-Internal-API-Key": "wrong-key"},
         )
 
         self.assertEqual(401, response.status_code)
@@ -105,7 +122,7 @@ class InternalAuthenticationTests(unittest.TestCase):
         response = client.post(
             "/analyze/v1",
             json=make_payload(),
-            headers={"X-Farol-Internal-Key": "test-internal-key"},
+            headers={"X-Internal-API-Key": "test-internal-key"},
         )
 
         self.assertEqual(200, response.status_code)
@@ -117,7 +134,7 @@ class InternalAuthenticationTests(unittest.TestCase):
         response = client.post(
             "/analyze/v1",
             json={"contractVersion": "v1"},
-            headers={"X-Farol-Internal-Key": "test-internal-key"},
+            headers={"X-Internal-API-Key": "test-internal-key"},
         )
 
         self.assertEqual(422, response.status_code)
@@ -125,3 +142,12 @@ class InternalAuthenticationTests(unittest.TestCase):
     def test_create_app_without_key_in_production_should_fail(self) -> None:
         with self.assertRaises(RuntimeError):
             load_app(environment="production", internal_api_key=None)
+
+    def test_create_app_without_environment_should_fail(self) -> None:
+        os.environ.pop("FAROL_ENVIRONMENT", None)
+        os.environ["FAROL_INTERNAL_API_KEY"] = "test-internal-key"
+
+        app_main = importlib.import_module("app.main")
+
+        with self.assertRaisesRegex(RuntimeError, "FAROL_ENVIRONMENT"):
+            importlib.reload(app_main)

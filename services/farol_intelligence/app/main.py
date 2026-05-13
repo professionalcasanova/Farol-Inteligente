@@ -8,13 +8,22 @@ from app.analysis import analyze_financial_snapshot
 from app.models import FinancialAnalysisRequest, FinancialAnalysisResponse
 
 INTERNAL_API_KEY_ENV = "FAROL_INTERNAL_API_KEY"
-INTERNAL_API_KEY_HEADER = "X-Farol-Internal-Key"
+INTERNAL_API_KEY_HEADER = "X-Internal-API-Key"
 ENVIRONMENT_ENV = "FAROL_ENVIRONMENT"
 DEVELOPMENT_ENVIRONMENTS = {"development", "dev", "local"}
 
 
+def _configured_environment() -> str | None:
+    value = os.getenv(ENVIRONMENT_ENV)
+    if value is None:
+        return None
+
+    normalized = value.strip().lower()
+    return normalized or None
+
+
 def _current_environment() -> str:
-    return os.getenv(ENVIRONMENT_ENV, "development").strip().lower()
+    return _configured_environment() or "production"
 
 
 def _configured_internal_api_key() -> str | None:
@@ -27,7 +36,12 @@ def _configured_internal_api_key() -> str | None:
 
 
 def _validate_startup_configuration() -> None:
-    if _configured_internal_api_key() is None and _current_environment() not in DEVELOPMENT_ENVIRONMENTS:
+    current_environment = _current_environment()
+
+    if _configured_environment() is None:
+        raise RuntimeError(f"{ENVIRONMENT_ENV} must be configured.")
+
+    if _configured_internal_api_key() is None and current_environment not in DEVELOPMENT_ENVIRONMENTS:
         raise RuntimeError(f"{INTERNAL_API_KEY_ENV} must be configured outside development.")
 
 
@@ -47,6 +61,7 @@ def create_app() -> FastAPI:
         title="Farol Intelligence Service",
         version="0.1.0",
         description="Deterministic financial intelligence engine for Farol.",
+        dependencies=[Depends(require_internal_api_key)],
     )
 
     @app.get("/health")
@@ -59,7 +74,6 @@ def create_app() -> FastAPI:
     @app.post(
         "/analyze/v1",
         response_model=FinancialAnalysisResponse,
-        dependencies=[Depends(require_internal_api_key)],
     )
     def analyze_v1(payload: FinancialAnalysisRequest) -> FinancialAnalysisResponse:
         result = analyze_financial_snapshot(payload.model_dump())

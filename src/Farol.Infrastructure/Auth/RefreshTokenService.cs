@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 using Farol.Domain.Users;
 using Farol.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -17,9 +18,10 @@ public sealed class RefreshTokenService(
         ArgumentNullException.ThrowIfNull(user);
 
         var now = timeProvider.GetUtcNow();
+        var tokenValue = GenerateToken();
         var refreshToken = new RefreshToken(
             user.Id,
-            GenerateToken(),
+            HashToken(tokenValue),
             now,
             now.Add(RefreshTokenLifetime));
 
@@ -28,7 +30,7 @@ public sealed class RefreshTokenService(
 
         return new AuthSession(
             jwtTokenService.CreateAccessToken(user),
-            refreshToken.Token);
+            tokenValue);
     }
 
     public async Task<RefreshSessionResult> RefreshAsync(
@@ -40,8 +42,12 @@ public sealed class RefreshTokenService(
             return RefreshSessionResult.Invalid();
         }
 
+        var trimmedToken = refreshTokenValue.Trim();
+        var hashedToken = HashToken(trimmedToken);
         var refreshToken = await dbContext.RefreshTokens
-            .SingleOrDefaultAsync(token => token.Token == refreshTokenValue.Trim(), cancellationToken);
+            .SingleOrDefaultAsync(
+                token => token.Token == hashedToken || token.Token == trimmedToken,
+                cancellationToken);
 
         if (refreshToken is null)
         {
@@ -72,9 +78,10 @@ public sealed class RefreshTokenService(
         refreshToken.Revoke();
 
         var now = timeProvider.GetUtcNow();
+        var rotatedTokenValue = GenerateToken();
         var rotatedRefreshToken = new RefreshToken(
             user.Id,
-            GenerateToken(),
+            HashToken(rotatedTokenValue),
             now,
             now.Add(RefreshTokenLifetime));
 
@@ -84,7 +91,7 @@ public sealed class RefreshTokenService(
         return RefreshSessionResult.Success(
             user,
             jwtTokenService.CreateAccessToken(user),
-            rotatedRefreshToken.Token);
+            rotatedTokenValue);
     }
 
     public async Task RevokeAsync(string refreshTokenValue, CancellationToken cancellationToken)
@@ -94,8 +101,12 @@ public sealed class RefreshTokenService(
             return;
         }
 
+        var trimmedToken = refreshTokenValue.Trim();
+        var hashedToken = HashToken(trimmedToken);
         var refreshToken = await dbContext.RefreshTokens
-            .SingleOrDefaultAsync(token => token.Token == refreshTokenValue.Trim(), cancellationToken);
+            .SingleOrDefaultAsync(
+                token => token.Token == hashedToken || token.Token == trimmedToken,
+                cancellationToken);
 
         if (refreshToken is null || refreshToken.Revoked)
         {
@@ -177,6 +188,12 @@ public sealed class RefreshTokenService(
     private static string GenerateToken()
     {
         return Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+    }
+
+    private static string HashToken(string token)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(token));
+        return Convert.ToHexString(bytes);
     }
 }
 

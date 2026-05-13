@@ -12,7 +12,7 @@ public sealed class FinancialIntelligenceOptions
 
     public string InternalApiKeyEnvironmentVariable { get; init; } = "FAROL_INTERNAL_API_KEY";
 
-    public string InternalApiKeyHeaderName { get; init; } = "X-Farol-Internal-Key";
+    public string InternalApiKeyHeaderName { get; init; } = "X-Internal-API-Key";
 
     public string ContractVersion { get; init; } = "v1";
 
