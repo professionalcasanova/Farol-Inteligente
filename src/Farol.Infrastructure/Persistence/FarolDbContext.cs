@@ -17,6 +17,9 @@ public sealed class FarolDbContext(DbContextOptions<FarolDbContext> options) : D
     public DbSet<Transaction> Transactions => Set<Transaction>();
     public DbSet<Bill> Bills => Set<Bill>();
     public DbSet<BillSeries> BillSeries => Set<BillSeries>();
+    public DbSet<CommunityBudget> CommunityBudgets => Set<CommunityBudget>();
+    public DbSet<CommunityBudgetItem> CommunityBudgetItems => Set<CommunityBudgetItem>();
+    public DbSet<CommunityBudgetReport> CommunityBudgetReports => Set<CommunityBudgetReport>();
     public DbSet<BudgetTemplate> BudgetTemplates => Set<BudgetTemplate>();
     public DbSet<BudgetTemplateCategory> BudgetTemplateCategories => Set<BudgetTemplateCategory>();
     public DbSet<MonthlyBudget> MonthlyBudgets => Set<MonthlyBudget>();

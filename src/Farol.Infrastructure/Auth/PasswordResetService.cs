@@ -1,8 +1,10 @@
 using System.Security.Cryptography;
 using Farol.Domain.Users;
+using Farol.Infrastructure.Email;
 using Farol.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Farol.Infrastructure.Auth;
 
@@ -10,10 +12,11 @@ public sealed class PasswordResetService(
     FarolDbContext dbContext,
     PasswordService passwordService,
     TimeProvider timeProvider,
-    ILogger<PasswordResetService> logger)
+    ILogger<PasswordResetService> logger,
+    IEmailService emailService,
+    PasswordResetEmailTemplate passwordResetEmailTemplate,
+    IOptions<EmailOptions> emailOptions)
 {
-    private static readonly TimeSpan TokenLifetime = TimeSpan.FromHours(1);
-
     public async Task RequestPasswordResetAsync(string email, CancellationToken cancellationToken)
     {
         var normalizedEmail = NormalizeEmail(email);
@@ -37,10 +40,24 @@ public sealed class PasswordResetService(
         var resetToken = new PasswordResetToken(
             user.Id,
             GenerateToken(),
-            timeProvider.GetUtcNow().Add(TokenLifetime));
+            timeProvider.GetUtcNow().Add(TimeSpan.FromMinutes(emailOptions.Value.ResetTokenMinutes)));
 
         dbContext.PasswordResetTokens.Add(resetToken);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        var emailResult = await emailService.SendAsync(
+            passwordResetEmailTemplate.Build(user.Email, user.Name, resetToken.Token),
+            cancellationToken);
+
+        if (!emailResult.Succeeded)
+        {
+            logger.LogWarning(
+                "TransactionalEmailFailed Event={Event} UserId={UserId} TimestampUtc={TimestampUtc:o} ErrorCode={ErrorCode}",
+                "PasswordResetEmailFailed",
+                user.Id,
+                timeProvider.GetUtcNow(),
+                emailResult.ErrorCode);
+        }
 
         AuthenticationSecurityLogger.LogPasswordResetRequested(
             logger,

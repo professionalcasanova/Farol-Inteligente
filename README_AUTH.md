@@ -47,13 +47,15 @@ Sucesso:
 {
   "data": {
     "accessToken": "jwt",
-    "refreshToken": "refresh-token",
     "userId": "00000000-0000-0000-0000-000000000000",
     "name": "Maria Silva",
     "email": "maria@email.com"
   }
 }
 ```
+
+O refresh token e enviado por cookie `HttpOnly`, `Secure`, `SameSite=Lax` chamado
+`__Host-farol_refresh`. Ele nao aparece no corpo da resposta.
 
 Uso do token:
 
@@ -75,13 +77,15 @@ Body:
 }
 ```
 
+O body e aceito para compatibilidade. O fluxo preferencial do frontend e renovar usando
+o cookie `HttpOnly` definido pelo backend.
+
 Sucesso:
 
 ```json
 {
   "data": {
     "accessToken": "novo-jwt",
-    "refreshToken": "novo-refresh-token",
     "userId": "00000000-0000-0000-0000-000000000000",
     "name": "Maria Silva",
     "email": "maria@email.com"
@@ -92,7 +96,7 @@ Sucesso:
 Regras:
 
 - o refresh token antigo e revogado
-- o refresh token novo passa a ser o unico valido da sessao
+- o refresh token novo e enviado por cookie `HttpOnly`
 - se o token estiver invalido, expirado ou revogado, o endpoint retorna `400`
 
 ## Sessoes do usuario
@@ -154,7 +158,7 @@ Regras:
 - o `accessToken` e curto e deve ser renovado com `refresh`
 - ao receber `401` por token expirado/invalido:
   1. chamar `POST /api/auth/refresh`
-  2. substituir `accessToken` e `refreshToken`
+  2. substituir o `accessToken` em memoria
   3. repetir a chamada protegida
 - se o refresh falhar, o cliente deve voltar para login
 
@@ -199,10 +203,17 @@ Resposta:
 ```json
 {
   "data": {
-    "message": "If the email exists, a password reset token has been generated."
+    "message": "If the email exists, password reset instructions have been sent."
   }
 }
 ```
+
+Regras:
+
+- a resposta e sempre generica para nao revelar se o email existe
+- o token de reset nao e retornado na resposta publica
+- em desenvolvimento, o email e enviado via SMTP para Mailpit quando ele estiver disponivel
+- falha de entrega nao expoe detalhe ao cliente
 
 ### Reset Password
 
@@ -285,6 +296,58 @@ Password must be at least 8 characters long, contain at least 1 letter and 1 num
 }
 ```
 
+## Email transacional
+
+O backend possui uma abstracao `IEmailService` para emails transacionais. O fluxo ativo
+nesta etapa e recuperacao de senha.
+
+Implementacoes disponiveis:
+
+- `SmtpEmailService`: uso local/homologacao tecnica com Mailpit ou outro SMTP
+- `ResendEmailService`: provider externo para producao/homologacao real
+- `PasswordResetEmailTemplate`: template simples para o email de recuperacao de senha
+
+Configuracao base:
+
+- `Email__Mode`: `Smtp` ou `Resend`
+- `Email__FromAddress`
+- `Email__FromName`
+- `Email__PublicBaseUrl`
+- `Email__PasswordResetPath`
+- `Email__ResetTokenMinutes`
+
+SMTP/Mailpit:
+
+- `Email__Smtp__Host`
+- `Email__Smtp__Port`
+- `Email__Smtp__UseTls`
+- `Email__Smtp__Username`
+- `Email__Smtp__Password`
+
+Resend:
+
+- `Email__Resend__ApiUrl`
+- `Email__Resend__ApiKey`
+- `Email__Resend__TimeoutSeconds`
+
+Validacoes em producao:
+
+- `Email__FromAddress` e obrigatorio
+- `Email__PublicBaseUrl` deve ser uma URL absoluta HTTPS
+- `Email__Mode=Resend` exige `Email__Resend__ApiKey` e `Email__Resend__ApiUrl` HTTPS
+- `Email__Mode=Smtp` exige host externo, porta valida e TLS ligado
+
+Logs:
+
+- podem registrar evento, provider, `UserId`, timestamp e id de mensagem do provider
+- nao devem registrar token de reset, senha, chave de API, corpo do email ou email completo
+
+Status de outros emails de autenticacao:
+
+- email de recuperacao de senha: implementado
+- email de boas-vindas: pendente; nao ha necessidade no fluxo atual
+- confirmacao de conta: pendente; nao existe endpoint/estado de confirmacao nesta fase
+
 ### Refresh invalido
 
 `400`
@@ -319,16 +382,19 @@ Variaveis/configuracao:
   - `ConnectionStrings:DefaultConnection`
   - `Jwt:*`
   - `FinancialIntelligence:*`
+  - `Email:*`
 - variavel de ambiente:
   - `FAROL_ENVIRONMENT`
   - `FAROL_INTERNAL_API_KEY`
+  - `Email__Resend__ApiKey` quando `Email__Mode=Resend`
 
 Subida local:
 
 1. garantir PostgreSQL em `localhost:5432`
-2. exportar `FAROL_ENVIRONMENT` e `FAROL_INTERNAL_API_KEY`
-3. subir o servico Python em `127.0.0.1:8000`
-4. rodar:
+2. garantir Mailpit SMTP em `localhost:1025` para testar email localmente
+3. exportar `FAROL_ENVIRONMENT` e `FAROL_INTERNAL_API_KEY`
+4. subir o servico Python em `127.0.0.1:8000`
+5. rodar:
 
 ```powershell
 $env:DOTNET_CLI_HOME='c:\Users\masuc\Desktop\PensarNoNome\.dotnet'
@@ -339,7 +405,7 @@ $env:FAROL_INTERNAL_API_KEY='dev-internal-key'
 dotnet run --project src/Farol.Api --launch-profile http
 ```
 
-5. validar:
+6. validar:
 
 ```powershell
 Invoke-WebRequest -UseBasicParsing http://localhost:5258/health

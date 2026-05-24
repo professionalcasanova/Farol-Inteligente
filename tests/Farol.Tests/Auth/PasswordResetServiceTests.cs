@@ -1,8 +1,11 @@
 using Farol.Domain.Users;
 using Farol.Infrastructure.Auth;
+using Farol.Infrastructure.Email;
 using Farol.Infrastructure.Persistence;
+using Farol.Tests.Email;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Farol.Tests.Auth;
 
@@ -20,11 +23,15 @@ public sealed class PasswordResetServiceTests
         await dbContext.SaveChangesAsync();
 
         var logger = new CapturingLogger<PasswordResetService>();
+        var emailService = new FakeEmailService();
         var service = new PasswordResetService(
             dbContext,
             passwordService,
             timeProvider,
-            logger);
+            logger,
+            emailService,
+            new PasswordResetEmailTemplate(Options.Create(new EmailOptions())),
+            Options.Create(new EmailOptions()));
 
         await service.RequestPasswordResetAsync("maria@email.com", CancellationToken.None);
 
@@ -39,6 +46,7 @@ public sealed class PasswordResetServiceTests
         Assert.Contains("PasswordResetCompleted", loggedContent, StringComparison.Ordinal);
         Assert.Contains(user.Id.ToString(), loggedContent, StringComparison.Ordinal);
         Assert.Contains("2026-04-29T10:30:00.0000000+00:00", loggedContent, StringComparison.Ordinal);
+        Assert.Single(emailService.Messages);
         Assert.DoesNotContain(resetToken.Token, loggedContent, StringComparison.Ordinal);
         Assert.DoesNotContain("Password123", loggedContent, StringComparison.Ordinal);
         Assert.DoesNotContain("Password456", loggedContent, StringComparison.Ordinal);

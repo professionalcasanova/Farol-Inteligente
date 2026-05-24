@@ -11,5 +11,5 @@ public sealed class UpdateAccountRequest
     [Required]
     public FinancialAccountType Type { get; init; }
 
-    public bool IsActive { get; init; }
+    public bool? IsActive { get; init; }
 }

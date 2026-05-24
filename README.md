@@ -20,6 +20,7 @@ O projeto cobre hoje o MVP local de demonstracao com:
 - categorias e transacoes
 - resumo mensal
 - orcamento mensal e template base
+- orcamentos da comunidade
 - importacao CSV
 - contas a pagar
 - alertas e leitura de saude financeira do mes
@@ -286,6 +287,7 @@ python -m unittest discover tests
 
 - [`agents.md`](agents.md): governanca e escopo dos agentes
 - [`web/README.md`](web/README.md): documentacao do frontend
+- [`README_COMMUNITY_BUDGETS.md`](README_COMMUNITY_BUDGETS.md): API backend de orcamentos da comunidade
 - [`services/farol_intelligence/README.md`](services/farol_intelligence/README.md): documentacao do servico Python
 - [`docs/demo-scenarios.md`](docs/demo-scenarios.md): usuarios de demonstracao local
 - [`docs/deployment/vercel-render-beta.md`](docs/deployment/vercel-render-beta.md): deploy beta

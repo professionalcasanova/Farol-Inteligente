@@ -3,6 +3,7 @@ using System;
 using Farol.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Farol.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(FarolDbContext))]
-    partial class FarolDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260517181250_AddCommunityBudgets")]
+    partial class AddCommunityBudgets
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -204,11 +207,6 @@ namespace Farol.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("OwnerUserId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
                     b.Property<string>("TargetProfile")
                         .IsRequired()
                         .HasMaxLength(120)
@@ -227,8 +225,6 @@ namespace Farol.Infrastructure.Persistence.Migrations
                     b.HasIndex("OwnerUserId");
 
                     b.HasIndex("IsPublic", "CreatedAtUtc");
-
-                    b.HasIndex("Status", "CreatedAtUtc");
 
                     b.ToTable("community_budgets", (string)null);
                 });
@@ -282,42 +278,6 @@ namespace Farol.Infrastructure.Persistence.Migrations
                     b.HasIndex("CommunityBudgetId", "SortOrder");
 
                     b.ToTable("community_budget_items", (string)null);
-                });
-
-            modelBuilder.Entity("Farol.Domain.Budgets.CommunityBudgetReport", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("CommunityBudgetId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<string>("Reason")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<Guid>("ReporterUserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CommunityBudgetId");
-
-                    b.HasIndex("ReporterUserId");
-
-                    b.HasIndex("CommunityBudgetId", "ReporterUserId")
-                        .IsUnique();
-
-                    b.ToTable("community_budget_reports", (string)null);
                 });
 
             modelBuilder.Entity("Farol.Domain.Budgets.MonthlyBudget", b =>
@@ -639,21 +599,6 @@ namespace Farol.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("CommunityBudgetId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("Farol.Domain.Budgets.CommunityBudgetReport", b =>
-                {
-                    b.HasOne("Farol.Domain.Budgets.CommunityBudget", null)
-                        .WithMany()
-                        .HasForeignKey("CommunityBudgetId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Farol.Domain.Users.User", null)
-                        .WithMany()
-                        .HasForeignKey("ReporterUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

@@ -24,6 +24,18 @@
     {
       "key": "resetToken",
       "value": ""
+    },
+    {
+      "key": "communityBudgetId",
+      "value": ""
+    },
+    {
+      "key": "importedCommunityBudgetId",
+      "value": ""
+    },
+    {
+      "key": "communityBudgetReportReason",
+      "value": "sensitive_data"
     }
   ],
   "item": [
@@ -157,6 +169,7 @@
     },
     {
       "name": "Forgot Password",
+      "description": "Solicita email transacional de recuperacao. A resposta publica e generica e nunca retorna o token de reset.",
       "request": {
         "method": "POST",
         "header": [
@@ -184,6 +197,7 @@
     },
     {
       "name": "Reset Password",
+      "description": "Redefine a senha usando o token recebido no link do email. Em desenvolvimento, copie o token/link capturado pelo Mailpit para a variavel resetToken.",
       "request": {
         "method": "POST",
         "header": [
@@ -239,6 +253,196 @@
           ]
         }
       }
+    },
+    {
+      "name": "Community Budgets",
+      "item": [
+        {
+          "name": "Create Community Budget",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Orcamento familia enxuto\",\n  \"description\": \"Modelo simples para organizar gastos essenciais.\",\n  \"targetProfile\": \"Casal com um filho\",\n  \"monthlyIncomeReference\": 4200,\n  \"isPublic\": true,\n  \"items\": [\n    {\n      \"name\": \"Aluguel\",\n      \"categoryName\": \"Moradia\",\n      \"type\": \"expense\",\n      \"allocationType\": \"fixed_amount\",\n      \"amount\": 1200,\n      \"percentage\": null,\n      \"notes\": null,\n      \"sortOrder\": 1\n    },\n    {\n      \"name\": \"Reserva\",\n      \"categoryName\": \"Reserva\",\n      \"type\": \"reserve\",\n      \"allocationType\": \"percentage\",\n      \"amount\": null,\n      \"percentage\": 10,\n      \"notes\": \"Guardar no inicio do mes.\",\n      \"sortOrder\": 2\n    }\n  ],\n  \"status\": \"published\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/community-budgets",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "community-budgets"
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Public Community Budgets",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/community-budgets",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "community-budgets"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Community Budget",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/community-budgets/{{communityBudgetId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "community-budgets",
+                "{{communityBudgetId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Community Budget",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Orcamento familia atualizado\",\n  \"description\": \"Modelo simples para organizar gastos essenciais.\",\n  \"targetProfile\": \"Casal com um filho\",\n  \"monthlyIncomeReference\": 4200,\n  \"isPublic\": true,\n  \"items\": [\n    {\n      \"name\": \"Mercado\",\n      \"categoryName\": \"Alimentacao\",\n      \"type\": \"expense\",\n      \"allocationType\": \"fixed_amount\",\n      \"amount\": 900,\n      \"percentage\": null,\n      \"notes\": null,\n      \"sortOrder\": 1\n    }\n  ],\n  \"status\": \"published\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/community-budgets/{{communityBudgetId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "community-budgets",
+                "{{communityBudgetId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Community Budget",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/community-budgets/{{communityBudgetId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "community-budgets",
+                "{{communityBudgetId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Import Community Budget",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/community-budgets/{{communityBudgetId}}/import",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "community-budgets",
+                "{{communityBudgetId}}",
+                "import"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Report Community Budget",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"{{communityBudgetReportReason}}\",\n  \"description\": \"O modelo parece conter dado sensivel.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/community-budgets/{{communityBudgetId}}/reports",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "community-budgets",
+                "{{communityBudgetId}}",
+                "reports"
+              ]
+            }
+          }
+        }
+      ]
     }
   ]
 }

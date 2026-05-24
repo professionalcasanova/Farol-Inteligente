@@ -109,7 +109,7 @@ public sealed class AuthController(
 
         return Ok(new SuccessResponse<object>(new
         {
-            message = "If the email exists, a password reset token has been generated."
+            message = "If the email exists, password reset instructions have been sent."
         }));
     }
 

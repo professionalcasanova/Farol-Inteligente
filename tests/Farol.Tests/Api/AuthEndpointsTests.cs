@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Farol.Api.Modules.Auth;
 using Farol.Domain.Users;
+using Farol.Infrastructure.Email;
 using Farol.Infrastructure.Persistence;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.DependencyInjection;
@@ -636,10 +637,17 @@ public sealed class AuthEndpointsTests : IClassFixture<FarolApiFactory>
         using var scope = _factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<FarolDbContext>();
         var token = dbContext.PasswordResetTokens.Single();
+        var responseJson = await response.Content.ReadAsStringAsync();
+        var email = Assert.Single(_factory.EmailService.Messages);
 
         Assert.False(string.IsNullOrWhiteSpace(token.Token));
         Assert.False(token.Used);
         Assert.NotEqual(default, token.ExpiresAtUtc);
+        Assert.DoesNotContain(token.Token, responseJson, StringComparison.Ordinal);
+        Assert.Equal("maria@email.com", email.To.Address);
+        Assert.Contains("Redefinicao de senha", email.Subject, StringComparison.Ordinal);
+        Assert.Contains(token.Token, email.TextBody, StringComparison.Ordinal);
+        Assert.Contains("http://localhost:3000/reset-password?token=", email.TextBody, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -659,6 +667,32 @@ public sealed class AuthEndpointsTests : IClassFixture<FarolApiFactory>
         var dbContext = scope.ServiceProvider.GetRequiredService<FarolDbContext>();
 
         Assert.Empty(dbContext.PasswordResetTokens);
+        Assert.Empty(_factory.EmailService.Messages);
+    }
+
+    [Fact]
+    public async Task ForgotPassword_EmailDeliveryFailure_ShouldReturnGenericSuccess()
+    {
+        await _factory.ResetDatabaseAsync();
+        _factory.EmailService.NextResult = EmailSendResult.Failure(EmailFailureCodes.DeliveryFailed);
+        using var client = CreateIsolatedClient();
+
+        await RegisterAsync(client, "Maria Silva", "maria@email.com", StrongPassword);
+
+        var response = await client.PostAsJsonAsync("/api/auth/forgot-password", new ForgotPasswordRequest
+        {
+            Email = "maria@email.com"
+        });
+
+        response.EnsureSuccessStatusCode();
+
+        using var scope = _factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<FarolDbContext>();
+        var token = dbContext.PasswordResetTokens.Single();
+        var responseJson = await response.Content.ReadAsStringAsync();
+
+        Assert.Single(_factory.EmailService.Messages);
+        Assert.DoesNotContain(token.Token, responseJson, StringComparison.Ordinal);
     }
 
     [Fact]

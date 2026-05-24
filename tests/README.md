@@ -6,8 +6,10 @@ Este diretorio concentra os testes automatizados do backend ASP.NET Core.
 
 - `Farol.Tests/Domain/`: unit tests de entidades e regras de dominio
 - `Farol.Tests/Auth/`: unit tests de servicos de autenticacao e seguranca
+- `Farol.Tests/Email/`: unit tests de configuracao e providers de email transacional
 - `Farol.Tests/Seeding/`: testes de seeding e dados base
 - `Farol.Tests/Api/`: integration tests de endpoints usando `FarolApiFactory`
+- `Farol.Tests/Api/CommunityBudgetsEndpointsTests.cs`: cobertura de autorizacao, validacao e importacao dos orcamentos da comunidade
 - `Farol.Tests/Smoke/`: smoke tests de migracao e infraestrutura
 
 ## Padrao de nomenclatura

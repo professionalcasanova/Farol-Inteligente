@@ -5,6 +5,7 @@ using Farol.Api.Modules.Bills;
 using Farol.Api.Modules.Imports;
 using Farol.Api.Modules.Insights;
 using Farol.Infrastructure.Auth;
+using Farol.Infrastructure.Email;
 using Farol.Infrastructure.Persistence;
 using Farol.Infrastructure.Seeding;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -124,6 +125,11 @@ var signingKey = jwtSection["SigningKey"]
 JwtSigningKeyValidator.EnsureSafeForEnvironment(signingKey, builder.Environment.EnvironmentName);
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection configuration is required.");
+var emailOptions = builder.Configuration
+    .GetSection(EmailOptions.SectionName)
+    .Get<EmailOptions>()
+    ?? new EmailOptions();
+EmailOptionsValidator.EnsureSafeForEnvironment(emailOptions, builder.Environment.EnvironmentName);
 var financialIntelligenceOptions = builder.Configuration
     .GetSection(FinancialIntelligenceOptions.SectionName)
     .Get<FinancialIntelligenceOptions>()
@@ -188,8 +194,30 @@ builder.Services.AddScoped<CsvImportFileReader>();
 builder.Services.AddScoped<CsvImportParser>();
 builder.Services.AddScoped<TransactionCsvImportProcessor>();
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.Configure<EmailOptions>(
+    builder.Configuration.GetSection(EmailOptions.SectionName));
+builder.Services.AddSingleton<PasswordResetEmailTemplate>();
 builder.Services.Configure<FinancialIntelligenceOptions>(
     builder.Configuration.GetSection(FinancialIntelligenceOptions.SectionName));
+builder.Services.AddScoped<SmtpEmailService>();
+builder.Services.AddHttpClient<ResendEmailService>((serviceProvider, client) =>
+{
+    var options = serviceProvider
+        .GetRequiredService<Microsoft.Extensions.Options.IOptions<EmailOptions>>()
+        .Value;
+
+    client.Timeout = TimeSpan.FromSeconds(Math.Max(1, options.Resend.TimeoutSeconds));
+});
+builder.Services.AddScoped<IEmailService>(serviceProvider =>
+{
+    var options = serviceProvider
+        .GetRequiredService<Microsoft.Extensions.Options.IOptions<EmailOptions>>()
+        .Value;
+
+    return string.Equals(options.Mode, EmailDeliveryModes.Resend, StringComparison.OrdinalIgnoreCase)
+        ? serviceProvider.GetRequiredService<ResendEmailService>()
+        : serviceProvider.GetRequiredService<SmtpEmailService>();
+});
 builder.Services.AddHttpClient<IFinancialIntelligenceClient, HttpFinancialIntelligenceClient>((serviceProvider, client) =>
 {
     var options = serviceProvider

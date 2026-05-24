@@ -114,13 +114,32 @@ Uso recomendado:
 
 Criar uma abstracao simples de envio no backend quando a implementacao entrar:
 
-- `IEmailSender`
+- `IEmailService`
 - implementacao SMTP para Mailpit
 - implementacao provider para producao
 - templates versionados para `EmailConfirmation` e `PasswordReset`
 
 Nao implementar envio direto no controller. Controllers devem apenas disparar o caso de
 uso, e o caso de uso decide se deve enviar email.
+
+## Implementacao atual
+
+A implementacao inicial foi feita no backend .NET com:
+
+- `IEmailService` como contrato interno de envio
+- `SmtpEmailService` para SMTP local, incluindo Mailpit em desenvolvimento
+- `ResendEmailService` para provider externo via API HTTP
+- `PasswordResetEmailTemplate` separado do caso de uso de senha
+- configuracao por `Email:*` em `appsettings` ou variaveis de ambiente
+- validacao obrigatoria de configuracao em producao
+- envio de recuperacao de senha integrado ao `PasswordResetService`
+
+O fluxo publico continua sem retornar token sensivel. O token aparece apenas no email
+transacional enviado ao usuario.
+
+Email de boas-vindas e confirmacao de conta continuam pendentes. O backend atual nao
+possui estado de conta nao confirmada nem endpoint de confirmacao, entao a implementacao
+nao cria um fluxo novo nesta etapa.
 
 ## Fluxo proposto
 
@@ -167,7 +186,7 @@ ou dominio de homologacao. Mailpit nao valida entrega real.
 
 Comuns:
 
-- `Email__Mode`: `Smtp` ou `Provider`
+- `Email__Mode`: `Smtp` ou `Resend`
 - `Email__FromAddress`
 - `Email__FromName`
 - `Email__PublicBaseUrl`
@@ -182,19 +201,19 @@ Mailpit/dev/homologacao tecnica:
 
 Provider/producao:
 
-- `Email__Provider`
-- `Email__ProviderApiKey`
-- `Email__ProviderWebhookSecret`
+- `Email__Resend__ApiUrl`
+- `Email__Resend__ApiKey`
+- `Email__Resend__TimeoutSeconds`
 
 Operacao:
 
 - `Email__ResetTokenMinutes`
-- `Email__ConfirmationTokenHours`
+- `Email__PasswordResetPath`
 
 ## Quick wins antes da implementacao
 
 - adicionar Mailpit ao `docker-compose.yml`
-- criar contrato `IEmailSender`
+- criar contrato `IEmailService`
 - mover montagem de link para servico do backend
 - adicionar testes garantindo que reset/confirmacao nao retornam token
 - adicionar testes garantindo que logs nao contem token, senha ou email completo

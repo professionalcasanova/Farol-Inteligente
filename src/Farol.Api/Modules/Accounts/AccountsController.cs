@@ -97,11 +97,11 @@ public sealed class AccountsController(FarolDbContext dbContext) : ControllerBas
         {
             account.UpdateDetails(request.Name, request.Type);
 
-            if (request.IsActive)
+            if (request.IsActive is true)
             {
                 account.Activate();
             }
-            else
+            else if (request.IsActive is false)
             {
                 account.Deactivate();
             }
@@ -115,6 +115,39 @@ public sealed class AccountsController(FarolDbContext dbContext) : ControllerBas
 
         return Ok(ToResponse(account));
     }
+
+    [HttpDelete("{id:guid}")]
+    public async Task<ActionResult> Delete(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        if (!AuthenticatedUser.TryGetUserId(User, out var userId))
+        {
+            return Unauthorized(new ErrorResponse("Invalid access token."));
+        }
+
+        var account = await dbContext.FinancialAccounts
+            .SingleOrDefaultAsync(candidate => candidate.Id == id && candidate.UserId == userId, cancellationToken);
+
+        if (account is null)
+        {
+            return NotFound(new ErrorResponse("Financial account was not found."));
+        }
+
+        var hasTransactions = await dbContext.Transactions
+            .AnyAsync(transaction => transaction.FinancialAccountId == account.Id, cancellationToken);
+
+        if (hasTransactions)
+        {
+            return Conflict(new ErrorResponse("Financial account cannot be deleted because it has transactions."));
+        }
+
+        dbContext.FinancialAccounts.Remove(account);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return NoContent();
+    }
+
     private static AccountResponse ToResponse(FinancialAccount account)
     {
         return new AccountResponse

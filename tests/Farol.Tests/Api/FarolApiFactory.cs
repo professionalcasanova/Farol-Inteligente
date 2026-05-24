@@ -1,5 +1,7 @@
 using Farol.Api.Modules.Insights;
+using Farol.Infrastructure.Email;
 using Farol.Infrastructure.Persistence;
+using Farol.Tests.Email;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -12,10 +14,12 @@ namespace Farol.Tests.Api;
 public sealed class FarolApiFactory : WebApplicationFactory<Program>
 {
     private readonly string _databaseName = $"FarolTests-{Guid.NewGuid()}";
+    private readonly FakeEmailService _emailService = new();
     private readonly FakeFinancialIntelligenceClient _financialIntelligenceClient = new();
     private readonly TimeProvider _timeProvider = new FixedTimeProvider(
         new DateTimeOffset(2026, 3, 10, 12, 0, 0, TimeSpan.Zero));
 
+    public FakeEmailService EmailService => _emailService;
     public FakeFinancialIntelligenceClient FinancialIntelligenceClient => _financialIntelligenceClient;
     public DateOnly Today => DateOnly.FromDateTime(_timeProvider.GetUtcNow().UtcDateTime);
 
@@ -33,11 +37,13 @@ public sealed class FarolApiFactory : WebApplicationFactory<Program>
             services.RemoveAll<DbContextOptions>();
             services.RemoveAll<FarolDbContext>();
             services.RemoveAll<IDbContextOptionsConfiguration<FarolDbContext>>();
+            services.RemoveAll<IEmailService>();
             services.RemoveAll<IFinancialIntelligenceClient>();
             services.RemoveAll<TimeProvider>();
 
             services.AddDbContext<FarolDbContext>(options =>
                 options.UseInMemoryDatabase(_databaseName));
+            services.AddSingleton<IEmailService>(_emailService);
             services.AddSingleton<IFinancialIntelligenceClient>(_financialIntelligenceClient);
             services.AddSingleton(_timeProvider);
         });
@@ -50,6 +56,7 @@ public sealed class FarolApiFactory : WebApplicationFactory<Program>
 
         await dbContext.Database.EnsureDeletedAsync();
         await dbContext.Database.EnsureCreatedAsync();
+        _emailService.Reset();
         _financialIntelligenceClient.Reset();
     }
 }
