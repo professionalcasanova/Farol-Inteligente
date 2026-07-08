@@ -646,7 +646,8 @@ public sealed class AuthEndpointsTests : IClassFixture<FarolApiFactory>
         Assert.DoesNotContain(token.Token, responseJson, StringComparison.Ordinal);
         Assert.Equal("maria@email.com", email.To.Address);
         Assert.Contains("Redefinicao de senha", email.Subject, StringComparison.Ordinal);
-        Assert.Contains(token.Token, email.TextBody, StringComparison.Ordinal);
+        Assert.DoesNotContain(token.Token, email.TextBody, StringComparison.Ordinal);
+        Assert.False(string.IsNullOrWhiteSpace(ExtractResetToken(email.TextBody)));
         Assert.Contains("http://localhost:3000/reset-password?token=", email.TextBody, StringComparison.Ordinal);
     }
 
@@ -708,12 +709,7 @@ public sealed class AuthEndpointsTests : IClassFixture<FarolApiFactory>
             Email = "maria@email.com"
         });
 
-        string tokenValue;
-        using (var scope = _factory.Services.CreateScope())
-        {
-            var dbContext = scope.ServiceProvider.GetRequiredService<FarolDbContext>();
-            tokenValue = dbContext.PasswordResetTokens.Single().Token;
-        }
+        var tokenValue = ExtractResetToken(_factory.EmailService.Messages.Single().TextBody);
 
         var resetResponse = await client.PostAsJsonAsync("/api/auth/reset-password", new ResetPasswordRequest
         {
@@ -744,6 +740,8 @@ public sealed class AuthEndpointsTests : IClassFixture<FarolApiFactory>
         var token = verificationDbContext.PasswordResetTokens.Single();
 
         Assert.True(token.Used);
+        Assert.Single(verificationDbContext.RefreshTokens, session => session.Revoked);
+        Assert.Single(verificationDbContext.RefreshTokens, session => !session.Revoked);
     }
 
     [Fact]
@@ -759,12 +757,7 @@ public sealed class AuthEndpointsTests : IClassFixture<FarolApiFactory>
             Email = "maria@email.com"
         });
 
-        string tokenValue;
-        using (var scope = _factory.Services.CreateScope())
-        {
-            var dbContext = scope.ServiceProvider.GetRequiredService<FarolDbContext>();
-            tokenValue = dbContext.PasswordResetTokens.Single().Token;
-        }
+        var tokenValue = ExtractResetToken(_factory.EmailService.Messages.Single().TextBody);
 
         var firstReset = await client.PostAsJsonAsync("/api/auth/reset-password", new ResetPasswordRequest
         {
@@ -801,12 +794,7 @@ public sealed class AuthEndpointsTests : IClassFixture<FarolApiFactory>
             Email = "maria@email.com"
         });
 
-        string tokenValue;
-        using (var scope = _factory.Services.CreateScope())
-        {
-            var dbContext = scope.ServiceProvider.GetRequiredService<FarolDbContext>();
-            tokenValue = dbContext.PasswordResetTokens.Single().Token;
-        }
+        var tokenValue = ExtractResetToken(_factory.EmailService.Messages.Single().TextBody);
 
         var resetResponse = await client.PostAsJsonAsync("/api/auth/reset-password", new ResetPasswordRequest
         {
@@ -839,6 +827,12 @@ public sealed class AuthEndpointsTests : IClassFixture<FarolApiFactory>
         });
 
         response.EnsureSuccessStatusCode();
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<FarolDbContext>();
+            Assert.All(dbContext.RefreshTokens, session => Assert.True(session.Revoked));
+        }
 
         client.DefaultRequestHeaders.Authorization = null;
 
@@ -979,6 +973,15 @@ public sealed class AuthEndpointsTests : IClassFixture<FarolApiFactory>
             : setCookie[valueStart..valueEnd];
     }
 
+    private static string ExtractResetToken(string textBody)
+    {
+        const string marker = "?token=";
+        var start = textBody.IndexOf(marker, StringComparison.Ordinal) + marker.Length;
+        var end = textBody.IndexOfAny(['\r', '\n', ' '], start);
+        var encodedToken = end < 0 ? textBody[start..] : textBody[start..end];
+        return Uri.UnescapeDataString(encodedToken);
+    }
+
     private static void AssertRefreshCookieIsSecure(HttpResponseMessage response)
     {
         var setCookie = GetRefreshSetCookieHeader(response);
@@ -1028,7 +1031,7 @@ public sealed class AuthEndpointsTests : IClassFixture<FarolApiFactory>
     private HttpClient CreateClientWithIp(string ipAddress)
     {
         var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("X-Forwarded-For", ipAddress);
+        client.DefaultRequestHeaders.Add("X-Test-Client-IP", ipAddress);
         return client;
     }
 

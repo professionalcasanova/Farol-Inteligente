@@ -20,6 +20,19 @@ using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
+static string GetRateLimitPartitionKey(HttpContext context)
+{
+    var environment = context.RequestServices.GetRequiredService<IWebHostEnvironment>();
+
+    if (environment.IsEnvironment("Testing") &&
+        context.Request.Headers.TryGetValue("X-Test-Client-IP", out var testClientIp))
+    {
+        return testClientIp.ToString();
+    }
+
+    return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+}
+
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Logging.AddDebug();
@@ -44,10 +57,7 @@ builder.Services.AddRateLimiter(options =>
 
     options.AddPolicy("auth-login", httpContext =>
     {
-        var forwardedFor = httpContext.Request.Headers["X-Forwarded-For"].ToString();
-        var partitionKey = string.IsNullOrWhiteSpace(forwardedFor)
-            ? httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown"
-            : forwardedFor.Split(',')[0].Trim();
+        var partitionKey = GetRateLimitPartitionKey(httpContext);
 
         return RateLimitPartition.GetFixedWindowLimiter(
             partitionKey,
@@ -62,10 +72,7 @@ builder.Services.AddRateLimiter(options =>
 
     options.AddPolicy("auth-sensitive", httpContext =>
     {
-        var forwardedFor = httpContext.Request.Headers["X-Forwarded-For"].ToString();
-        var partitionKey = string.IsNullOrWhiteSpace(forwardedFor)
-            ? httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown"
-            : forwardedFor.Split(',')[0].Trim();
+        var partitionKey = GetRateLimitPartitionKey(httpContext);
         var environment = httpContext.RequestServices.GetRequiredService<IWebHostEnvironment>();
         var permitLimit = environment.IsEnvironment("Testing") ? 1000 : 20;
 
@@ -268,12 +275,26 @@ app.UseExceptionHandler(errorApp =>
 
 if (!app.Environment.IsEnvironment("Testing"))
 {
+    if (!app.Environment.IsDevelopment())
+    {
+        app.UseHsts();
+    }
+
     app.UseForwardedHeaders(new ForwardedHeadersOptions
     {
         ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
     });
     app.UseHttpsRedirection();
 }
+
+app.Use(async (context, next) =>
+{
+    context.Response.Headers.XContentTypeOptions = "nosniff";
+    context.Response.Headers.XFrameOptions = "DENY";
+    context.Response.Headers["Referrer-Policy"] = "no-referrer";
+    context.Response.Headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'";
+    await next();
+});
 
 app.MapGet("/health", () => Results.Ok(new
 {

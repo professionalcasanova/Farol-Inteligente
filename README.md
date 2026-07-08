@@ -1,302 +1,207 @@
 # Farol
 
-Farol e um assistente financeiro pessoal para usuarios brasileiros.
+[![Backend CI](https://github.com/professionalcasanova/PensarNoNome/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/professionalcasanova/PensarNoNome/actions/workflows/backend-ci.yml)
+[![Frontend CI](https://github.com/professionalcasanova/PensarNoNome/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/professionalcasanova/PensarNoNome/actions/workflows/frontend-ci.yml)
+[![Python Service CI](https://github.com/professionalcasanova/PensarNoNome/actions/workflows/python-service-ci.yml/badge.svg)](https://github.com/professionalcasanova/PensarNoNome/actions/workflows/python-service-ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-O repositorio esta organizado como um monorepo com quatro partes bem separadas:
+Farol is an open-source personal finance platform designed around the realities of Brazilian households. It brings accounts, transactions, budgets, recurring bills, CSV imports, and monthly financial guidance into a single application.
 
-- `web/`: frontend em Next.js/React para a experiencia do usuario
-- `src/`: backend .NET com API HTTP e regras de dominio
-- `services/farol_intelligence/`: servico Python para analise financeira deterministica
-- `docker-compose.yml`: infraestrutura local do PostgreSQL para desenvolvimento
+The project is also a production-oriented engineering portfolio: a typed Next.js frontend, a modular ASP.NET Core API, PostgreSQL persistence, and an isolated Python service for deterministic financial analysis.
 
-Este README descreve o estado atual do projeto e como trabalhar em cada parte sem misturar responsabilidades.
+> Farol is under active development. The repository is suitable for local evaluation and technical review; it is not financial advice or a substitute for professional financial planning.
 
-## Estado atual
+## Product capabilities
 
-O projeto cobre hoje o MVP local de demonstracao com:
+- Secure registration, authentication, password recovery, refresh-token rotation, and session management
+- Financial account and transaction management
+- Monthly budgets and reusable budget templates
+- Recurring bills, installments, payment tracking, and cash-flow summaries
+- Flexible CSV transaction import with file, row, and content limits
+- Monthly health indicators, alerts, and recommended actions
+- Community budget sharing with privacy validation and reporting controls
+- Responsive web experience for desktop and mobile
+- Deterministic analysis service with an explicit, versioned HTTP contract
 
-- autenticacao basica
-- contas financeiras
-- categorias e transacoes
-- resumo mensal
-- orcamento mensal e template base
-- orcamentos da comunidade
-- importacao CSV
-- contas a pagar
-- alertas e leitura de saude financeira do mes
-- frontend web consumindo a API
-- servico Python responsavel pela analise deterministica
+## Engineering highlights
 
-## Estrutura do repositorio
+- Clear boundaries between domain, infrastructure, API, web, and analysis components
+- Ownership checks on user-scoped resources to prevent cross-account access
+- Password hashing, hashed recovery and refresh tokens, token rotation, and session revocation
+- Rate limiting on authentication endpoints and strict production secret validation
+- `HttpOnly`, `Secure`, `SameSite=Lax` refresh cookies; access tokens remain in memory
+- Restricted CORS, security headers, HSTS, controlled error responses, and upload limits
+- Automated backend, frontend, and Python test pipelines
+- Dependabot coverage for npm, NuGet, Python, and GitHub Actions
 
-```txt
-Farol.sln
-.github/
-docs/
-scripts/
-services/
-  farol_intelligence/
-src/
-  Farol.Api/
-  Farol.Domain/
-  Farol.Infrastructure/
-tests/
-  Farol.Tests/
-web/
-docker-compose.yml
-render.yaml
+## Architecture
+
+```mermaid
+flowchart LR
+    Browser["Next.js web application"] -->|"HTTPS / JSON"| API["ASP.NET Core API"]
+    API --> Domain["Domain model and business rules"]
+    API --> Infrastructure["Infrastructure adapters"]
+    Infrastructure --> PostgreSQL[(PostgreSQL)]
+    API -->|"Authenticated internal HTTP"| Intelligence["Python intelligence service"]
 ```
 
-## Separacao entre frontend, backend e servicos
+The backend follows a pragmatic layered architecture:
 
-- O frontend em `web/` pode ser executado isoladamente como workspace proprio.
-- O backend em `src/` e os testes em `tests/` formam a aplicacao .NET.
-- O servico Python em `services/farol_intelligence/` e independente do frontend e exposto por HTTP.
-- O banco local e provisionado via `docker compose`.
+- `Farol.Domain` contains entities, invariants, and business concepts without framework dependencies.
+- `Farol.Infrastructure` contains persistence, authentication, email, and external-service implementations.
+- `Farol.Api` owns HTTP contracts, authorization, application orchestration, and dependency composition.
+- `Farol.Tests` covers domain behavior, API contracts, authorization boundaries, and infrastructure behavior.
+- `web` is an independently buildable Next.js application.
+- `services/farol_intelligence` is an independently deployable FastAPI service.
 
-Importante:
+More detail is available in [Architecture](docs/architecture.md).
 
-- frontend nao deve conter regra de dominio do backend
-- backend nao deve incorporar detalhes de UI do frontend
-- servico Python nao deve assumir responsabilidade de API web ou tela
-- integracao entre stacks deve acontecer por contrato HTTP e configuracao
+## Technology stack
 
-## Requisitos locais
+| Area | Technology |
+| --- | --- |
+| Web | Next.js 15, React 19, TypeScript, Tailwind CSS, Vitest |
+| API | ASP.NET Core 10, C#, JWT bearer authentication, Swagger/OpenAPI |
+| Persistence | Entity Framework Core, PostgreSQL |
+| Intelligence service | Python 3.11+, FastAPI, Pydantic |
+| Delivery | Docker, Render blueprint, Vercel-compatible frontend, GitHub Actions |
 
-### Backend e banco
+## Repository layout
+
+```text
+Farol.sln
+├── src/
+│   ├── Farol.Api/
+│   ├── Farol.Domain/
+│   └── Farol.Infrastructure/
+├── tests/Farol.Tests/
+├── web/
+├── services/farol_intelligence/
+├── docs/
+├── scripts/
+├── docker-compose.yml
+└── render.yaml
+```
+
+## Local setup
+
+### Prerequisites
 
 - .NET 10 SDK
-- Docker Desktop ou compatível com `docker compose`
-- PostgreSQL local via Compose
+- Node.js 22 and npm
+- Python 3.11 or newer
+- Docker with Docker Compose
 
-### Frontend
+### 1. Clone the repository
 
-- Node.js 22+
-- npm
-
-### Servico Python
-
-- Python 3.11+
-
-## Variaveis de ambiente principais
-
-### Frontend
-
-Arquivo local: `web/.env.local`
-
-```env
-NEXT_PUBLIC_API_BASE_URL=http://localhost:5258
+```bash
+git clone https://github.com/professionalcasanova/PensarNoNome.git
+cd PensarNoNome
 ```
 
-Arquivos de exemplo:
+### 2. Start PostgreSQL
 
-- [`web/.env.local.example`](web/.env.local.example)
-- [`web/.env.production.example`](web/.env.production.example)
-
-### Backend
-
-Nao existe um `.env` obrigatorio para o fluxo local padrao. A configuracao base fica em:
-
-- [`src/Farol.Api/appsettings.json`](src/Farol.Api/appsettings.json)
-- [`src/Farol.Api/appsettings.Development.json`](src/Farol.Api/appsettings.Development.json)
-
-Pontos principais:
-
-- `ConnectionStrings:DefaultConnection`
-- `Jwt:*` (`Jwt:SigningKey` nao pode ser vazio, fraco ou conter termos de segredo local/default em producao)
-- `Cors:AllowedOrigins`
-- `FinancialIntelligence:*`
-- `FAROL_INTERNAL_API_KEY`
-- `Database:MigrateOnStartup`
-
-Valores locais atuais:
-
-- API HTTP local: `http://localhost:5258`
-- PostgreSQL local: `localhost:5432`
-- servico Python local: `http://127.0.0.1:8000`
-
-### Servico Python
-
-Variaveis obrigatorias:
-
-- `FAROL_ENVIRONMENT`: `Production` em deploy; `Development` apenas localmente.
-- `FAROL_INTERNAL_API_KEY`: chave compartilhada com a API .NET.
-
-Todas as chamadas ao servico Python exigem o header `X-Internal-API-Key`.
-
-### Importacao CSV
-
-Limites de seguranca atuais:
-
-- upload maximo: 2 MB
-- extensao obrigatoria: `.csv`
-- MIME types aceitos: `text/csv`, `application/csv`, `application/vnd.ms-excel`, `application/octet-stream` ou vazio
-- maximo de linhas: 5000
-- maximo por linha: 10000 caracteres
-
-Erros de limite retornam resposta controlada com mensagem amigavel.
-
-## Como rodar o frontend isoladamente
-
-O frontend pode ser iniciado sozinho, mas as telas reais dependem da API configurada em `NEXT_PUBLIC_API_BASE_URL`.
-
-1. Configure o arquivo `web/.env.local`
-
-```env
-NEXT_PUBLIC_API_BASE_URL=http://localhost:5258
+```bash
+docker compose up -d postgres
 ```
 
-2. Instale dependencias
+Docker Compose creates an isolated local database named `farol_dev`. No database files or personal financial records are stored in this repository.
+
+### 3. Start the intelligence service
+
+```bash
+cd services/farol_intelligence
+python -m venv .venv
+```
+
+PowerShell:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e .
+$env:FAROL_ENVIRONMENT = "Development"
+$env:FAROL_INTERNAL_API_KEY = "local-development-only-key"
+python -m uvicorn app.main:app --reload --port 8000
+```
+
+### 4. Start the API
+
+From the repository root, in a separate terminal:
+
+```powershell
+$env:ASPNETCORE_ENVIRONMENT = "Development"
+$env:FAROL_INTERNAL_API_KEY = "local-development-only-key"
+dotnet restore Farol.sln
+dotnet run --project src/Farol.Api/Farol.Api.csproj
+```
+
+The development configuration uses the local PostgreSQL container and automatically applies migrations. Swagger is available at `http://localhost:5258/swagger`.
+
+### 5. Start the web application
 
 ```powershell
 Set-Location web
-npm install
-```
-
-3. Rode o frontend
-
-```powershell
+Copy-Item .env.local.example .env.local
+npm ci
 npm run dev
 ```
 
-Aplicacao web:
+Open `http://localhost:3000`.
 
-- `http://localhost:3000`
+## Configuration and data safety
 
-Comandos uteis do frontend:
+Only safe local defaults and example files belong in source control.
 
-```powershell
-npm run dev
-npm run lint
+- Real `.env` files are ignored.
+- Production connection strings, signing keys, email credentials, and internal API keys must be supplied by the deployment platform.
+- `appsettings.json` does not contain a production database connection or signing key.
+- `appsettings.Development.json` contains local-only values for the disposable Docker environment.
+- PostgreSQL data is stored in a local Docker volume, outside Git.
+- Demo scenarios contain synthetic data and are enabled only in the development environment.
+- Production startup fails when required secrets are missing or unsafe.
+
+See [Security](SECURITY.md) before deploying or reporting a vulnerability.
+
+## Quality checks
+
+```bash
+dotnet test Farol.sln
+```
+
+```bash
+cd web
+npm ci
 npm run test
 npm run build
 ```
 
-Observacao:
-
-- o frontend sobe sozinho, mas login, dashboard e fluxos de dados dependem da API estar disponivel
-
-## Como rodar backend e infraestrutura
-
-### 1. Subir o banco
-
-```powershell
-docker compose up -d
-```
-
-Banco local atual:
-
-- database: `farol_dev`
-- user: `postgres`
-- password: `postgres`
-- porta: `5432`
-
-### 2. Restaurar e compilar a solution
-
-```powershell
-$env:DOTNET_CLI_HOME='c:\Users\masuc\Desktop\PensarNoNome\.dotnet'
-$env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE='1'
-dotnet restore Farol.sln
-dotnet build Farol.sln --no-restore -c Release -m:1 -v minimal
-```
-
-### 3. Aplicar migrations manualmente, se necessario
-
-Em desenvolvimento, `appsettings.Development.json` esta com `Database:MigrateOnStartup=true`, mas o comando abaixo continua sendo o caminho explicito e seguro quando for necessario controlar a atualizacao:
-
-```powershell
-& "$env:USERPROFILE\.dotnet\tools\dotnet-ef.exe" database update `
-  --project src/Farol.Infrastructure/Farol.Infrastructure.csproj `
-  --startup-project src/Farol.Api `
-  --context FarolDbContext `
-  --no-build
-```
-
-### 4. Rodar a API
-
-```powershell
-dotnet run --project src/Farol.Api/Farol.Api.csproj -c Release --no-build
-```
-
-Endpoints uteis:
-
-- Swagger: `http://localhost:5258/swagger`
-- Health: `http://localhost:5258/health`
-
-### 5. Rodar testes do backend
-
-```powershell
-dotnet test tests/Farol.Tests/Farol.Tests.csproj --no-build -c Release -m:1 -v minimal
-```
-
-## Como rodar o servico Python
-
-No diretorio `services/farol_intelligence`:
-
-```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-python -m pip install -e .
-$env:FAROL_ENVIRONMENT='Development'
-$env:FAROL_INTERNAL_API_KEY='dev-internal-key'
-python -m uvicorn app.main:app --reload --port 8000
-```
-
-Endpoints uteis:
-
-- Health: `http://127.0.0.1:8000/health`
-- Analise: `POST http://127.0.0.1:8000/analyze/v1`
-
-Para rodar testes:
-
-```powershell
+```bash
+cd services/farol_intelligence
 python -m unittest discover tests
 ```
 
-## Fluxo basico de desenvolvimento
+## API and product documentation
 
-### Quando a tarefa for de frontend
+- [Documentation index](docs/README.md)
+- [Architecture](docs/architecture.md)
+- [Authentication and password recovery](README_AUTH.md)
+- [Community budgets](README_COMMUNITY_BUDGETS.md)
+- [Frontend workspace](web/README.md)
+- [Intelligence service](services/farol_intelligence/README.md)
+- [Deployment guide](docs/deployment/vercel-render-beta.md)
 
-1. Trabalhe em `web/`
-2. Aponte `NEXT_PUBLIC_API_BASE_URL` para a API correta
-3. Rode `npm run lint`, `npm run test` e `npm run build`
-4. Nao altere backend ou servico Python sem necessidade explicita
+## Roadmap
 
-### Quando a tarefa for de backend
+- Improve observability and production operations
+- Expand automated security and integration testing
+- Refine the community budget moderation workflow
+- Evolve receipt processing behind stable service contracts
+- Add end-to-end browser coverage for critical user journeys
 
-1. Trabalhe em `src/` e `tests/`
-2. Suba o banco local
-3. Rode restore, build e testes .NET
-4. Nao altere `web/` nem o servico Python sem contrato explicito
+## Contributing
 
-### Quando a tarefa for do servico Python
+Issues and pull requests are welcome. Keep changes within the existing component boundaries, include tests for behavioral changes, and never commit credentials or personal financial data. See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow.
 
-1. Trabalhe em `services/farol_intelligence/`
-2. Valide o contrato HTTP consumido pelo backend
-3. Rode os testes Python existentes
-4. Nao altere frontend ou backend sem motivo de integracao formal
+## License
 
-## Fluxo recomendado para rodar tudo localmente
-
-1. `docker compose up -d`
-2. Subir a API .NET em `http://localhost:5258`
-3. Subir o servico Python em `http://127.0.0.1:8000`
-4. Subir o frontend em `http://localhost:3000`
-
-## Documentacao adicional
-
-- [`agents.md`](agents.md): governanca e escopo dos agentes
-- [`web/README.md`](web/README.md): documentacao do frontend
-- [`README_COMMUNITY_BUDGETS.md`](README_COMMUNITY_BUDGETS.md): API backend de orcamentos da comunidade
-- [`services/farol_intelligence/README.md`](services/farol_intelligence/README.md): documentacao do servico Python
-- [`docs/demo-scenarios.md`](docs/demo-scenarios.md): usuarios de demonstracao local
-- [`docs/deployment/vercel-render-beta.md`](docs/deployment/vercel-render-beta.md): deploy beta
-- [`docs/product-decisions/issue-37-payment-trail-modeling.md`](docs/product-decisions/issue-37-payment-trail-modeling.md)
-- [`docs/product-decisions/issue-38-natural-language-assistant-phase-1.md`](docs/product-decisions/issue-38-natural-language-assistant-phase-1.md)
-
-## Observacoes importantes
-
-- o frontend mantem access token apenas em memoria
-- o refresh token e enviado por cookie `HttpOnly`
-- o backend local aceita `http://localhost:3000` e `http://localhost:3001` no CORS atual
-- o servico Python e consumido pelo backend, nao diretamente pelo navegador
+Farol is available under the [MIT License](LICENSE).

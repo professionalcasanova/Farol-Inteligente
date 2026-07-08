@@ -5,10 +5,26 @@
 
 # dotenv files
 .env
+**/.env*
+!**/.env.example
+!**/.env.*.example
+.envrc
+.direnv/
 .dotnet/.dotnet/
+.dotnet/.templateengine/
 .dotnet/.dotnet/TelemetryStorageService/
 .dotnet/.dotnet/toolResolverCache/
 NuGet.Config.local
+
+# Local databases, exports, and private key material
+*.db
+*.sqlite
+*.sqlite3
+*.bak
+*.dump
+*.pem
+*.pfx
+*.key
 
 # User-specific files
 *.rsuser

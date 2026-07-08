@@ -10,8 +10,8 @@ applyTo: ["web/**/*.{ts,tsx,js,jsx}"]
 - Use feature-driven organization
 
 ### Authentication
-- Client-side with localStorage (temporary MVP design)
-- Not persistent on page reload; no refresh tokens
+- Access tokens remain only in memory
+- Refresh tokens use a `Secure`, `HttpOnly`, `SameSite=Lax` cookie
 - API calls use centralized client in [lib/api.ts](web/lib/api.ts)
 
 ### TypeScript

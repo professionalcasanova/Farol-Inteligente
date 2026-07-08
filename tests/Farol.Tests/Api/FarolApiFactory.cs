@@ -26,6 +26,8 @@ public sealed class FarolApiFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
+        builder.UseSetting("ConnectionStrings:DefaultConnection", "Host=localhost;Database=farol_tests");
+        builder.UseSetting("Jwt:SigningKey", "farol-test-signing-key-1234567890");
 
         builder.ConfigureServices(services =>
         {

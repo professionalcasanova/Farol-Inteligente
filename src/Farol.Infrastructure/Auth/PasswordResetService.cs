@@ -37,16 +37,17 @@ public sealed class PasswordResetService(
             activeToken.MarkAsUsed();
         }
 
+        var tokenForEmail = GenerateToken();
         var resetToken = new PasswordResetToken(
             user.Id,
-            GenerateToken(),
+            HashToken(tokenForEmail),
             timeProvider.GetUtcNow().Add(TimeSpan.FromMinutes(emailOptions.Value.ResetTokenMinutes)));
 
         dbContext.PasswordResetTokens.Add(resetToken);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         var emailResult = await emailService.SendAsync(
-            passwordResetEmailTemplate.Build(user.Email, user.Name, resetToken.Token),
+            passwordResetEmailTemplate.Build(user.Email, user.Name, tokenForEmail),
             cancellationToken);
 
         if (!emailResult.Succeeded)
@@ -75,8 +76,9 @@ public sealed class PasswordResetService(
             return PasswordResetResult.InvalidToken;
         }
 
+        var tokenHash = HashToken(token.Trim());
         var resetToken = await dbContext.PasswordResetTokens
-            .SingleOrDefaultAsync(candidate => candidate.Token == token.Trim(), cancellationToken);
+            .SingleOrDefaultAsync(candidate => candidate.Token == tokenHash, cancellationToken);
 
         if (resetToken is null || resetToken.Used || resetToken.IsExpired(timeProvider))
         {
@@ -111,6 +113,15 @@ public sealed class PasswordResetService(
             siblingToken.MarkAsUsed();
         }
 
+        var activeSessions = await dbContext.RefreshTokens
+            .Where(candidate => candidate.UserId == user.Id && !candidate.Revoked)
+            .ToListAsync(cancellationToken);
+
+        foreach (var activeSession in activeSessions)
+        {
+            activeSession.Revoke();
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
 
         AuthenticationSecurityLogger.LogPasswordResetCompleted(
@@ -129,6 +140,11 @@ public sealed class PasswordResetService(
     private static string GenerateToken()
     {
         return Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+    }
+
+    private static string HashToken(string token)
+    {
+        return Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(token)));
     }
 }
 

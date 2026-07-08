@@ -36,8 +36,9 @@ public sealed class PasswordResetServiceTests
         await service.RequestPasswordResetAsync("maria@email.com", CancellationToken.None);
 
         var resetToken = await dbContext.PasswordResetTokens.SingleAsync();
+        var rawToken = ExtractResetToken(emailService.Messages.Single().TextBody);
 
-        await service.ResetPasswordAsync(resetToken.Token, "Password456", CancellationToken.None);
+        await service.ResetPasswordAsync(rawToken, "Password456", CancellationToken.None);
 
         var loggedContent = string.Join(Environment.NewLine, logger.Messages);
 
@@ -47,10 +48,20 @@ public sealed class PasswordResetServiceTests
         Assert.Contains(user.Id.ToString(), loggedContent, StringComparison.Ordinal);
         Assert.Contains("2026-04-29T10:30:00.0000000+00:00", loggedContent, StringComparison.Ordinal);
         Assert.Single(emailService.Messages);
+        Assert.DoesNotContain(resetToken.Token, emailService.Messages.Single().TextBody, StringComparison.Ordinal);
         Assert.DoesNotContain(resetToken.Token, loggedContent, StringComparison.Ordinal);
         Assert.DoesNotContain("Password123", loggedContent, StringComparison.Ordinal);
         Assert.DoesNotContain("Password456", loggedContent, StringComparison.Ordinal);
         Assert.DoesNotContain("maria@email.com", loggedContent, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string ExtractResetToken(string textBody)
+    {
+        const string marker = "?token=";
+        var start = textBody.IndexOf(marker, StringComparison.Ordinal) + marker.Length;
+        var end = textBody.IndexOfAny(['\r', '\n', ' '], start);
+        var encodedToken = end < 0 ? textBody[start..] : textBody[start..end];
+        return Uri.UnescapeDataString(encodedToken);
     }
 
     private static FarolDbContext CreateDbContext()

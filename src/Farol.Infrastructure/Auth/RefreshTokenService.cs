@@ -42,11 +42,10 @@ public sealed class RefreshTokenService(
             return RefreshSessionResult.Invalid();
         }
 
-        var trimmedToken = refreshTokenValue.Trim();
-        var hashedToken = HashToken(trimmedToken);
+        var hashedToken = HashToken(refreshTokenValue.Trim());
         var refreshToken = await dbContext.RefreshTokens
             .SingleOrDefaultAsync(
-                token => token.Token == hashedToken || token.Token == trimmedToken,
+                token => token.Token == hashedToken,
                 cancellationToken);
 
         if (refreshToken is null)
@@ -101,11 +100,10 @@ public sealed class RefreshTokenService(
             return;
         }
 
-        var trimmedToken = refreshTokenValue.Trim();
-        var hashedToken = HashToken(trimmedToken);
+        var hashedToken = HashToken(refreshTokenValue.Trim());
         var refreshToken = await dbContext.RefreshTokens
             .SingleOrDefaultAsync(
-                token => token.Token == hashedToken || token.Token == trimmedToken,
+                token => token.Token == hashedToken,
                 cancellationToken);
 
         if (refreshToken is null || refreshToken.Revoked)
@@ -164,6 +162,11 @@ public sealed class RefreshTokenService(
         }
 
         return true;
+    }
+
+    public Task RevokeAllSessionsAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        return RevokeActiveTokensAsync(userId, cancellationToken);
     }
 
     private async Task RevokeActiveTokensAsync(Guid userId, CancellationToken cancellationToken)

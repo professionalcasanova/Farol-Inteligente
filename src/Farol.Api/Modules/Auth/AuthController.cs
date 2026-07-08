@@ -296,6 +296,7 @@ public sealed class AuthController(
 
         user.ChangePasswordHash(passwordService.HashPassword(user, request.NewPassword));
         await dbContext.SaveChangesAsync(cancellationToken);
+        await refreshTokenService.RevokeAllSessionsAsync(user.Id, cancellationToken);
 
         return Ok(new SuccessResponse<object>(new
         {
