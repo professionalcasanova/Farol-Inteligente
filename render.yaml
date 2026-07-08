@@ -9,7 +9,7 @@ services:
     runtime: docker
     dockerContext: .
     dockerfilePath: ./services/farol_intelligence/Dockerfile
-    autoDeploy: true
+    autoDeployTrigger: off
     envVars:
       - key: FAROL_ENVIRONMENT
         value: Production
@@ -21,7 +21,7 @@ services:
     runtime: docker
     dockerContext: .
     dockerfilePath: ./src/Farol.Api/Dockerfile
-    autoDeploy: true
+    autoDeployTrigger: off
     healthCheckPath: /health
     envVars:
       - key: ASPNETCORE_ENVIRONMENT

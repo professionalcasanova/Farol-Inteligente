@@ -93,6 +93,12 @@ NEXT_PUBLIC_API_BASE_URL=https://sua-api.onrender.com
 
 Depois copie a URL do Vercel.
 
+### Deploy manual
+
+O arquivo `web/vercel.json` mantém os deploys automáticos por Git desativados. Para publicar uma versão, use `Create Deployment` no painel do Vercel ou execute o Vercel CLI explicitamente.
+
+No Render, os serviços definidos em `render.yaml` usam `autoDeployTrigger: off`. Novas versões devem ser publicadas manualmente no painel do serviço.
+
 ## Passo 3. Fechar o circuito entre web e API
 
 Volte no Render, abra o servico `farol-api` e ajuste:
