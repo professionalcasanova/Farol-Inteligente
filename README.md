@@ -189,6 +189,8 @@ python -m unittest discover tests
 - [Frontend workspace](web/README.md)
 - [Intelligence service](services/farol_intelligence/README.md)
 - [Deployment guide](docs/deployment/vercel-render-beta.md)
+- [Changelog](CHANGELOG.md)
+- [Support](SUPPORT.md)
 
 ## Roadmap
 
