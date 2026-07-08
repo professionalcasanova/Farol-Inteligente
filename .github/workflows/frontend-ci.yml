@@ -4,17 +4,9 @@ on:
   pull_request:
     branches:
       - dev
-      - master
-    paths:
-      - "web/**"
-      - ".github/workflows/frontend-ci.yml"
   push:
     branches:
       - dev
-      - master
-    paths:
-      - "web/**"
-      - ".github/workflows/frontend-ci.yml"
   workflow_dispatch:
 
 permissions:

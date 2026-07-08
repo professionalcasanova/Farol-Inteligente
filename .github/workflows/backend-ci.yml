@@ -4,33 +4,9 @@ on:
   pull_request:
     branches:
       - dev
-      - master
-    paths:
-      - "src/**"
-      - "tests/**"
-      - "scripts/validate-nuget-config.ps1"
-      - "Farol.sln"
-      - "NuGet.Config"
-      - "dotnet-tools.json"
-      - "docker-compose.yml"
-      - ".dockerignore"
-      - "render.yaml"
-      - ".github/workflows/backend-ci.yml"
   push:
     branches:
       - dev
-      - master
-    paths:
-      - "src/**"
-      - "tests/**"
-      - "scripts/validate-nuget-config.ps1"
-      - "Farol.sln"
-      - "NuGet.Config"
-      - "dotnet-tools.json"
-      - "docker-compose.yml"
-      - ".dockerignore"
-      - "render.yaml"
-      - ".github/workflows/backend-ci.yml"
   workflow_dispatch:
 
 permissions:
