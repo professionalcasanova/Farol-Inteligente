@@ -6,7 +6,7 @@ Do not disclose vulnerabilities in public issues.
 
 Use GitHub's private vulnerability reporting at:
 
-`https://github.com/professionalcasanova/PensarNoNome/security/advisories/new`
+`https://github.com/professionalcasanova/Farol-Inteligente/security/advisories/new`
 
 Include the affected component, reproduction steps, impact, and any suggested mitigation.
 Please allow reasonable time for investigation and remediation before public disclosure.

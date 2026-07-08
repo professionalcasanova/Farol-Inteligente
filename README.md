@@ -1,8 +1,8 @@
 # Farol
 
-[![Backend CI](https://github.com/professionalcasanova/PensarNoNome/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/professionalcasanova/PensarNoNome/actions/workflows/backend-ci.yml)
-[![Frontend CI](https://github.com/professionalcasanova/PensarNoNome/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/professionalcasanova/PensarNoNome/actions/workflows/frontend-ci.yml)
-[![Python Service CI](https://github.com/professionalcasanova/PensarNoNome/actions/workflows/python-service-ci.yml/badge.svg)](https://github.com/professionalcasanova/PensarNoNome/actions/workflows/python-service-ci.yml)
+[![Backend CI](https://github.com/professionalcasanova/Farol-Inteligente/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/professionalcasanova/Farol-Inteligente/actions/workflows/backend-ci.yml)
+[![Frontend CI](https://github.com/professionalcasanova/Farol-Inteligente/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/professionalcasanova/Farol-Inteligente/actions/workflows/frontend-ci.yml)
+[![Python Service CI](https://github.com/professionalcasanova/Farol-Inteligente/actions/workflows/python-service-ci.yml/badge.svg)](https://github.com/professionalcasanova/Farol-Inteligente/actions/workflows/python-service-ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Farol is an open-source personal finance platform designed around the realities of Brazilian households. It brings accounts, transactions, budgets, recurring bills, CSV imports, and monthly financial guidance into a single application.
@@ -95,8 +95,8 @@ Farol.sln
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/professionalcasanova/PensarNoNome.git
-cd PensarNoNome
+git clone https://github.com/professionalcasanova/Farol-Inteligente.git
+cd Farol-Inteligente
 ```
 
 ### 2. Start PostgreSQL

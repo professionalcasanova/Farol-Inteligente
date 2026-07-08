@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 
 $OWNER = 'professionalcasanova'
-$REPO = 'PensarNoNome'
+$REPO = 'Farol-Inteligente'
 $PROJECT_NUMBER = '1'
 
 $ASSIGNEE = '@me'

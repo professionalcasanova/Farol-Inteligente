@@ -4,7 +4,7 @@ $ErrorActionPreference = 'Stop'
 # CONFIGURE THESE VALUES
 # -----------------------------
 $OWNER = 'professionalcasanova'
-$REPO = 'PensarNoNome'
+$REPO = 'Farol-Inteligente'
 $PROJECT_NUMBER = '1'
 
 # Optional defaults
